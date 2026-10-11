@@ -1,98 +1,115 @@
-﻿// COPYRIGHT 2012, 2014 by the Open Rails project.
-// 
+// COPYRIGHT 2012, 2014 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
-using System.Drawing;
-using System.Windows.Forms;
-
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using ORTS.Common.Input;
 
 namespace Menu
 {
     /// <summary>
-    /// A control for viewing and altering keyboard input settings, in combination with <see cref="KeyInputEditControl"/>.
+    /// A control for viewing and altering RailDriver button assignments.
     /// </summary>
     /// <remarks>
-    /// <para>This control will modify the <see cref="UserCommandInput"/> it is given (but not the default input).</para>
-    /// <para>The control displays the currently assigtned keyboard shortcut and highlights the text if it is not the default. Clicking on the text invokes the editing behaviour via <see cref="KeyInputEditControl"/>.</para>
+    /// <para>The control displays the currently assigned button and highlights the text if it is not the default.
+    /// Clicking on the text starts reading the RailDriver: pressing one of its buttons assigns it, Backspace removes the assignment.</para>
     /// </remarks>
-    public partial class RDButtonInputControl : UserControl
+    public class RDButtonInputControl : UserControl
     {
         public byte UserButton { get; private set; }
         public byte DefaultButton { get; private set; }
+        public UserCommand Command { get; }
 
         private static RailDriverDevice railDriver;
         private static byte[] readBuffer;
-        private static byte[] buttonData = new byte[8];
+        private static readonly byte[] buttonData = new byte[8];
 
-        private static bool edit;
+        private static RDButtonInputControl editing;
 
-        public RDButtonInputControl(byte userButton, byte defaultButton, RailDriverDevice railDriver)
+        readonly TextBox textBox;
+        readonly StackPanel editButtons;
+
+        static readonly IBrush ChangedBackground = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+
+        public RDButtonInputControl(UserCommand command, byte userButton, byte defaultButton, RailDriverDevice device)
         {
-            InitializeComponent();
-            if (RDButtonInputControl.railDriver == null)
-                RDButtonInputControl.railDriver = railDriver;
-            if (null == readBuffer)
+            Command = command;
+            if (railDriver == null && device != null && device.Enabled)
+                railDriver = device;
+            if (null == readBuffer && railDriver != null)
                 readBuffer = railDriver.GetReadBuffer();
             UserButton = userButton;
             DefaultButton = defaultButton;
 
+            textBox = new TextBox { IsReadOnly = true, MinHeight = 24, Padding = new Thickness(4, 2), VerticalContentAlignment = VerticalAlignment.Center };
+            ToolTip.SetTip(textBox, Localization.GetString("Press any RailDriver button to Assign. Press Backspace to remove an assignment."));
+            textBox.GotFocus += TextBox_Enter;
+            textBox.AddHandler(KeyDownEvent, TextBox_KeyPress, RoutingStrategies.Tunnel);
+
+            editButtons = new StackPanel { Orientation = Orientation.Horizontal, IsVisible = false, Margin = new Thickness(2, 0, 0, 0) };
+            editButtons.Children.Add(CreateEditButton("✔", "Accept changes", ButtonOK_Click));
+            editButtons.Children.Add(CreateEditButton("✘", "Cancel changes", ButtonCancel_Click));
+            editButtons.Children.Add(CreateEditButton("↺", "Reset to default", ButtonDefault_Click));
+
+            var panel = new DockPanel();
+            DockPanel.SetDock(editButtons, Dock.Right);
+            panel.Children.Add(editButtons);
+            panel.Children.Add(textBox);
+            Content = panel;
+
             UpdateText();
+        }
+
+        Button CreateEditButton(string text, string toolTip, EventHandler<RoutedEventArgs> click)
+        {
+            var button = new Button { Content = text, Width = 26, MinHeight = 24, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Center, Focusable = false };
+            ToolTip.SetTip(button, Localization.GetString(toolTip));
+            button.Click += click;
+            return button;
         }
 
         private void UpdateText()
         {
-            textBox.Text = UserButton == byte.MaxValue ? string.Empty: UserButton.ToString();
+            textBox.Text = UserButton == byte.MaxValue ? string.Empty : UserButton.ToString();
             if (UserButton == DefaultButton)
             {
-                textBox.BackColor = SystemColors.Window;
-                textBox.ForeColor = SystemColors.WindowText;
+                textBox.ClearValue(BackgroundProperty);
+                textBox.ClearValue(ForegroundProperty);
             }
             else
             {
-                textBox.BackColor = SystemColors.Highlight;
-                textBox.ForeColor = SystemColors.HighlightText;
+                textBox.Background = ChangedBackground;
+                textBox.Foreground = Brushes.White;
             }
-        }
-
-        private void EnableEditButtons(bool enable)
-        {
-            edit = enable;
-            if (enable)
-            {
-                buttonOK.Click += ButtonOK_Click;
-                buttonCancel.Click += ButtonCancel_Click;
-                buttonDefault.Click += ButtonDefault_Click;
-            }
-            else
-            {
-                buttonOK.Click -= ButtonOK_Click;
-                buttonCancel.Click -= ButtonCancel_Click;
-                buttonDefault.Click -= ButtonDefault_Click;
-            }
-            buttonCancel.Visible = enable;
-            buttonOK.Visible = enable;
-            buttonDefault.Visible = enable;
         }
 
         private async void TextBox_Enter(object sender, EventArgs e)
         {
-            EnableEditButtons(true);
-            while (edit)
+            if (railDriver == null || editing == this)
+                return;
+            editing?.ButtonClick();
+            editing = this;
+            editButtons.IsVisible = true;
+            while (editing == this)
             {
                 railDriver.ReadCurrentData(ref readBuffer);
                 sbyte data = ValidateButtonIndex();
@@ -102,10 +119,10 @@ namespace Menu
                     railDriver.SetLedsNumeric((byte)data);
                 }
                 await System.Threading.Tasks.Task.Delay(100);
-            }                
+            }
         }
 
-        private sbyte ValidateButtonIndex()
+        private static sbyte ValidateButtonIndex()
         {
             if (readBuffer.Length > 0)
             {
@@ -126,13 +143,7 @@ namespace Menu
             return -1;
         }
 
-        private void TextBox_Leave(object sender, EventArgs e)
-        {
-            if (edit)
-                textBox.Focus();
-        }
-
-        private void ButtonOK_Click(object sender, EventArgs e)
+        private void ButtonOK_Click(object sender, RoutedEventArgs e)
         {
             if (byte.TryParse(textBox.Text, out byte result))
                 UserButton = result;
@@ -140,12 +151,13 @@ namespace Menu
                 UserButton = 255;
             ButtonClick();
         }
-        private void ButtonCancel_Click(object sender, EventArgs e)
+
+        private void ButtonCancel_Click(object sender, RoutedEventArgs e)
         {
             ButtonClick();
         }
 
-        private void ButtonDefault_Click(object sender, EventArgs e)
+        private void ButtonDefault_Click(object sender, RoutedEventArgs e)
         {
             UserButton = DefaultButton;
             ButtonClick();
@@ -153,19 +165,20 @@ namespace Menu
 
         private void ButtonClick()
         {
-            EnableEditButtons(false);
+            if (editing == this)
+                editing = null;
+            editButtons.IsVisible = false;
             railDriver?.ClearDisplay();
             UpdateText();
-            Parent.Focus();
         }
 
-        private void TextBox_KeyPress(object sender, KeyPressEventArgs e)
+        private void TextBox_KeyPress(object sender, KeyEventArgs e)
         {
-            if (e.KeyChar == (char)8)   //Backspace
+            if (e.Key == Key.Back && editing == this)
             {
                 textBox.Text = string.Empty;
+                e.Handled = true;
             }
         }
-
     }
 }

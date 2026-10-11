@@ -13,6 +13,8 @@
     <Product>Open Rails</Product>
     <Copyright>Copyright © 2009 - 2022</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <!-- The launcher checks the Windows prerequisites and starts Menu.exe; on Linux and macOS run Program/Menu directly. -->
+    <OrtsWindowsOnly>true</OrtsWindowsOnly>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <DocumentationFile>..\..\Program\OpenRails.xml</DocumentationFile>

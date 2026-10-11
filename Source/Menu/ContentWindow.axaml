@@ -1,0 +1,79 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.ContentWindow"
+        Title="{l:Tr Content}"
+        Width="760" Height="580" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid Margin="10" RowDefinitions="*,Auto">
+    <TabControl x:Name="tabControlContent" Grid.Row="0">
+      <TabItem x:Name="tabPageAutoInstall" Header="{l:Tr 'Auto Installed'}">
+        <Grid RowDefinitions="*,Auto,Auto,Auto" ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+          <DataGrid x:Name="dataGridViewAutoInstall" Grid.Row="0" Grid.ColumnSpan="2" IsReadOnly="True" SelectionMode="Single"
+                    CanUserSortColumns="True" CanUserResizeColumns="True" GridLinesVisibility="All" HeadersVisibility="Column"
+                    BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="{l:Tr Route}" Binding="{ReflectionBinding Route}" />
+              <DataGridTextColumn Header="{l:Tr Installed}" Binding="{ReflectionBinding Installed}" />
+              <DataGridTextColumn Header="{l:Tr Url}" Binding="{ReflectionBinding Url}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <TextBox x:Name="textBoxAutoInstallRoute" Grid.Row="1" Grid.Column="0" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                   Height="110" Margin="0,6,6,0" VerticalContentAlignment="Top" />
+          <Border Grid.Row="1" Grid.Column="1" Width="130" Height="110" Margin="0,6,0,0" BorderThickness="1"
+                  BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <Image x:Name="pictureBoxAutoInstallRoute" Stretch="Uniform" />
+          </Border>
+          <DockPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,6,0,0">
+            <TextBlock Text="{l:Tr 'Install Path:'}" VerticalAlignment="Center" Margin="0,0,6,0" DockPanel.Dock="Left" />
+            <Button x:Name="buttonAutoInstallBrowse" Content="{l:Tr 'Browse...'}" DockPanel.Dock="Right" Margin="6,0,0,0" />
+            <TextBox x:Name="textBoxAutoInstallPath" />
+          </DockPanel>
+          <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+            <StackPanel.Styles>
+              <Style Selector="Button">
+                <Setter Property="MinWidth" Value="80" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+              </Style>
+            </StackPanel.Styles>
+            <Button x:Name="buttonAutoInstallInfo" Content="{l:Tr Info}" />
+            <Button x:Name="buttonAutoInstallInstall" Content="{l:Tr Install}" IsEnabled="False" />
+            <Button x:Name="buttonAutoInstallUpdate" Content="{l:Tr Update}" />
+            <Button x:Name="buttonAutoInstallDelete" Content="{l:Tr Delete}" IsEnabled="False" />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+      <TabItem x:Name="tabPageManuallyInstall" Header="{l:Tr 'Manually Installed'}">
+        <Grid RowDefinitions="*,Auto,Auto" ColumnDefinitions="Auto,*" Margin="0,6,0,0">
+          <DataGrid x:Name="dataGridViewManualInstall" Grid.Row="0" Grid.ColumnSpan="2" IsReadOnly="True" SelectionMode="Single"
+                    CanUserSortColumns="True" CanUserResizeColumns="True" GridLinesVisibility="All" HeadersVisibility="Column"
+                    BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="{l:Tr Route}" Binding="{ReflectionBinding Route}" />
+              <DataGridTextColumn Header="{l:Tr Path}" Binding="{ReflectionBinding Path}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Spacing="6" Margin="0,8,8,0" VerticalAlignment="Top">
+            <Button x:Name="buttonManualInstallAdd" Content="{l:Tr 'Add...'}" MinWidth="80" HorizontalContentAlignment="Center" />
+            <Button x:Name="buttonManualInstallDelete" Content="{l:Tr Delete}" MinWidth="80" HorizontalContentAlignment="Center" />
+          </StackPanel>
+          <HeaderedContentControl Grid.Row="1" Grid.Column="1" Classes="group" Header="{l:Tr 'Installation profile'}">
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr 'Route:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="textBoxManualInstallRoute" Margin="0,2" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr 'Path:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox Grid.Row="1" Grid.Column="1" x:Name="textBoxManualInstallPath" Margin="0,2" />
+              <Button Grid.Row="1" Grid.Column="2" x:Name="buttonManualInstallBrowse" Content="{l:Tr 'Browse...'}" Margin="6,2,0,2" />
+            </Grid>
+          </HeaderedContentControl>
+        </Grid>
+      </TabItem>
+    </TabControl>
+    <Image x:Name="pbContent" Grid.Row="0" Classes="help" Source="avares://Menu/Resources/info-18.png"
+           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,4,0" ToolTip.Tip="{l:Tr Help}" />
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6" Margin="0,8,0,0">
+      <Button x:Name="buttonCancel" Content="{l:Tr Cancel}" MinWidth="80" HorizontalContentAlignment="Center" />
+      <Button x:Name="buttonOK" Content="{l:Tr OK}" MinWidth="80" HorizontalContentAlignment="Center" />
+    </StackPanel>
+  </Grid>
+</Window>

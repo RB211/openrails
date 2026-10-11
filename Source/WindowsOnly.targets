@@ -1,0 +1,9 @@
+<Project>
+  <!-- Imported (by Directory.Build.targets) only for Windows-only projects built on another platform: skip them. -->
+  <Target Name="Build">
+    <Message Importance="high" Text="$(MSBuildProjectName): skipped, this project is only built on Windows." />
+  </Target>
+  <Target Name="Rebuild" DependsOnTargets="Build" />
+  <Target Name="Publish" DependsOnTargets="Build" />
+  <Target Name="Pack" DependsOnTargets="Build" />
+</Project>

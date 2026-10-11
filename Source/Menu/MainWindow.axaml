@@ -1,0 +1,150 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.MainWindow"
+        Title="Open Rails"
+        Width="900" Height="620" MinWidth="760" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+  <Grid Margin="10" RowDefinitions="*,Auto" ColumnDefinitions="300,*">
+
+    <!-- Selection of content and mode -->
+    <ScrollViewer Grid.Row="0" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,10,0">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{l:Tr 'Installation profile:'}" />
+        <ComboBox x:Name="comboBoxFolder" HorizontalAlignment="Stretch" />
+        <TextBlock Text="{l:Tr 'Route:'}" Margin="0,6,0,0" />
+        <ComboBox x:Name="comboBoxRoute" HorizontalAlignment="Stretch" />
+        <TextBlock Text="{l:Tr 'Mode:'}" Margin="0,6,0,0" />
+        <Grid ColumnDefinitions="*,*">
+          <RadioButton x:Name="radioButtonModeActivity" GroupName="Mode" Content="{l:Tr Activity}" IsChecked="True" />
+          <RadioButton x:Name="radioButtonModeTimetable" Grid.Column="1" GroupName="Mode" Content="{l:Tr Timetable}" />
+        </Grid>
+
+        <Panel>
+          <StackPanel x:Name="panelModeActivity" Spacing="2">
+            <TextBlock Text="{l:Tr 'Activity:'}" />
+            <ComboBox x:Name="comboBoxActivity" HorizontalAlignment="Stretch" />
+            <TextBlock Text="{l:Tr 'Locomotive:'}" Margin="0,4,0,0" />
+            <ComboBox x:Name="comboBoxLocomotive" HorizontalAlignment="Stretch" />
+            <TextBlock Text="{l:Tr 'Consist:'}" Margin="0,4,0,0" />
+            <ComboBox x:Name="comboBoxConsist" HorizontalAlignment="Stretch" />
+            <TextBlock Text="{l:Tr 'Starting at:'}" Margin="0,4,0,0" />
+            <ComboBox x:Name="comboBoxStartAt" HorizontalAlignment="Stretch" />
+            <TextBlock Text="{l:Tr 'Heading to:'}" Margin="0,4,0,0" />
+            <ComboBox x:Name="comboBoxHeadTo" HorizontalAlignment="Stretch" />
+            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,8,0,0">
+              <Grid.Styles>
+                <Style Selector="TextBlock">
+                  <Setter Property="VerticalAlignment" Value="Center" />
+                  <Setter Property="Margin" Value="0,0,6,0" />
+                </Style>
+                <Style Selector="ComboBox">
+                  <Setter Property="HorizontalAlignment" Value="Stretch" />
+                  <Setter Property="Margin" Value="0,2,8,2" />
+                </Style>
+              </Grid.Styles>
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="{l:Tr 'Time:'}" />
+              <ComboBox Grid.Row="0" Grid.Column="1" x:Name="comboBoxStartTime" />
+              <TextBlock Grid.Row="0" Grid.Column="2" Text="{l:Tr 'Duration:'}" />
+              <ComboBox Grid.Row="0" Grid.Column="3" x:Name="comboBoxDuration" IsEnabled="False" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr 'Season:'}" />
+              <ComboBox Grid.Row="1" Grid.Column="1" x:Name="comboBoxStartSeason" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{l:Tr 'Difficulty:'}" />
+              <ComboBox Grid.Row="1" Grid.Column="3" x:Name="comboBoxDifficulty" IsEnabled="False" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="{l:Tr 'Weather:'}" />
+              <ComboBox Grid.Row="2" Grid.Column="1" x:Name="comboBoxStartWeather" />
+            </Grid>
+          </StackPanel>
+
+          <StackPanel x:Name="panelModeTimetable" Spacing="2" IsVisible="False">
+            <TextBlock Text="{l:Tr 'Timetable set:'}" />
+            <ComboBox x:Name="comboBoxTimetableSet" HorizontalAlignment="Stretch" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,6,0,0">
+              <Grid.Styles>
+                <Style Selector="TextBlock">
+                  <Setter Property="VerticalAlignment" Value="Center" />
+                  <Setter Property="Margin" Value="0,0,8,0" />
+                </Style>
+                <Style Selector="ComboBox">
+                  <Setter Property="HorizontalAlignment" Value="Stretch" />
+                  <Setter Property="Margin" Value="0,2" />
+                </Style>
+              </Grid.Styles>
+              <TextBlock Grid.Row="0" Text="{l:Tr 'Timetable:'}" />
+              <ComboBox Grid.Row="0" Grid.Column="1" x:Name="comboBoxTimetable" />
+              <TextBlock Grid.Row="1" Text="{l:Tr 'Train:'}" />
+              <ComboBox Grid.Row="1" Grid.Column="1" x:Name="comboBoxTimetableTrain" />
+              <TextBlock Grid.Row="2" Text="{l:Tr 'Day:'}" />
+              <ComboBox Grid.Row="2" Grid.Column="1" x:Name="comboBoxTimetableDay" HorizontalAlignment="Left" MinWidth="120" />
+              <TextBlock Grid.Row="3" Text="{l:Tr 'Season:'}" />
+              <ComboBox Grid.Row="3" Grid.Column="1" x:Name="comboBoxTimetableSeason" HorizontalAlignment="Left" MinWidth="120" />
+              <TextBlock Grid.Row="4" Text="{l:Tr 'Weather:'}" />
+              <ComboBox Grid.Row="4" Grid.Column="1" x:Name="comboBoxTimetableWeather" HorizontalAlignment="Left" MinWidth="120" />
+              <TextBlock Grid.Row="5" Text="{l:Tr 'Weather File:'}" />
+              <ComboBox Grid.Row="5" Grid.Column="1" x:Name="comboBoxTimetableWeatherFile" />
+            </Grid>
+          </StackPanel>
+        </Panel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Details of the selection, or the notifications -->
+    <Grid Grid.Row="0" Grid.Column="1">
+      <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" Margin="0,18,0,0">
+        <ScrollViewer x:Name="scrollDetails" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel x:Name="panelDetails" Margin="6,4,6,4" />
+        </ScrollViewer>
+      </Border>
+      <Panel x:Name="panelNotificationIcon" HorizontalAlignment="Right" VerticalAlignment="Top" Width="37" Height="31" Margin="0,0,4,0" Cursor="Hand" Background="Transparent">
+        <Image x:Name="pbNotificationsNone" Source="avares://Menu/Resources/chat_icon_no_message_transparent.png" Stretch="None" />
+        <Image x:Name="pbNotificationsSome" Source="avares://Menu/Resources/chat_icon_new_message_transparent.png" Stretch="None" IsVisible="False" />
+        <TextBlock x:Name="lblNotificationCount" Text="1" FontSize="9" FontWeight="Bold" Foreground="White" IsVisible="False"
+                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,7,0" />
+      </Panel>
+    </Grid>
+
+    <!-- Buttons -->
+    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,10,0,0">
+      <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Spacing="10">
+        <Image Source="avares://Menu/Resources/OpenRailsLogo.png" Width="64" Height="64" />
+        <TextBlock x:Name="labelLogo" Text="Open Rails" FontSize="32" FontStyle="Italic" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <Grid Grid.Column="2" ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto" VerticalAlignment="Bottom" Margin="10,0">
+        <Grid.Styles>
+          <Style Selector="Button">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="2" />
+          </Style>
+        </Grid.Styles>
+        <Button Grid.Row="0" Grid.Column="0" x:Name="buttonDownloadContent" Content="{l:Tr Content}" MinWidth="110" />
+        <Button Grid.Row="1" Grid.Column="0" x:Name="buttonTools" Content="{l:Tr 'Tools ▼'}" />
+        <Button Grid.Row="2" Grid.Column="0" x:Name="buttonDocuments" Content="{l:Tr 'Documents ▼'}" />
+        <Button Grid.Row="0" Grid.Column="1" x:Name="buttonOptions" Content="{l:Tr Options}" MinWidth="90" />
+        <CheckBox Grid.Row="1" Grid.Column="1" x:Name="checkBoxWarnings" Content="{l:Tr Logging}" Margin="4,0" />
+      </Grid>
+
+      <HeaderedContentControl Grid.Column="3" Classes="group" Header="{l:Tr Singleplayer}" VerticalAlignment="Bottom" Margin="0,0,10,0">
+        <StackPanel Spacing="6">
+          <Button x:Name="buttonStart" Content="{l:Tr Start}" MinWidth="100" MinHeight="46" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" FontWeight="SemiBold" />
+          <Button x:Name="buttonResume" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+            <TextBlock Text="{l:Tr 'Resume/ Replay...'}" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="90" />
+          </Button>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Grid.Column="4" Classes="group" Header="{l:Tr Multiplayer}" VerticalAlignment="Bottom">
+        <Grid ColumnDefinitions="Auto,*,*" RowDefinitions="Auto,Auto,Auto,Auto" Width="270">
+          <TextBlock Grid.Row="0" Text="{l:Tr 'User name:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+          <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="textBoxMPUser" Margin="0,1" />
+          <TextBlock Grid.Row="1" Text="{l:Tr 'Host/port:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+          <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="textBoxMPHost" Margin="0,1" />
+          <RadioButton Grid.Row="2" Grid.Column="0" x:Name="radioButtonMPClient" GroupName="MP" Content="{l:Tr Client}" IsChecked="True" />
+          <RadioButton Grid.Row="3" Grid.Column="0" x:Name="radioButtonMPServer" GroupName="MP" Content="{l:Tr Server}" />
+          <Button Grid.Row="2" Grid.RowSpan="2" Grid.Column="1" x:Name="buttonStartMP" Content="{l:Tr 'Start MP'}" HorizontalAlignment="Stretch" VerticalAlignment="Center" HorizontalContentAlignment="Center" Margin="2,4" />
+          <Button Grid.Row="2" Grid.RowSpan="2" Grid.Column="2" x:Name="buttonResumeMP" Content="{l:Tr 'Resume MP'}" HorizontalAlignment="Stretch" VerticalAlignment="Center" HorizontalContentAlignment="Center" Margin="2,4" />
+        </Grid>
+      </HeaderedContentControl>
+    </Grid>
+  </Grid>
+</Window>

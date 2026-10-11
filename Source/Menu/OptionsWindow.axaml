@@ -1,0 +1,514 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.OptionsWindow"
+        Title="{l:Tr Options}"
+        Width="860" Height="620" MinWidth="760" MinHeight="520" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="StackPanel.row">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Margin" Value="0,2" />
+    </Style>
+    <Style Selector="StackPanel.row > TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+    </Style>
+    <Style Selector="StackPanel.row > ComboBox">
+      <Setter Property="MinWidth" Value="140" />
+    </Style>
+    <!-- Space taking the place of a help icon, to line up rows without one -->
+    <Style Selector="Border.noHelp">
+      <Setter Property="Width" Value="24" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinHeight" Value="32" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+  </Window.Styles>
+
+  <Grid Margin="10" RowDefinitions="*,Auto">
+    <TabControl x:Name="tabOptions" Grid.Row="0">
+
+      <!-- General -->
+      <TabItem x:Name="tabPageGeneral" Header="{l:Tr General}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+            <StackPanel Grid.Column="0">
+              <StackPanel Classes="row">
+                <Image x:Name="pbAlerter" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkAlerter" Content="{l:Tr 'Alerter in cab'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="44,0,0,0">
+                <CheckBox x:Name="checkAlerterExternal" Content="{l:Tr 'Also in external views'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbRetainers" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkRetainers" Content="{l:Tr 'Retainer valve on all cars'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbGraduatedRelease" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkGraduatedRelease" Content="{l:Tr 'Graduated release air brakes'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbBrakePipeChargingRate" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <NumericUpDown x:Name="numericBrakePipeChargingRate" Minimum="1" Maximum="1000" Increment="1" />
+                <TextBlock x:Name="lBrakePipeChargingRate" Text="{l:Tr 'Brake pipe charging rate (PSI/s)'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbPressureUnit" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <ComboBox x:Name="comboPressureUnit" />
+                <TextBlock x:Name="labelPressureUnit" Text="{l:Tr 'Pressure unit'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbOtherUnits" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <ComboBox x:Name="comboOtherUnits" />
+                <TextBlock x:Name="labelOtherUnits" Text="{l:Tr 'Other units'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbEnableTcsScripts" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkEnableTCSScripts" Content="{l:Tr 'Use TCS scripts'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbAutoSave" Classes="help" Source="avares://Menu/Resources/info-18.png" VerticalAlignment="Top" Margin="0,3,6,0" />
+                <CheckBox x:Name="checkAutoSaveActive" Content="{l:Tr 'Auto save'}" VerticalAlignment="Top" />
+                <TextBlock x:Name="labelAutoSaveInterval" Text="{l:Tr 'Interval :'}" VerticalAlignment="Top" Margin="16,3,6,0" />
+                <StackPanel>
+                  <RadioButton x:Name="ButtonAutoSave15" GroupName="AutoSave" Content="{l:Tr '15 mins'}" />
+                  <RadioButton x:Name="ButtonAutoSave30" GroupName="AutoSave" Content="{l:Tr '30 mins'}" />
+                  <RadioButton x:Name="ButtonAutoSave60" GroupName="AutoSave" Content="{l:Tr '60 mins'}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbTelemetry" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <Button x:Name="buttonTelemetry" Content="{l:Tr 'Telemetry Options'}" MinWidth="150" HorizontalContentAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+              <StackPanel Classes="row">
+                <Image x:Name="pbOverspeedMonitor" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkOverspeedMonitor" Content="{l:Tr 'Overspeed monitor'}" />
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Audio -->
+      <TabItem x:Name="tabPageAudio" Header="{l:Tr Audio}">
+        <StackPanel Margin="0,8,0,0">
+          <StackPanel Classes="row">
+            <Image x:Name="pbSoundVolumePercent" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+            <NumericUpDown x:Name="numericSoundVolumePercent" Minimum="10" Maximum="100" Increment="10" ToolTip.Tip="{l:Tr 'Sound Volume 0-100'}" />
+            <TextBlock x:Name="labelSoundVolume" Text="{l:Tr '% sound volume'}" />
+          </StackPanel>
+          <StackPanel Classes="row">
+            <Image x:Name="pbSoundDetailLevel" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+            <NumericUpDown x:Name="numericSoundDetailLevel" Minimum="0" Maximum="5" Increment="1" />
+            <TextBlock x:Name="labelSoundDetailLevel" Text="{l:Tr 'Sound detail level'}" />
+          </StackPanel>
+          <StackPanel Classes="row">
+            <Image x:Name="pbExternalSoundPassThruPercent" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+            <NumericUpDown x:Name="numericExternalSoundPassThruPercent" Minimum="0" Maximum="100" Increment="5" ToolTip.Tip="{l:Tr 'Min 0 Max 100. Higher: louder sound'}" />
+            <TextBlock x:Name="labelExternalSound" Text="{l:Tr '% external sound heard internally'}" />
+          </StackPanel>
+        </StackPanel>
+      </TabItem>
+
+      <!-- Video -->
+      <TabItem x:Name="tabPageVideo" Header="{l:Tr Video}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+            <StackPanel Grid.Column="0">
+              <StackPanel Classes="row">
+                <Image x:Name="pbViewingDistance" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <NumericUpDown x:Name="numericViewingDistance" Minimum="500" Maximum="10000" Increment="100" />
+                <TextBlock x:Name="labelViewingDistance" Text="{l:Tr 'Viewing distance (m)'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbDistantMountains" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkDistantMountains" Content="{l:Tr 'Distant mountains'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="44,0,0,2">
+                <NumericUpDown x:Name="numericDistantMountainsViewingDistance" Minimum="10" Maximum="1000" Increment="5" ToolTip.Tip="{l:Tr 'Distance to see mountains'}" />
+                <TextBlock x:Name="labelDistantMountainsViewingDistance" Text="{l:Tr 'Viewing distance (km)'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbLODViewingExtension" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkLODViewingExtension" Content="{l:Tr 'Extend object maximum viewing distance to horizon'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbDynamicShadows" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkDynamicShadows" Content="{l:Tr 'Dynamic shadows'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbShadowAllShapes" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkShadowAllShapes" Content="{l:Tr 'Shadow for all shapes'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbWire" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkWire" Content="{l:Tr 'Overhead wire'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbDoubleWire" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkDoubleWire" Content="{l:Tr 'Double overhead wires'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbSignalLightGlow" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkSignalLightGlow" Content="{l:Tr 'Signal light glow'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,8,0,0">
+                <Image x:Name="pbDayAmbientLight" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <TextBlock x:Name="labelAmbientDaylightBrightness" Text="{l:Tr 'Ambient daylight brightness:'}" Margin="0" />
+                <TextBlock x:Name="labelDayAmbientLight" Classes="value" />
+              </StackPanel>
+              <Slider x:Name="trackDayAmbientLight" Minimum="15" Maximum="30" SmallChange="2" LargeChange="4" TickFrequency="1" IsSnapToTickEnabled="True"
+                      TickPlacement="BottomRight" Margin="24,0,20,0" ToolTip.Tip="{l:Tr 'Default is 100%'}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+              <StackPanel Classes="row">
+                <Image x:Name="pbModelInstancing" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkModelInstancing" Content="{l:Tr 'Model instancing'}" />
+              </StackPanel>
+              <StackPanel Classes="row">
+                <Image x:Name="pbVerticalSync" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkVerticalSync" Content="{l:Tr 'Vertical sync'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,8,0,0">
+                <Image x:Name="pbAntiAliasing" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <TextBlock x:Name="labelAntiAliasing" Text="{l:Tr 'Anti-aliasing:'}" Margin="0" />
+                <TextBlock x:Name="labelAntiAliasingValue" Classes="value" />
+              </StackPanel>
+              <Slider x:Name="trackAntiAliasing" Minimum="1" Maximum="6" SmallChange="1" LargeChange="2" TickFrequency="1" IsSnapToTickEnabled="True"
+                      TickPlacement="BottomRight" Margin="24,0,20,0" ToolTip.Tip="{l:Tr 'Default is 2x MSAA'}" />
+              <StackPanel Classes="row">
+                <Image x:Name="pbWorldObjectDensity" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <NumericUpDown x:Name="numericWorldObjectDensity" Minimum="0" Maximum="99" Increment="1" />
+                <TextBlock x:Name="labelWorldObjectDensity" Text="{l:Tr 'World object density'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,8,0,0">
+                <Image x:Name="pbLODBias" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <TextBlock Text="{l:Tr 'Level of detail bias:'}" Margin="0" />
+                <TextBlock x:Name="labelLODBias" Classes="value" />
+              </StackPanel>
+              <Slider x:Name="trackLODBias" Minimum="-100" Maximum="100" SmallChange="1" LargeChange="10" TickFrequency="10"
+                      TickPlacement="BottomRight" Margin="24,0,20,0" ToolTip.Tip="{l:Tr 'Default is 0%'}" />
+              <StackPanel Classes="row">
+                <Image x:Name="pbViewingFOV" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <NumericUpDown x:Name="numericViewingFOV" Minimum="1" Maximum="120" Increment="1" />
+                <TextBlock x:Name="labelViewingVerticalFOV" Text="{l:Tr 'Viewing vertical FOV'}" />
+              </StackPanel>
+              <TextBlock x:Name="labelFOVHelp" Margin="24,4,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Simulation -->
+      <TabItem x:Name="tabPageSimulation" Header="{l:Tr Simulation}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+            <StackPanel Grid.Column="0">
+              <StackPanel Classes="row">
+                <Image x:Name="pbAdvancedAdhesionModel" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkUseAdvancedAdhesion" Content="{l:Tr 'Advanced adhesion model'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbBreakCouplers" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkBreakCouplers" Content="{l:Tr 'Break couplers'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,12,0,2">
+                <Image x:Name="pbCurveDependentSpeedLimit" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkCurveSpeedDependent" Content="{l:Tr 'Curve dependent speed limit'}" />
+              </StackPanel>
+              <TextBlock Text="{l:Tr 'At game start, locomotives have:'}" Margin="0,16,0,4" />
+              <StackPanel Classes="row" Margin="20,0,0,2">
+                <Image x:Name="pbAtGameStartSteamPreHeatBoiler" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkBoilerPreheated" Content="{l:Tr 'Steam - boiler pre-heated'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="20,0,0,2">
+                <Image x:Name="pbAtGameStartDieselRunEngines" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkDieselEnginesStarted" Content="{l:Tr 'Diesel - engine(s) started'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="20,0,0,2">
+                <Image x:Name="pbAtGameStartElectricPowerConnected" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkElectricPowerConnected" Content="{l:Tr 'Electric - power connected'}" />
+              </StackPanel>
+              <StackPanel Classes="row" Margin="0,16,0,2">
+                <Image x:Name="pbSimpleControlAndPhysics" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                <CheckBox x:Name="checkSimpleControlsPhysics" Content="{l:Tr 'Simple controls and physics'}" />
+              </StackPanel>
+            </StackPanel>
+            <HeaderedContentControl Grid.Column="1" Classes="group" Header="{l:Tr 'Activity Options'}" VerticalAlignment="Top" Margin="8,0,0,0">
+              <StackPanel>
+                <StackPanel Classes="row">
+                  <Image x:Name="pbForcedRedAtStationStops" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkForcedRedAtStationStops" Content="{l:Tr 'Forced red at station stops'}" />
+                </StackPanel>
+                <StackPanel Classes="row">
+                  <Image x:Name="pbOpenCloseDoorsOnAiTrains" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkDoorsAITrains" Content="{l:Tr 'Open/close doors in AI trains'}" />
+                </StackPanel>
+                <StackPanel Classes="row">
+                  <Image x:Name="pbLocationLinkedPassingPathProcessing" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkUseLocationPassingPaths" Content="{l:Tr 'Location-linked passing path processing'}" />
+                </StackPanel>
+              </StackPanel>
+            </HeaderedContentControl>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Keyboard -->
+      <TabItem x:Name="tabPageKeyboard" Header="{l:Tr Keyboard}">
+        <DockPanel Margin="0,8,0,0">
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,8,0,0">
+            <Image Grid.Column="0" x:Name="pbKeyboardOptions" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+            <Button Grid.Column="1" x:Name="buttonCheckKeys" Content="{l:Tr Check}" MinWidth="80" HorizontalContentAlignment="Center" Margin="0,0,6,0"
+                    ToolTip.Tip="{l:Tr 'Check for incorrect key assignments.'}" />
+            <Button Grid.Column="2" x:Name="buttonDefaultKeys" Content="{l:Tr Defaults}" MinWidth="80" HorizontalContentAlignment="Center"
+                    ToolTip.Tip="{l:Tr 'Load the factory default key assignments.'}" />
+            <Button Grid.Column="4" x:Name="buttonExport" Content="{l:Tr Export}" MinWidth="80" HorizontalContentAlignment="Center" />
+          </Grid>
+          <Border BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <Grid x:Name="panelKeys" ColumnDefinitions="*,*" Margin="4,2,16,2" />
+            </ScrollViewer>
+          </Border>
+        </DockPanel>
+      </TabItem>
+
+      <!-- RailDriver -->
+      <TabItem x:Name="tabPageRailDriver" Header="{l:Tr RailDriver}">
+        <DockPanel Margin="0,8,0,0">
+          <TextBlock x:Name="labelRailDriverUnavailable" DockPanel.Dock="Top" TextWrapping="Wrap" IsVisible="False" Margin="0,0,0,8"
+                     Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="0,8,0,0">
+            <Grid.Styles>
+              <Style Selector="Button">
+                <Setter Property="MinWidth" Value="80" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,6,0" />
+              </Style>
+            </Grid.Styles>
+            <Image Grid.Column="0" x:Name="pbRailDriverOptions" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+            <Button Grid.Column="1" x:Name="btnShowRDLegend" Content="{l:Tr Legend}" />
+            <Button Grid.Column="2" x:Name="btnStartRDCalibration" Content="{l:Tr Calibration}" ToolTip.Tip="{l:Tr 'Calibrate the lever position reading'}" />
+            <Button Grid.Column="3" x:Name="btnRDReset" Content="{l:Tr Defaults}" ToolTip.Tip="{l:Tr 'Load the factory default button assignments.'}" />
+            <Button Grid.Column="4" x:Name="btnCheck" Content="{l:Tr Check}" ToolTip.Tip="{l:Tr 'Check for incorrect button assignments.'}" />
+            <Button Grid.Column="6" x:Name="btnRDSettingsExport" Content="{l:Tr Export}" Margin="0" />
+          </Grid>
+          <Grid x:Name="panelRDSettings" ColumnDefinitions="*,*">
+            <Border Grid.Column="0" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <Grid x:Name="panelRDButtons" ColumnDefinitions="2*,*" Margin="4,2,16,2" />
+              </ScrollViewer>
+            </Border>
+            <HeaderedContentControl Grid.Column="1" x:Name="groupBoxReverseRDLevers" Classes="group" Header="{l:Tr 'Reverse Levers'}" VerticalAlignment="Top" Margin="12,0,0,0">
+              <StackPanel>
+                <CheckBox x:Name="checkReverseReverser" Content="{l:Tr 'Reverse Reverser Direction'}" />
+                <CheckBox x:Name="checkReverseThrottle" Content="{l:Tr 'Reverse Throttle Direction'}" />
+                <CheckBox x:Name="checkReverseAutoBrake" Content="{l:Tr 'Reverse Auto Brake Direction'}" />
+                <CheckBox x:Name="checkReverseIndependentBrake" Content="{l:Tr 'Reverse Independent Brake Direction'}" />
+                <CheckBox x:Name="checkFullRangeThrottle" Content="{l:Tr 'Full Range Throttle'}" Margin="0,8,0,0"
+                          ToolTip.Tip="{l:Tr 'Use the full range of the Throttle Lever. There will be no Auto Brake!'}" />
+              </StackPanel>
+            </HeaderedContentControl>
+          </Grid>
+        </DockPanel>
+      </TabItem>
+
+      <!-- Data logger -->
+      <TabItem x:Name="tabPageDataLogger" Header="{l:Tr 'Data logger'}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,8,0,0">
+            <StackPanel Classes="row">
+              <Image x:Name="pbDataLoggerOptions" Classes="help" Source="avares://Menu/Resources/info-18.png" VerticalAlignment="Top" />
+              <TextBlock x:Name="label18" TextWrapping="Wrap" MaxWidth="760" Margin="0"
+                         Text="{l:Tr 'Use data logger to record your simulation data (in-game command: F12).&#x0a;Please remember that the size of the dump file grows with the simulation time!'}" />
+            </StackPanel>
+            <StackPanel Classes="row" Margin="24,8,0,2">
+              <ComboBox x:Name="comboDataLoggerSeparator" />
+              <TextBlock Text="{l:Tr Separator}" />
+              <NumericUpDown x:Name="dataLoggerInterval" Minimum="0" Maximum="60000" Increment="50" Margin="40,0,0,0"
+                             ToolTip.Tip="{l:Tr 'Interval at which to log data. In milliseconds, 0 means log at frame rate.'}" />
+              <TextBlock Text="{l:Tr 'Logging Interval (msec)'}" />
+            </StackPanel>
+            <StackPanel Margin="24,4,0,0">
+              <CheckBox x:Name="checkDataLogUseInternalUnits" Content="{l:Tr 'Use internal units'}"
+                        ToolTip.Tip="{l:Tr 'When checked, use units used by the software (i.e. no conversion).'}" />
+              <CheckBox x:Name="checkDataLogger" Content="{l:Tr 'Start logging with the simulation start'}" />
+              <CheckBox x:Name="checkDataLogPerformance" Content="{l:Tr 'Log performance data'}" />
+              <CheckBox x:Name="checkDataLogPhysics" Content="{l:Tr 'Log physics data'}" />
+              <CheckBox x:Name="checkDataLogSteamPerformance" Content="{l:Tr 'Log steam performance data (exclusive)'}" />
+              <CheckBox x:Name="checkDataLogSteamPowerCurve" Content="{l:Tr 'Log steam power curve data (exclusive)'}" />
+              <CheckBox x:Name="checkVerboseConfigurationMessages" Content="{l:Tr 'Verbose ENG/WAG configuration messages'}" Margin="0,16,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Evaluation -->
+      <TabItem x:Name="tabPageEvaluate" Header="{l:Tr Evaluation}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,8,0,0">
+            <CheckBox x:Name="checkDataLogTrainSpeed" Content="{l:Tr 'Log train speed'}" />
+            <StackPanel Classes="row" Margin="24,2,0,2">
+              <NumericUpDown x:Name="numericDataLogTSInterval" Minimum="1" Maximum="60" Increment="1" />
+              <TextBlock x:Name="labelDataLogTSInterval" Text="{l:Tr 'Interval (sec)'}" />
+            </StackPanel>
+            <Border Margin="24,4,0,0" BorderThickness="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" HorizontalAlignment="Left" MinWidth="240">
+              <StackPanel x:Name="checkListDataLogTSContents" Margin="6,2" />
+            </Border>
+            <CheckBox x:Name="checkDataLogStationStops" Content="{l:Tr 'Log station stops'}" Margin="0,12,0,0" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- System -->
+      <TabItem x:Name="tabPageSystem" Header="{l:Tr System}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,8,0,0">
+            <StackPanel Classes="row">
+              <Image x:Name="pbLanguage" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+              <ComboBox x:Name="comboLanguage" MinWidth="200" />
+              <TextBlock x:Name="labelLanguage" Text="{l:Tr Language}" />
+            </StackPanel>
+            <StackPanel Classes="row" Margin="0,12,0,2">
+              <Image x:Name="pbUpdateMode" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+              <TextBlock x:Name="labelUpdateMode" Text="{l:Tr 'Update mode:'}" Margin="0" />
+            </StackPanel>
+            <StackPanel x:Name="panelUpdateChannels" Margin="24,0,0,0" />
+            <Grid ColumnDefinitions="*,*" Margin="0,12,0,0">
+              <StackPanel Grid.Column="0">
+                <StackPanel Classes="row">
+                  <Image x:Name="pbWindowed" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkWindowed" Content="{l:Tr Windowed}" />
+                </StackPanel>
+                <StackPanel Classes="row" Margin="44,0,0,2">
+                  <ComboBox x:Name="comboWindowSize" IsEditable="True" MinWidth="120" />
+                  <TextBlock x:Name="labelWindowSize" Text="{l:Tr 'Window size (choose or specify WIDTHxHEIGHT)'}" TextWrapping="Wrap" MaxWidth="220" />
+                </StackPanel>
+                <StackPanel Classes="row">
+                  <Image x:Name="pbWindowGlass" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkWindowGlass" Content="{l:Tr 'Use glass for in-game windows'}" />
+                </StackPanel>
+                <StackPanel Classes="row" Margin="0,8,0,2">
+                  <Image x:Name="pbControlConfirmations" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <ComboBox x:Name="comboControlConfirmations" />
+                  <TextBlock x:Name="labelControlConfirmations" Text="{l:Tr 'Messages suppressed'}" />
+                </StackPanel>
+                <StackPanel Classes="row">
+                  <Image x:Name="pbWebServerPort" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <NumericUpDown x:Name="numericWebServerPort" Minimum="1025" Maximum="65534" Increment="1" />
+                  <TextBlock x:Name="labelWebServerPort" Text="{l:Tr 'Web server port'}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Bottom">
+                <StackPanel Classes="row">
+                  <Image x:Name="pbPerformanceTuner" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkPerformanceTuner">
+                    <TextBlock Text="{l:Tr 'Automatically tune settings to keep performance level'}" TextWrapping="Wrap" MaxWidth="320" />
+                  </CheckBox>
+                </StackPanel>
+                <StackPanel Classes="row" Margin="44,0,0,2">
+                  <NumericUpDown x:Name="numericPerformanceTunerTarget" Minimum="10" Maximum="300" Increment="5" />
+                  <TextBlock x:Name="labelPerformanceTunerTarget" Text="{l:Tr 'Target frame rate'}" />
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Experimental -->
+      <TabItem x:Name="tabPageExperimental" Header="{l:Tr Experimental}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="0,8,0,0">
+            <TextBlock x:Name="label5" Text="{l:Tr 'Experimental features that may slow down the game, use at your own risk.'}" TextWrapping="Wrap" Margin="0,0,0,8" />
+            <Grid ColumnDefinitions="*,*">
+              <StackPanel Grid.Column="0">
+                <StackPanel Classes="row">
+                  <Image x:Name="pbSuperElevation" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <TextBlock x:Name="ElevationText" Text="{l:Tr Superelevation}" Margin="0" />
+                </StackPanel>
+                <StackPanel Margin="24,0,0,0">
+                  <CheckBox x:Name="checkUseSuperElevation" Content="{l:Tr 'Legacy Superelevation'}" />
+                  <StackPanel Classes="row">
+                    <NumericUpDown x:Name="numericSuperElevationGauge" Minimum="600" Maximum="1800" Increment="5" />
+                    <TextBlock x:Name="label8" Text="{l:Tr 'Default Gauge (mm)'}" />
+                  </StackPanel>
+                </StackPanel>
+                <StackPanel Classes="row" Margin="0,16,0,2">
+                  <Image x:Name="pbShowShapeWarnings" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkShapeWarnings" Content="{l:Tr 'Show shape warnings'}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Grid.Column="1">
+                <StackPanel Classes="row">
+                  <Image x:Name="pbCorrectQuestionableBrakingParameters" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkCorrectQuestionableBrakingParams" Content="{l:Tr 'Correct questionable braking parameters'}" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+                  <StackPanel Grid.Column="0">
+                    <StackPanel Classes="row">
+                      <Image x:Name="pbActivityRandomization" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                      <TextBlock x:Name="label13" Text="{l:Tr 'Activity randomization'}" TextWrapping="Wrap" MaxWidth="130" Margin="0" />
+                    </StackPanel>
+                    <StackPanel Classes="row" Margin="24,0,0,0">
+                      <NumericUpDown x:Name="numericActRandomizationLevel" Minimum="0" Maximum="3" Increment="1" MinWidth="80"
+                                     ToolTip.Tip="{l:Tr '0: no randomization, 1: moderate, 2: significant; 3: high (may be unrealistic)'}" />
+                      <TextBlock x:Name="label12" Text="{l:Tr Level}" />
+                    </StackPanel>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1">
+                    <StackPanel Classes="row">
+                      <Image x:Name="pbActivityWeatherRandomization" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                      <TextBlock x:Name="label26" Text="{l:Tr 'Activity weather randomization'}" TextWrapping="Wrap" MaxWidth="130" Margin="0" />
+                    </StackPanel>
+                    <StackPanel Classes="row" Margin="24,0,0,0">
+                      <NumericUpDown x:Name="numericActWeatherRandomizationLevel" Minimum="0" Maximum="3" Increment="1" MinWidth="80"
+                                     ToolTip.Tip="{l:Tr '0: no randomization, 1: moderate, 2: significant; 3: high (may be unrealistic)'}" />
+                      <TextBlock x:Name="label27" Text="{l:Tr Level}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+                <StackPanel Classes="row" Margin="0,12,0,2">
+                  <Image x:Name="pbMstsEnvironments" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <CheckBox x:Name="checkUseMSTSEnv" Content="{l:Tr 'MSTS environments'}" />
+                </StackPanel>
+                <StackPanel Classes="row" Margin="0,12,0,0">
+                  <Image x:Name="pbAdhesionFactorCorrection" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <TextBlock x:Name="label9" Text="{l:Tr 'Adhesion factor correction:'}" Margin="0" />
+                  <TextBlock x:Name="AdhesionFactorValueLabel" Classes="value" />
+                </StackPanel>
+                <Slider x:Name="trackAdhesionFactor" Minimum="10" Maximum="200" SmallChange="1" LargeChange="10" TickFrequency="10"
+                        TickPlacement="BottomRight" Margin="24,0,20,0" ToolTip.Tip="{l:Tr 'Default is 100%'}" />
+                <StackPanel Classes="row">
+                  <Image x:Name="pbAdhesionFactorRandomChange" Classes="help" Source="avares://Menu/Resources/info-18.png" />
+                  <TextBlock x:Name="label16" Text="{l:Tr 'Adhesion factor random change:'}" Margin="0" />
+                  <TextBlock x:Name="AdhesionFactorChangeValueLabel" Classes="value" />
+                </StackPanel>
+                <Slider x:Name="trackAdhesionFactorChange" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10" TickFrequency="10"
+                        TickPlacement="BottomRight" Margin="24,0,20,0" ToolTip.Tip="{l:Tr 'Default is 10%'}" />
+                <StackPanel Classes="row" Margin="24,0,0,0">
+                  <TextBlock x:Name="AdhesionLevelLabel" Text="{l:Tr 'Level:'}" Margin="0" />
+                  <TextBlock x:Name="AdhesionLevelValue" Classes="value" />
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6" Margin="0,8,0,0">
+      <Button x:Name="buttonOK" Content="{l:Tr OK}" MinWidth="80" HorizontalContentAlignment="Center" />
+      <Button x:Name="buttonCancel" Content="{l:Tr Cancel}" MinWidth="80" HorizontalContentAlignment="Center" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -39,7 +39,7 @@ namespace ORTS.Menu
 
         public static List<Folder> GetFolders(UserSettings settings)
         {
-            var folderDataFile = UserSettings.UserDataFolder + @"/folder.dat";
+            var folderDataFile = System.IO.Path.Combine(UserSettings.UserDataFolder, "folder.dat");
             var folders = new List<Folder>();
 
             if (settings.Folders.Folders.Count == 0 && File.Exists(ORTS.IO.PathResolver.Resolve(folderDataFile)))

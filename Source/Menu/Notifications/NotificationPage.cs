@@ -1,28 +1,28 @@
-﻿// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015 by the Open Rails project.
-// 
+// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
-using System.Windows.Forms;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using ORTS.Updater;
-using Button = System.Windows.Forms.Button;
-using Image = System.Drawing.Image;
 
 namespace Menu.Notifications
 {
@@ -31,16 +31,16 @@ namespace Menu.Notifications
     /// </summary>
     public class NotificationPage
     {
-        private Panel Panel; // Needed so that controls can be added
-        private MainForm MainForm; // Needed so the Retry button can raise an event which the form can catch.
+        private StackPanel Panel; // Needed so that controls can be added
+        private MainWindow MainForm; // Needed so the Retry button can raise an event which the form can catch.
 
-        // Holds size of items, so they can be positioned on the panel
+        // Holds the controls for each item, so they can be added to the panel in order.
         public List<NDetail> NDetailList = new List<NDetail>();
 
         // Holds the index of each button on the page and the button, so the correct action can be taken depending on the type of button and its index.
         public Dictionary<int, NButtonControl> ButtonDictionary = new Dictionary<int, NButtonControl>();
 
-        public NotificationPage(MainForm mainForm, Panel panel, NotificationManager manager)
+        public NotificationPage(MainWindow mainForm, StackPanel panel, NotificationManager manager)
         {
             MainForm = mainForm;
             Panel = panel;
@@ -53,193 +53,140 @@ namespace Menu.Notifications
             var pageCount = manager.Notifications?.NotificationList.Count ?? 0; // If no Internet connection, then Notifications == null
             var pageLabel = $"{manager.CurrentPageIndex + 1}/{pageCount}";
 
-            // Swap visibility for clickable arrows and disabled ones at each end of range.
-            var nextVisibility = (manager.CurrentPageIndex < pageCount - 1);
-            var nextPageControl = new Arrow(Panel, manager.NextImage, nextVisibility, true, 25);
-            nextPageControl.Click += new EventHandler(MainForm.Next_Click);
-            Panel.Controls.Add(nextPageControl);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 4, Margin = new Thickness(0, 0, 48, 0) };
 
-            Panel.Controls.Add(new Arrow(Panel, manager.LastImage, !nextVisibility, false, 25));
-
+            // Swap clickable arrows and disabled ones at each end of range.
             var previousVisibility = (manager.CurrentPageIndex > 0);
-            var previousPageControl = new Arrow(Panel, manager.PreviousImage, previousVisibility, true, 90);
-            previousPageControl.Click += new EventHandler(MainForm.Previous_Click);
-            Panel.Controls.Add(previousPageControl);
+            row.Children.Add(previousVisibility
+                ? new Arrow(manager.PreviousImage, true, MainForm.Previous_Click)
+                : new Arrow(manager.FirstImage, false, null));
 
-            Panel.Controls.Add(new Arrow(Panel, manager.FirstImage, !previousVisibility, false, 90));
+            row.Children.Add(new TextBlock { Text = pageLabel, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center, MinWidth = 30, TextAlignment = TextAlignment.Center });
 
-            var pageCountControl = new Label
-            {
-                Text = pageLabel,
-                UseMnemonic = false,
-                Font = new Font(Panel.Font, FontStyle.Bold),
-                Height = 15,
-                Left = Panel.ClientSize.Width - 85 + (pageLabel.Length * 9), // Keeps the text centred between the < > arrows
-                Top = 3
-            };
-            Panel.Controls.Add(pageCountControl);
+            var nextVisibility = (manager.CurrentPageIndex < pageCount - 1);
+            row.Children.Add(nextVisibility
+                ? new Arrow(manager.NextImage, true, MainForm.Next_Click)
+                : new Arrow(manager.LastImage, false, null));
+
+            Panel.Children.Add(row);
         }
 
         public class Arrow : Button
         {
-            public Arrow(Panel panel, Image image, bool visible, bool enabled, int indentRight)
+            protected override Type StyleKeyOverride => typeof(Button);
+
+            public Arrow(Bitmap image, bool enabled, EventHandler<EventArgs> click)
             {
-                Margin = new Padding(0);
-                Text = "";
-                FlatStyle = FlatStyle.Flat;
-                Left = panel.ClientSize.Width - indentRight;
-                Top = 0;
+                Classes.Add("flat");
+                Content = new Image { Source = image, Width = 9, Height = 9 };
                 Width = 20;
-                Anchor = AnchorStyles.Top | AnchorStyles.Left;
-                FlatAppearance.BorderSize = 0;
-                BackgroundImageLayout = ImageLayout.Center;
-                BackgroundImage = image;
-                Visible = visible;
-                Enabled = enabled;
+                Height = 20;
+                IsEnabled = enabled;
+                if (click != null)
+                    Click += (sender, e) => click(sender, e);
             }
         }
 
         #region NDetails
-        // An NDetail may create one or more controls and add them to the page's panel.
+        // An NDetail creates a control (a row) for the page's panel.
 
         public class NDetail
         {
-            public Label Control;
+            public Control Control;
 
-            // Values chosen to work where System > Display > Scale = 125% as well as the usual 100%
-            public const int TopPadding = 20;
-            public const int VerticalSpacing = 10;
+            public const int VerticalSpacing = 6;
             public const int LeftPadding = 10;
             public const int LeftPaddingIndented = 20;
-            public const int TitleHeight = 20;
-            public const int HeadingHeight = 30;
-            public const int TextHeight = 18;
-            public const int ButtonHeight = 30;
-            public const int RecordHeight = 18;
-            public const int ScrollBarWidth = 20;
+
+            protected static IBrush GetBrush(string colorName, IBrush defaultBrush)
+            {
+                // "black" text would be invisible on a dark theme, so let the theme decide.
+                if (String.IsNullOrEmpty(colorName) || colorName.Equals("black", StringComparison.OrdinalIgnoreCase))
+                    return defaultBrush;
+                return Color.TryParse(colorName, out var color) ? new SolidColorBrush(color) : defaultBrush;
+            }
         }
 
         public class NTitleControl : NDetail
         {
-            public NTitleControl(Panel panel, int current, int total, string date, string text)
+            public NTitleControl(StackPanel panel, int current, int total, string date, string text)
             {
                 var title = $"Notification {current}/{total}: {date} - {text}";
-                var left = LeftPadding;
-                Control = new Label
+                Control = new TextBlock
                 {
                     Text = title,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Bold),
-                    TextAlign = ContentAlignment.BottomLeft,
-                    Height = TitleHeight,
-                    Width = panel.Width - ScrollBarWidth - left,
-                    Left = LeftPadding
+                    FontWeight = FontWeight.Bold,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(LeftPadding, 0, 0, 0),
                 };
-                panel.Controls.Add(Control);
             }
         }
         public class NHeadingControl : NDetail
         {
-            public NHeadingControl(Panel panel, string text, string colorName = "blue")
+            public NHeadingControl(StackPanel panel, string text, string colorName = "blue")
             {
-                var color = Color.FromName(colorName);
-                var left = LeftPadding;
-                Control = new Label
+                Control = new TextBlock
                 {
-                    ForeColor = color,
+                    Foreground = GetBrush(colorName, Brushes.Blue),
                     Text = text,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Bold),
-                    TextAlign = ContentAlignment.BottomLeft,
-                    Height = HeadingHeight,
-                    Width = panel.Width - ScrollBarWidth - left,
-                    Left = left,
-                    Top = TopPadding,
+                    FontWeight = FontWeight.Bold,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(LeftPadding, 10, 0, 0),
                 };
-                panel.Controls.Add(Control);
             }
         }
         public class NTextControl : NDetail
         {
-            public NTextControl(Panel panel, string text, string colorName = "black")
+            public NTextControl(StackPanel panel, string text, string colorName = "black")
             {
-                var color = Color.FromName(colorName);
-                var left = LeftPaddingIndented;
-                Control = new Label
+                var textBlock = new TextBlock
                 {
-                    ForeColor = color,
                     Text = text,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Regular),
-                    TextAlign = ContentAlignment.BottomLeft,
-                    Height = TextHeight,
-                    Width = panel.Width - ScrollBarWidth - left,
-                    Left = left,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(LeftPaddingIndented, 0, 0, 0),
                 };
-                panel.Controls.Add(Control);
+                var brush = GetBrush(colorName, null);
+                if (brush != null)
+                    textBlock.Foreground = brush;
+                Control = textBlock;
             }
         }
         public class NButtonControl : NDetail
         {
             public static int ButtonCount = 0;
             public Button Button;
-            protected MainForm MainForm;
-            public NButtonControl(Panel panel, string legend, int width, string description, MainForm mainForm)
+            protected MainWindow MainForm;
+            public NButtonControl(StackPanel panel, string legend, int width, string description, MainWindow mainForm)
             {
                 MainForm = mainForm;
-                var buttonLeft = LeftPaddingIndented;
                 Button = new Button
                 {
-                    Margin = new Padding(20),
-                    Text = legend,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Regular),
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Height = ButtonHeight,
+                    Content = legend,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
                     Width = width,
-                    Left = buttonLeft,
-                    Top = TopPadding,
-                    BackColor = SystemColors.ButtonFace
+                    VerticalAlignment = VerticalAlignment.Center,
                 };
-                panel.Controls.Add(Button);
+                var index = ButtonCount;
+                Button.Click += (sender, e) => mainForm.DoNotificationButton(index);
 
-                // 3 should be enough, but is there a way to get unlimited buttons?
-                switch (ButtonCount)
+                var label = new TextBlock
                 {
-                    case 0:
-                        Button.Click += new EventHandler(mainForm.Button0_Click);
-                        break;
-                    case 1:
-                        Button.Click += new EventHandler(mainForm.Button1_Click);
-                        break;
-                    case 2:
-                        Button.Click += new EventHandler(mainForm.Button2_Click);
-                        break;
-                    default:
-                        MessageBox.Show("Cannot add 4th button; only 3 buttons are supported.", "Add Notification Button");
-                        break;
-                }
-
-                var labelLeft = Button.Left + Button.Width + LeftPaddingIndented;
-                Control = new Label
-                {
-                    Margin = new Padding(20),
                     Text = description,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Regular),
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    Height = ButtonHeight,
-                    Width = panel.Width - ScrollBarWidth - labelLeft,
-                    Top = TopPadding,
-                    Left = labelLeft
+                    TextWrapping = TextWrapping.Wrap,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(LeftPaddingIndented, 0, 0, 0),
                 };
-                panel.Controls.Add(Control);
+                var row = new DockPanel { Margin = new Thickness(LeftPaddingIndented, 0, 0, 0) };
+                DockPanel.SetDock(Button, Dock.Left);
+                row.Children.Add(Button);
+                row.Children.Add(label);
+                Control = row;
             }
         }
         public class NLinkControl : NButtonControl
         {
             public string Url;
-            public NLinkControl(NotificationPage page, string legend, int width, string description, MainForm mainForm, string url)
+            public NLinkControl(NotificationPage page, string legend, int width, string description, MainWindow mainForm, string url)
             : base(page.Panel, legend, width, description, mainForm)
             {
                 Url = url;
@@ -250,7 +197,7 @@ namespace Menu.Notifications
         public class NDialogControl : NButtonControl
         {
             public string Form;
-            public NDialogControl(NotificationPage page, string legend, int width, string description, MainForm mainForm, string form)
+            public NDialogControl(NotificationPage page, string legend, int width, string description, MainWindow mainForm, string form)
             : base(page.Panel, legend, width, description, mainForm)
             {
                 Form = form;
@@ -273,7 +220,7 @@ namespace Menu.Notifications
         }
         public class NUpdateControl : NButtonControl
         {
-            public NUpdateControl(NotificationPage page, string legend, int width, string description, MainForm mainForm)
+            public NUpdateControl(NotificationPage page, string legend, int width, string description, MainWindow mainForm)
             : base(page.Panel, legend, width, description, mainForm)
             {
                 page.ButtonDictionary.Add(ButtonCount, this);
@@ -282,7 +229,7 @@ namespace Menu.Notifications
         }
         public class NRefreshControl : NButtonControl
         {
-            public NRefreshControl(NotificationPage page, string legend, int width, string description, MainForm mainForm)
+            public NRefreshControl(NotificationPage page, string legend, int width, string description, MainWindow mainForm)
             : base(page.Panel, legend, width, description, mainForm)
             {
                 page.ButtonDictionary.Add(ButtonCount, this);
@@ -291,7 +238,7 @@ namespace Menu.Notifications
         }
         public class NRetryControl : NButtonControl
         {
-            public NRetryControl(NotificationPage page, string legend, int width, string description, MainForm mainForm)
+            public NRetryControl(NotificationPage page, string legend, int width, string description, MainWindow mainForm)
             : base(page.Panel, legend, width, description, mainForm)
             {
                 page.ButtonDictionary.Add(ButtonCount, this);
@@ -302,11 +249,15 @@ namespace Menu.Notifications
         {
             var button = ButtonDictionary[key];
             if (button is NLinkControl)
-                Process.Start(new ProcessStartInfo { FileName = ((NLinkControl)button).Url, UseShellExecute = true });
+                ExternalProcess.Open(((NLinkControl)button).Url);
             else if (button is NDialogControl dialogControl)
                 dialogControl.Show();
             else if (button is NUpdateControl)
-                updateManager.Update();
+            {
+                // In-place updates are only supported on Windows; elsewhere there is no update to apply.
+                if (updateManager.LastUpdate != null)
+                    updateManager.Update();
+            }
             else if (button is NRefreshControl)
                 MainForm.OnRefreshUpdates(EventArgs.Empty);
             else if (button is NRetryControl)
@@ -316,60 +267,38 @@ namespace Menu.Notifications
 
         public class NRecordControl : NDetail
         {
-            public Label Field;
+            public TextBlock Field;
 
-            public NRecordControl(Panel panel, string label, int legendWidth, string field)//: base(page)
+            public NRecordControl(StackPanel panel, string label, int legendWidth, string field)
             {
-                // Add the legend
-                Control = new Label
+                // The legend, and the field to the right of it
+                var legend = new TextBlock
                 {
                     Text = label + ":",
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Bold),
-                    TextAlign = ContentAlignment.BottomRight,
+                    FontWeight = FontWeight.Bold,
+                    TextAlignment = TextAlignment.Right,
                     Width = legendWidth,
-                    Height = RecordHeight,
-                    Left = LeftPadding,
-                    Top = TopPadding
                 };
-                panel.Controls.Add(Control);
-
-                // Add field to the right of the legend
-                var left = LeftPadding + legendWidth;
-                Field = new Label
+                Field = new TextBlock
                 {
                     Text = field,
-                    UseMnemonic = false,
-                    Font = new Font(panel.Font, FontStyle.Regular),
-                    TextAlign = ContentAlignment.BottomLeft,
-                    Width = panel.Width - ScrollBarWidth - left,
-                    Height = RecordHeight,
-                    Left = left,
-                    Top = TopPadding
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(6, 0, 0, 0),
                 };
-                panel.Controls.Add(Field);
+                var row = new DockPanel { Margin = new Thickness(LeftPadding, 0, 0, 0) };
+                DockPanel.SetDock(legend, Dock.Left);
+                row.Children.Add(legend);
+                row.Children.Add(Field);
+                Control = row;
             }
         }
 
         public void FlowNDetails()
         {
-            var top = 2;
             foreach (var nDetail in NDetailList)
             {
-                nDetail.Control.Top = top;
-
-                // Adjust details that have a second part.
-                if (nDetail is NButtonControl)
-                {
-                    ((NButtonControl)nDetail).Button.Top = top;
-                }
-                if (nDetail is NRecordControl)
-                {
-                    ((NRecordControl)nDetail).Field.Top = top;
-                }
-
-                this.Panel.Controls.Add(nDetail.Control);
-                top += nDetail.Control.Height + NDetail.VerticalSpacing;
+                nDetail.Control.Margin = new Thickness(nDetail.Control.Margin.Left, nDetail.Control.Margin.Top, nDetail.Control.Margin.Right, NDetail.VerticalSpacing);
+                this.Panel.Children.Add(nDetail.Control);
             }
         }
         #endregion NDetails

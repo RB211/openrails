@@ -231,3 +231,16 @@ Open Rails uses Git for source code control. In addition to using Git from the c
 Visual Studio 2019 includes facilities for working with Git, see [https://docs.microsoft.com/en-gb/visualstudio/version-control/?view=vs-2019](https://docs.microsoft.com/en-gb/visualstudio/version-control/?view=vs-2019)
 
 For guidance on contributing, see [https://github.com/openrails/openrails/blob/master/Docs/Contributing.md](https://github.com/openrails/openrails/blob/master/Docs/Contributing.md)
+
+## Linux
+
+The menu (Source/Menu) uses Avalonia, so it builds and runs natively on Linux with the .NET 10 SDK:
+
+```
+dotnet build Source/Menu/Menu.csproj
+Program/Menu
+```
+
+On Linux there is no `OpenRails.exe`: the Launcher project (which only checks the Windows prerequisites and then starts the menu) and the Updater (in-place updating is Windows-only) are skipped when building on other platforms, so run `Program/Menu` directly. Settings are kept in an INI file in the per-user configuration folder (`$XDG_CONFIG_HOME`, usually `~/.config`) instead of the registry.
+
+Holding Alt while pressing Start (or Resume) copies the RunActivity command line to the clipboard instead of starting the simulator, which is handy for debugging.

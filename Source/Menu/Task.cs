@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2011, 2012, 2013 by the Open Rails project.
+// COPYRIGHT 2011, 2012, 2013 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -24,19 +24,21 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
-using System.Windows.Forms;
+using Avalonia.Controls;
+using Avalonia.Threading;
 
 namespace Menu
 {
     /// <summary>
     /// Allows work to be done as a background task so that the form remains responsive (e.g. to a cancel or close button).
-    /// Note: The "work" part is done by the background thread and the "success" part is done by the form's thread, so
-    /// make sure the "success" part is short. 
+    /// Note: The "work" part is done by the background thread and the "success" part is done by the UI thread, so
+    /// make sure the "success" part is short. If the window the task belongs to has been closed, the callbacks are skipped.
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public sealed class Task<T>
     {
-        readonly Control Control;
+        readonly Window Window;
+        bool WindowClosed;
         readonly Func<T> Work;
         readonly Action<T> Success;
         readonly Action Failure;
@@ -44,18 +46,20 @@ namespace Menu
         readonly Thread Thread;
         public bool Cancelled;
 
-        Task(Control control, Func<T> work, Action<T> success, Action failure, Action complete)
+        Task(Window window, Func<T> work, Action<T> success, Action failure, Action complete)
         {
 #if DEBUG_BACKGROUND_TASKS
             Trace.TraceInformation("Task<{0}> created", typeof(T).ToString());
 #endif
-            Control = control;
+            Window = window;
+            if (Window != null)
+                Window.Closed += (sender, e) => WindowClosed = true;
             Work = work;
             Success = success;
             Failure = failure;
             Complete = complete;
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
-            Thread = new Thread(TaskWorker);
+            Thread = new Thread(TaskWorker) { IsBackground = true };
             Thread.CurrentUICulture = System.Globalization.CultureInfo.CurrentUICulture;
             Thread.Start();
 #else
@@ -63,13 +67,13 @@ namespace Menu
 #endif
         }
 
-        public Task(Control control, Func<T> work, Action<T> success)
-            : this(control, work, success, null, null)
+        public Task(Window window, Func<T> work, Action<T> success)
+            : this(window, work, success, null, null)
         {
         }
 
-        public Task(Control control, Func<T> work, Action complete)
-            : this(control, work, null, null, complete)
+        public Task(Window window, Func<T> work, Action complete)
+            : this(window, work, null, null, complete)
         {
         }
 
@@ -84,12 +88,22 @@ namespace Menu
             }
         }
 
+        void Invoke(Action action)
+        {
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                if (!WindowClosed)
+                    action();
+            });
+        }
+
         void TaskWorker()
         {
 #if DEBUG_BACKGROUND_TASKS
             var typeName = typeof(T).ToString();
 #endif
             T result = default(T);
+            var failed = false;
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
             try
             {
@@ -109,6 +123,7 @@ namespace Menu
             catch (Exception)
             {
 #endif
+                failed = true;
             }
 #endif
 
@@ -120,12 +135,8 @@ namespace Menu
 #endif
 
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
-            // If the control we've been passed is still setting itself up, we must wait before invoking the callbacks.
-            while (!Control.IsHandleCreated && !Control.IsDisposed)
-                Thread.Sleep(100);
-
-            // The control we were meant to be informing has gone away entirely, so we must give up here.
-            if (Control.IsDisposed)
+            // The window we were meant to be informing has gone away entirely, so we must give up here.
+            if (WindowClosed)
                 return;
 #endif
 
@@ -134,14 +145,15 @@ namespace Menu
             {
 #endif
                 // Execute the success/failure handlers if they exist.
-                if (!cancelled)
+                // Unlike the WinForms version, Success is not given a default result when the work failed.
+                if (!cancelled && !failed)
                 {
 #if DEBUG_BACKGROUND_TASKS
                     Trace.TraceInformation("Task<{0}> invoke Success()", typeName);
 #endif
                     if (Success != null)
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
-                        Control.Invoke(Success, result);
+                        Invoke(() => Success(result));
 #else
                         Success(result);
 #endif
@@ -153,7 +165,7 @@ namespace Menu
 #endif
                     if (Failure != null)
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
-                        Control.Invoke(Failure);
+                        Invoke(Failure);
 #else
                         Failure();
 #endif
@@ -170,7 +182,7 @@ namespace Menu
                 // Execute the complete handler if it exists.
                 if (Complete != null)
 #if TASK_CATCH_EXCEPTIONS_AND_THREADED
-                    Control.Invoke(Complete);
+                    Invoke(Complete);
 #else
                     Complete();
 #endif

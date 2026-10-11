@@ -1,179 +1,153 @@
-﻿// COPYRIGHT 2009, 2010, 2011, 2012, 2013 by the Open Rails project.
-// 
+// COPYRIGHT 2009, 2010, 2011, 2012, 2013 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
-using ORTS.Common;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Windows.Forms;
+using Avalonia;
 
 namespace Menu
 {
     static class Program
     {
-        [STAThread]  // required for use of the DirectoryBrowserDialog in the main form.
-        static void Main(string[] args)
+        [STAThread]
+        static int Main(string[] args)
         {
-            Application.EnableVisualStyles();
-
             if (Debugger.IsAttached)
+                return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+
+            try
             {
-                MainForm();
+                return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             }
-            else
+            catch (Exception error)
             {
-                try
-                {
-                    MainForm();
-                }
-                catch (Exception error)
-                {
-                    MessageBox.Show(error.ToString(), Application.ProductName + " " + VersionInfo.VersionOrBuild);
-                }
+                // The UI is gone by now, so all we can do is report to the console.
+                Console.Error.WriteLine(error);
+                return 1;
             }
         }
 
-        static void MainForm()
+        // Also used by the Avalonia designer.
+        public static AppBuilder BuildAvaloniaApp()
         {
-            using (var MainForm = new MainForm())
-            {
-                while (MainForm.ShowDialog() == DialogResult.OK)
-                {
-                    var parameters = new List<string>();
-                    switch (MainForm.SelectedAction)
-                    {
-                        case MainForm.UserAction.SingleplayerNewGame:
-                            parameters.Add("-start");
-                            break;
-                        case MainForm.UserAction.SingleplayerResumeSave:
-                            parameters.Add("-resume");
-                            break;
-                        case MainForm.UserAction.SingleplayerReplaySave:
-                            parameters.Add("-replay");
-                            break;
-                        case MainForm.UserAction.SingleplayerReplaySaveFromSave:
-                            parameters.Add("-replay_from_save");
-                            break;
-                        case MainForm.UserAction.MultiplayerClient:
-                            parameters.Add("-multiplayerclient");
-                            break;
-                        case MainForm.UserAction.MultiplayerServer:
-                            parameters.Add("-multiplayerserver");
-                            break;
-                        case MainForm.UserAction.SinglePlayerTimetableGame:
-                            parameters.Add("-start");
-                            break;
-                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
-                            parameters.Add("-resume");
-                            break;
-                        case MainForm.UserAction.MultiplayerClientResumeSave:
-                            parameters.Add("-multiplayerclient");
-                            break;
-                        case MainForm.UserAction.MultiplayerServerResumeSave:
-                            parameters.Add("-multiplayerserver");
-                            break;
-                    }
-                    switch (MainForm.SelectedAction)
-                    {
-                        case MainForm.UserAction.SingleplayerNewGame:
-                        case MainForm.UserAction.MultiplayerClient:
-                        case MainForm.UserAction.MultiplayerServer:
-                            if (MainForm.SelectedActivity is ORTS.Menu.DefaultExploreActivity)
-                            {
-                                var exploreActivity = MainForm.SelectedActivity as ORTS.Menu.DefaultExploreActivity;
-                                parameters.Add(String.Format("-explorer \"{0}\" \"{1}\" {2} {3} {4}",
-                                    exploreActivity.Path.FilePath,
-                                    exploreActivity.Consist.FilePath,
-                                    exploreActivity.StartTime,
-                                    (int)exploreActivity.Season,
-                                    (int)exploreActivity.Weather));
-                            }
-                            else if (MainForm.SelectedActivity is ORTS.Menu.ExploreThroughActivity)
-                            {
-                                var exploreActivity = MainForm.SelectedActivity as ORTS.Menu.ExploreThroughActivity;
-                                parameters.Add(String.Format("-exploreactivity \"{0}\" \"{1}\" {2} {3} {4}",
-                                    exploreActivity.Path.FilePath,
-                                    exploreActivity.Consist.FilePath,
-                                    exploreActivity.StartTime,
-                                    (int)exploreActivity.Season,
-                                    (int)exploreActivity.Weather));
-                            }
-                            else
-                            {
-                                parameters.Add(String.Format("-activity \"{0}\"", MainForm.SelectedActivity.FilePath));
-                            }
-                            break;
-                        case MainForm.UserAction.SingleplayerResumeSave:
-                        case MainForm.UserAction.SingleplayerReplaySave:
-                        case MainForm.UserAction.SingleplayerReplaySaveFromSave:
-                        case MainForm.UserAction.MultiplayerClientResumeSave:
-                        case MainForm.UserAction.MultiplayerServerResumeSave:
-                            parameters.Add("\"" + MainForm.SelectedSaveFile + "\"");
-                            break;
-                        case MainForm.UserAction.SinglePlayerTimetableGame:
-                            if (String.IsNullOrEmpty(MainForm.SelectedTimetableSet.WeatherFile))
-                            {
-                                parameters.Add(String.Format("-timetable \"{0}\" \"{1}:{2}\" {3} {4} {5}",
-                                    MainForm.SelectedTimetableSet.fileName,
-                                    MainForm.SelectedTimetable,
-                                    MainForm.SelectedTimetableTrain,
-                                    MainForm.SelectedTimetableSet.Day,
-                                    MainForm.SelectedTimetableSet.Season,
-                                    MainForm.SelectedTimetableSet.Weather));
-                            }
-                            else
-                            {
-                                parameters.Add(String.Format("-timetable \"{0}\" \"{1}:{2}\" {3} {4} {5} \"{6}\" ",
-                                    MainForm.SelectedTimetableSet.fileName,
-                                    MainForm.SelectedTimetable,
-                                    MainForm.SelectedTimetableTrain,
-                                    MainForm.SelectedTimetableSet.Day,
-                                    MainForm.SelectedTimetableSet.Season,
-                                    MainForm.SelectedTimetableSet.Weather,
-                                    MainForm.SelectedTimetableSet.WeatherFile));
-                            }
-                            break;
-                        case MainForm.UserAction.SinglePlayerResumeTimetableGame:
-                            parameters.Add("\"" + MainForm.SelectedSaveFile + "\"");
-                            break;
-                    }
-                    
-                    var joinedParameters = string.Join(" ", parameters);
-                    if ((Control.ModifierKeys & Keys.Alt) == Keys.Alt)
-                    {
-                        Clipboard.SetText(joinedParameters);
-                        MessageBox.Show(
-                            "RunActivity.exe arguments have been copied to the clipboard:" +
-                            $"\n\n{joinedParameters}\n\n" +
-                            "This is a debugging aid. If you wanted to start the simulator instead, select Start without holding down the Alt key.");
-                        continue;
-                    }
+            return AppBuilder.Configure<App>()
+                .UsePlatformDetect()
+                .LogToTrace();
+        }
 
-                    var processStartInfo = new ProcessStartInfo()
-                    {
-                        FileName = MainForm.RunActivityProgram,
-                        Arguments = joinedParameters,
-                        WindowStyle = ProcessWindowStyle.Normal,
-                        WorkingDirectory = ApplicationInfo.ProcessDirectory,
-                    };
-                    var process = Process.Start(processStartInfo);
-                    process.WaitForExit();
-                }
+        /// <summary>
+        /// Builds the RunActivity command line for the action chosen in the main window.
+        /// Each element is one argument; they are passed to the process via <see cref="ProcessStartInfo.ArgumentList"/>
+        /// so no quoting is needed, whatever the platform.
+        /// </summary>
+        public static List<string> GetRunActivityArguments(MainWindow mainWindow)
+        {
+            var parameters = new List<string>();
+            switch (mainWindow.SelectedAction)
+            {
+                case MainWindow.UserAction.SingleplayerNewGame:
+                    parameters.Add("-start");
+                    break;
+                case MainWindow.UserAction.SingleplayerResumeSave:
+                    parameters.Add("-resume");
+                    break;
+                case MainWindow.UserAction.SingleplayerReplaySave:
+                    parameters.Add("-replay");
+                    break;
+                case MainWindow.UserAction.SingleplayerReplaySaveFromSave:
+                    parameters.Add("-replay_from_save");
+                    break;
+                case MainWindow.UserAction.MultiplayerClient:
+                    parameters.Add("-multiplayerclient");
+                    break;
+                case MainWindow.UserAction.MultiplayerServer:
+                    parameters.Add("-multiplayerserver");
+                    break;
+                case MainWindow.UserAction.SinglePlayerTimetableGame:
+                    parameters.Add("-start");
+                    break;
+                case MainWindow.UserAction.SinglePlayerResumeTimetableGame:
+                    parameters.Add("-resume");
+                    break;
+                case MainWindow.UserAction.MultiplayerClientResumeSave:
+                    parameters.Add("-multiplayerclient");
+                    break;
+                case MainWindow.UserAction.MultiplayerServerResumeSave:
+                    parameters.Add("-multiplayerserver");
+                    break;
             }
+            switch (mainWindow.SelectedAction)
+            {
+                case MainWindow.UserAction.SingleplayerNewGame:
+                case MainWindow.UserAction.MultiplayerClient:
+                case MainWindow.UserAction.MultiplayerServer:
+                    if (mainWindow.SelectedActivity is ORTS.Menu.DefaultExploreActivity exploreActivity)
+                    {
+                        parameters.AddRange(new[] {
+                            "-explorer",
+                            exploreActivity.Path.FilePath,
+                            exploreActivity.Consist.FilePath,
+                            exploreActivity.StartTime,
+                            ((int)exploreActivity.Season).ToString(),
+                            ((int)exploreActivity.Weather).ToString(),
+                        });
+                    }
+                    else if (mainWindow.SelectedActivity is ORTS.Menu.ExploreThroughActivity exploreThroughActivity)
+                    {
+                        parameters.AddRange(new[] {
+                            "-exploreactivity",
+                            exploreThroughActivity.Path.FilePath,
+                            exploreThroughActivity.Consist.FilePath,
+                            exploreThroughActivity.StartTime,
+                            ((int)exploreThroughActivity.Season).ToString(),
+                            ((int)exploreThroughActivity.Weather).ToString(),
+                        });
+                    }
+                    else
+                    {
+                        parameters.Add("-activity");
+                        parameters.Add(mainWindow.SelectedActivity.FilePath);
+                    }
+                    break;
+                case MainWindow.UserAction.SingleplayerResumeSave:
+                case MainWindow.UserAction.SingleplayerReplaySave:
+                case MainWindow.UserAction.SingleplayerReplaySaveFromSave:
+                case MainWindow.UserAction.MultiplayerClientResumeSave:
+                case MainWindow.UserAction.MultiplayerServerResumeSave:
+                    parameters.Add(mainWindow.SelectedSaveFile);
+                    break;
+                case MainWindow.UserAction.SinglePlayerTimetableGame:
+                    parameters.AddRange(new[] {
+                        "-timetable",
+                        mainWindow.SelectedTimetableSet.fileName,
+                        $"{mainWindow.SelectedTimetable}:{mainWindow.SelectedTimetableTrain}",
+                        mainWindow.SelectedTimetableSet.Day.ToString(),
+                        mainWindow.SelectedTimetableSet.Season.ToString(),
+                        mainWindow.SelectedTimetableSet.Weather.ToString(),
+                    });
+                    if (!String.IsNullOrEmpty(mainWindow.SelectedTimetableSet.WeatherFile))
+                        parameters.Add(mainWindow.SelectedTimetableSet.WeatherFile);
+                    break;
+                case MainWindow.UserAction.SinglePlayerResumeTimetableGame:
+                    parameters.Add(mainWindow.SelectedSaveFile);
+                    break;
+            }
+            return parameters;
         }
     }
 }
