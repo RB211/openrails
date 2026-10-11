@@ -35,7 +35,7 @@ namespace Orts.Simulation.RollingStocks
             GenericWAGFile wagFile = null;
 
             string orFile = ORFileHelper.GetORTSFilePath(wagFilePath);
-            bool ortsWag = File.Exists(orFile);
+            bool ortsWag = File.Exists(ORTS.IO.PathResolver.Resolve(orFile));
 
             if (ortsWag)
                 wagFile = SharedGenericWAGFileManager.Get(orFile);

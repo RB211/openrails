@@ -296,7 +296,7 @@ namespace Orts.Simulation.Timetables
             }
 
 #if DEBUG_TIMETABLE
-            if (File.Exists(@"C:\temp\timetableproc.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\timetableproc.txt")))
             {
                 File.Delete(@"C:\temp\timetableproc.txt");
             }
@@ -1167,11 +1167,11 @@ namespace Orts.Simulation.Timetables
                 bool binaryloaded = false;
                 var formedpathFilefullBinary = simulator.Settings.GetCacheFilePath("Path", formedpathFilefull);
 
-                if (BinaryPaths && File.Exists(formedpathFilefullBinary))
+                if (BinaryPaths && File.Exists(ORTS.IO.PathResolver.Resolve(formedpathFilefullBinary)))
                 {
-                    var binaryLastWriteTime = File.GetLastWriteTime(formedpathFilefullBinary);
+                    var binaryLastWriteTime = File.GetLastWriteTime(ORTS.IO.PathResolver.Resolve(formedpathFilefullBinary));
                     if (binaryLastWriteTime < simulator.TDB.LastWriteTime ||
-                        (File.Exists(formedpathFilefull) && binaryLastWriteTime < File.GetLastWriteTime(formedpathFilefull)))
+                        (File.Exists(ORTS.IO.PathResolver.Resolve(formedpathFilefull)) && binaryLastWriteTime < File.GetLastWriteTime(ORTS.IO.PathResolver.Resolve(formedpathFilefull))))
                     {
                         File.Delete(formedpathFilefullBinary);
                     }
@@ -1179,7 +1179,7 @@ namespace Orts.Simulation.Timetables
                     {
                         try
                         {
-                            var infpath = new BinaryReader(new FileStream(formedpathFilefullBinary, FileMode.Open, FileAccess.Read));
+                            var infpath = new BinaryReader(new FileStream(ORTS.IO.PathResolver.Resolve(formedpathFilefullBinary), FileMode.Open, FileAccess.Read));
                             var cachePath = infpath.ReadString();
                             if (cachePath != formedpathFilefull)
                             {
@@ -1244,7 +1244,7 @@ namespace Orts.Simulation.Timetables
                         {
                             try
                             {
-                                var outfpath = new BinaryWriter(new FileStream(formedpathFilefullBinary, FileMode.Create));
+                                var outfpath = new BinaryWriter(new FileStream(ORTS.IO.PathResolver.Resolve(formedpathFilefullBinary), FileMode.Create));
                                 outfpath.Write(formedpathFilefull);
                                 outPath.Save(outfpath);
                                 outfpath.Close();
@@ -2464,11 +2464,11 @@ namespace Orts.Simulation.Timetables
                         wagonFilePath = Path.ChangeExtension(wagonFilePath, ".eng");
                     else if (wagon.IsEOT)
                     {
-                        wagonFolder = simulator.BasePath + @"\trains\orts_eot\" + wagon.Folder;
-                        wagonFilePath = wagonFolder + @"\" + wagon.Name + ".eot";
+                        wagonFolder = simulator.BasePath + @"/trains/orts_eot/" + wagon.Folder;
+                        wagonFilePath = wagonFolder + @"/" + wagon.Name + ".eot";
                     }
 
-                    if (!File.Exists(wagonFilePath))
+                    if (!File.Exists(ORTS.IO.PathResolver.Resolve(wagonFilePath)))
                     {
                         Trace.TraceWarning($"Ignored missing {(wagon.IsEngine ? "engine" : "wagon")} {wagonFilePath} in consist {consistFile}");
                         continue;

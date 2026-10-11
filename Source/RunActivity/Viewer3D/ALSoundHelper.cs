@@ -1239,7 +1239,7 @@ namespace Orts.Viewer3D
 
             if (SoundQueue[QueueTail % QUEUELENGHT].SoundPiece != null)
             {
-                retval[1] = SoundQueue[QueueTail % QUEUELENGHT].SoundPiece.Name.Split('\\').Last();
+                retval[1] = SoundQueue[QueueTail % QUEUELENGHT].SoundPiece.Name.Split('\\', '/').Last();
                 retval[2] = SoundQueue[QueueTail % QUEUELENGHT].SoundPiece.NumCuePoints.ToString();
             }
             else

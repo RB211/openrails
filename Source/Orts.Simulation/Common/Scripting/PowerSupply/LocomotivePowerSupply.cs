@@ -621,16 +621,13 @@ namespace ORTS.Scripting.Api
         protected T LoadParameter<T>(string sectionName, string keyName, T defaultValue)
         {
             string buffer;
-            int length;
 
-            if (File.Exists(LpsHost.ParametersFileName))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(LpsHost.ParametersFileName)))
             {
-                buffer = new string('\0', 256);
-                length = NativeMethods.GetPrivateProfileString(sectionName, keyName, null, buffer, buffer.Length, LpsHost.ParametersFileName);
+                buffer = IniFile.GetValue(sectionName, keyName, LpsHost.ParametersFileName);
 
-                if (length > 0)
+                if (!string.IsNullOrEmpty(buffer))
                 {
-                    buffer = buffer.Trim('\0').Trim();
                     return (T)Convert.ChangeType(buffer, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
                 }
             }

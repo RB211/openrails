@@ -43,7 +43,7 @@ namespace ORTS.Menu
 
         protected TimetableInfo(string filePath)
         {
-            if (File.Exists(filePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 try
                 {
@@ -64,7 +64,7 @@ namespace ORTS.Menu
 
         protected TimetableInfo(String filePath, String directory)
         {
-            if (File.Exists(filePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 try
                 {
@@ -98,9 +98,9 @@ namespace ORTS.Menu
                 var actdirectory = System.IO.Path.Combine(route.Path, "ACTIVITIES");
                 var directory = System.IO.Path.Combine(actdirectory, "OPENRAILS");
 
-                if (Directory.Exists(directory))
+                if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
                 {
-                    foreach (var ORTimetableFile in Directory.GetFiles(directory, "*.timetable_or"))
+                    foreach (var ORTimetableFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.timetable_or"))
                     {
                         try
                         {
@@ -109,7 +109,7 @@ namespace ORTS.Menu
                         catch { }
                     }
 
-                    foreach (var ORTimetableFile in Directory.GetFiles(directory, "*.timetable-or"))
+                    foreach (var ORTimetableFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.timetable-or"))
                     {
                         try
                         {
@@ -118,7 +118,7 @@ namespace ORTS.Menu
                         catch { }
                     }
 
-                    foreach (var ORMultitimetableFile in Directory.GetFiles(directory, "*.timetablelist_or"))
+                    foreach (var ORMultitimetableFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.timetablelist_or"))
                     {
                         try
                         {
@@ -127,7 +127,7 @@ namespace ORTS.Menu
                         catch { }
                     }
 
-                    foreach (var ORMultitimetableFile in Directory.GetFiles(directory, "*.timetablelist-or"))
+                    foreach (var ORMultitimetableFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.timetablelist-or"))
                     {
                         try
                         {
@@ -147,7 +147,7 @@ namespace ORTS.Menu
 
         public WeatherFileInfo(string filename)
         {
-            filedetails = new FileInfo(filename);
+            filedetails = new FileInfo(ORTS.IO.PathResolver.Resolve(filename));
         }
 
         public override string ToString()
@@ -168,9 +168,9 @@ namespace ORTS.Menu
             {
                 var directory = System.IO.Path.Combine(route.Path, "WeatherFiles");
 
-                if (Directory.Exists(directory))
+                if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
                 {
-                    foreach (var weatherFile in Directory.GetFiles(directory, "*.weather-or"))
+                    foreach (var weatherFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.weather-or"))
                     {
                         weatherInfo.Add(new WeatherFileInfo(weatherFile));
                     }

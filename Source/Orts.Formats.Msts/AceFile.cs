@@ -33,7 +33,7 @@ namespace Orts.Formats.Msts
     {
         public static Texture2D Texture2DFromFile(GraphicsDevice graphicsDevice, string fileName)
         {
-            using (var stream = File.OpenRead(fileName))
+            using (var stream = File.OpenRead(ORTS.IO.PathResolver.Resolve(fileName)))
                 return Texture2DFromStream(graphicsDevice, stream);
         }
 

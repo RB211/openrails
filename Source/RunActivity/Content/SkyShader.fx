@@ -23,6 +23,8 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float4   LightVector;  // Direction vector to sun, w = 1/length of vector
 float    Time;  // Used for moving textures across the sky
@@ -36,13 +38,13 @@ float2   MoonTexCoord;
 float    CloudColor;
 float3   RightVector;
 float3   UpVector;
-texture  SkyMapTexture;
-texture  StarMapTexture;
-texture  MoonMapTexture;
-texture  MoonMaskTexture;
-texture  CloudMapTexture;
+Texture2D  SkyMapTexture;
+Texture2D  StarMapTexture;
+Texture2D  MoonMapTexture;
+Texture2D  MoonMaskTexture;
+Texture2D  CloudMapTexture;
 
-sampler SkyMapSampler = sampler_state
+SamplerState SkyMapSampler = sampler_state
 {
 	Texture = (SkyMapTexture);
 	MAGFILTER = LINEAR;
@@ -53,7 +55,7 @@ sampler SkyMapSampler = sampler_state
 	AddressV = Wrap;
 };
 
-sampler StarMapSampler = sampler_state
+SamplerState StarMapSampler = sampler_state
 {
 	Texture = (StarMapTexture);
 	MAGFILTER = LINEAR;
@@ -64,7 +66,7 @@ sampler StarMapSampler = sampler_state
 	AddressV = wrap;
 };
 
-sampler MoonMapSampler = sampler_state
+SamplerState MoonMapSampler = sampler_state
 {
 	Texture = (MoonMapTexture);
 	MAGFILTER = LINEAR;
@@ -75,7 +77,7 @@ sampler MoonMapSampler = sampler_state
 	AddressV = wrap;
 };
 
-sampler MoonMaskSampler = sampler_state
+SamplerState MoonMaskSampler = sampler_state
 {
 	Texture = (MoonMaskTexture);
 	MAGFILTER = LINEAR;
@@ -86,7 +88,7 @@ sampler MoonMaskSampler = sampler_state
 	AddressV = wrap;
 };
 
-sampler CloudMapSampler = sampler_state
+SamplerState CloudMapSampler = sampler_state
 {
 	Texture = (CloudMapTexture);
 	MAGFILTER = LINEAR;
@@ -110,7 +112,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Pos      : POSITION;
+	float4 Pos      : SV_POSITION;
 	float3 Normal   : TEXCOORD0;
 	float2 TexCoord : TEXCOORD1;
 };
@@ -166,12 +168,12 @@ float3 ContrastSaturationBrightness(float3 color, float brt, float sat, float co
 	return conColor;
 }
 
-float4 PSSky(VERTEX_OUTPUT In) : COLOR
+float4 PSSky(VERTEX_OUTPUT In) : SV_TARGET0
 {
 	// Get the color information for the current pixel
-	float4 skyColor = tex2D(SkyMapSampler, In.TexCoord);
+	float4 skyColor = SkyMapTexture.Sample(SkyMapSampler, In.TexCoord);
 	float2 TexCoord = float2((1.0 - In.TexCoord.x) + Time, In.TexCoord.y);
-	float4 starColor = tex2D(StarMapSampler, TexCoord);
+	float4 starColor = StarMapTexture.Sample(StarMapSampler, TexCoord);
 	
 	// Adjust sky color brightness for time of day
 	skyColor *= SkyColor.y;
@@ -234,12 +236,12 @@ float4 PSSky(VERTEX_OUTPUT In) : COLOR
 	return skyColor;
 }
 
-float4 PSMoon(VERTEX_OUTPUT In) : COLOR
+float4 PSMoon(VERTEX_OUTPUT In) : SV_TARGET0
 {
 	// Get the color information for the current pixel
 	float2 TexCoord = float2(MoonTexCoord.x + In.TexCoord.x * 0.5, MoonTexCoord.y + In.TexCoord.y * 0.25);
-	float4 moonColor = tex2D(MoonMapSampler, TexCoord);
-	float4 moonMask = tex2D(MoonMaskSampler, In.TexCoord);
+	float4 moonColor = MoonMapTexture.Sample(MoonMapSampler, TexCoord);
+	float4 moonMask = MoonMaskTexture.Sample(MoonMaskSampler, In.TexCoord);
 	
 	// Fade moon during daylight
 	moonColor.a *= MoonColor.x;
@@ -253,10 +255,10 @@ float4 PSMoon(VERTEX_OUTPUT In) : COLOR
 	return moonColor;
 }
 
-float4 PSClouds(VERTEX_OUTPUT In) : COLOR
+float4 PSClouds(VERTEX_OUTPUT In) : SV_TARGET0
 {
 	float2 TexCoord = In.TexCoord.xy * CloudScalePosition.xy - CloudScalePosition.zw;
-	float4 cloudColor = tex2D(CloudMapSampler, TexCoord);
+	float4 cloudColor = CloudMapTexture.Sample(CloudMapSampler, TexCoord);
 	float alpha = cloudColor.a;
 	
     // Fogging
@@ -287,21 +289,21 @@ float4 PSClouds(VERTEX_OUTPUT In) : COLOR
 
 technique Sky {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSSky();
-	  PixelShader = compile ps_4_0_level_9_1 PSSky();
+	  VertexShader = compile VS_LOW VSSky();
+	  PixelShader = compile PS_LOW PSSky();
    }
 }
 
 technique Moon {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSMoon();
-	  PixelShader = compile ps_4_0_level_9_1 PSMoon();
+	  VertexShader = compile VS_LOW VSMoon();
+	  PixelShader = compile PS_LOW PSMoon();
    }
 }
 
 technique Clouds {
    pass Pass_0 {
-	  VertexShader = compile vs_4_0_level_9_1 VSSky();
-	  PixelShader = compile ps_4_0_level_9_1 PSClouds();
+	  VertexShader = compile VS_LOW VSSky();
+	  PixelShader = compile PS_LOW PSClouds();
    }
 }

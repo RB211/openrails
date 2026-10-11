@@ -222,7 +222,7 @@ namespace Orts.Formats.OR
             //{
                 // TODO: This code is BROKEN. It loads and saves file formats with internal type information included, which causes breakages if the types are moved. This is not acceptable for public, shared data.
                 //JsonSerializer serializer = new JsonSerializer();
-                //using (StreamReader sr = new StreamReader(fileName))
+                //using (StreamReader sr = new StreamReader(ORTS.IO.PathResolver.Resolve(fileName)))
                 //{
                 //    ORRouteConfig orRouteConfig = JsonConvert.DeserializeObject<ORRouteConfig>((string)sr.ReadToEnd(), new JsonSerializerSettings
                 //    {
@@ -434,7 +434,7 @@ namespace Orts.Formats.OR
             string currentProgFolder = dataFolder;
             currentProgFolder = Path.GetDirectoryName(currentProgFolder);
             string completeFileName = Path.Combine(currentProgFolder, "Open Rails");
-            if (!Directory.Exists(completeFileName)) Directory.CreateDirectory(completeFileName);
+            if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(completeFileName))) Directory.CreateDirectory(completeFileName);
             completeFileName = Path.Combine (completeFileName, "ORConfig.json");
             ORConfig loaded = DeserializeJSON(completeFileName);
             return loaded;
@@ -466,7 +466,7 @@ namespace Orts.Formats.OR
             try
             {
                 JsonSerializer serializer = new JsonSerializer();
-                using (StreamReader sr = new StreamReader(fileName))
+                using (StreamReader sr = new StreamReader(ORTS.IO.PathResolver.Resolve(fileName)))
                 {
                     ORConfig orConfig = JsonConvert.DeserializeObject<ORConfig>((string)sr.ReadToEnd(), new JsonSerializerSettings
                     {

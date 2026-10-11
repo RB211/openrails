@@ -34,7 +34,7 @@ namespace ORTS.Menu
 
         Route(string path)
         {
-            if (Directory.Exists(path))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
 				var trkFilePath = MSTSPath.GetTRKFileName(path);
                 try
@@ -67,9 +67,9 @@ namespace ORTS.Menu
         {
             var routes = new List<Route>();
             var directory = System.IO.Path.Combine(folder.Path, "ROUTES");
-            if (Directory.Exists(directory))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
             {
-                foreach (var routeDirectory in Directory.GetDirectories(directory))
+                foreach (var routeDirectory in Directory.GetDirectories(ORTS.IO.PathResolver.Resolve(directory)))
                 {
                     try
                     {

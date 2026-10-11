@@ -86,7 +86,7 @@ namespace Orts.Formats.OR
                     ClockShape.Name = path;
                     if (string.IsNullOrEmpty(stringValue))
                         return false;
-                    if (File.Exists(path) == false)
+                    if (File.Exists(ORTS.IO.PathResolver.Resolve(path)) == false)
                         Trace.TraceWarning($"Non-existent shape file {path} referenced in animated.clocks-or");
                     break;
 
@@ -180,7 +180,7 @@ namespace Orts.Formats.OR
                         else
                         {
                             var dataItem = new ClockShape(stf, shapePath);
-                            if (File.Exists(shapePath + dataItem.Name))
+                            if (File.Exists(ORTS.IO.PathResolver.Resolve(shapePath + dataItem.Name)))
                                 clockDataItems.Add(dataItem);
                             else
                                 STFException.TraceWarning(stf, String.Format("Non-existent shape file {0} referenced", dataItem.Name));

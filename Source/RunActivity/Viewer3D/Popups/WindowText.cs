@@ -27,12 +27,23 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
-using Font = System.Drawing.Font;
-using FontStyle = System.Drawing.FontStyle;
-using GraphicsUnit = System.Drawing.GraphicsUnit;
+using SkiaSharp;
 
 namespace Orts.Viewer3D.Popups
 {
+    /// <summary>
+    /// Font style flags; values match Orts.Viewer3D.Popups.FontStyle.
+    /// </summary>
+    [Flags]
+    public enum FontStyle
+    {
+        Regular = 0,
+        Bold = 1,
+        Italic = 2,
+        Underline = 4,
+        Strikeout = 8,
+    }
+
     public sealed class WindowTextManager
     {
         // THREAD SAFETY:
@@ -55,7 +66,7 @@ namespace Orts.Viewer3D.Popups
         /// size and style.</returns>
         public WindowTextFont GetScaled(string fontFamily, float sizeInPt, FontStyle style)
         {
-            return GetExact(fontFamily, sizeInPt * System.Drawing.Graphics.FromHwnd(IntPtr.Zero).DpiY / 96, style);
+            return GetExact(fontFamily, sizeInPt * DpiScale, style);
         }
 
         /// <summary>
@@ -92,7 +103,7 @@ namespace Orts.Viewer3D.Popups
         /// size and style with the given outline size.</returns>
         public WindowTextFont GetScaled(string fontFamily, float sizeInPt, FontStyle style, int outlineSize)
         {
-            return GetExact(fontFamily, sizeInPt * System.Drawing.Graphics.FromHwnd(IntPtr.Zero).DpiY / 96, style, outlineSize);
+            return GetExact(fontFamily, sizeInPt * DpiScale, style, outlineSize);
         }
 
         /// <summary>
@@ -122,6 +133,30 @@ namespace Orts.Viewer3D.Popups
             return fonts[key];
         }
 
+        /// <summary>
+        /// System DPI relative to 96 DPI. OPENRAILS_DPI_SCALE overrides it (useful on Wayland, where the
+        /// compositor's scale factor is not reported as a DPI).
+        /// </summary>
+        public static readonly float DpiScale = GetDpiScale();
+
+        static float GetDpiScale()
+        {
+            if (float.TryParse(Environment.GetEnvironmentVariable("OPENRAILS_DPI_SCALE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var scale) && scale > 0)
+                return scale;
+            try
+            {
+                if (OperatingSystem.IsWindows())
+                    return NativeMethods.GetDpiForSystem() / 96f;
+                if (NativeMethods.SDL_GetDisplayDPI(0, out _, out _, out var verticalDpi) == 0 && verticalDpi > 0)
+                    // X11 reports the physical DPI, which is noisy; round to the nearest quarter step like desktop scaling does.
+                    return Math.Max(1, (float)Math.Round(verticalDpi / 96 * 4) / 4);
+            }
+            catch (Exception error) when (error is DllNotFoundException || error is EntryPointNotFoundException)
+            {
+            }
+            return 1;
+        }
+
         [CallOnThread("Loader")]
         public void Load(GraphicsDevice graphicsDevice)
         {
@@ -133,7 +168,7 @@ namespace Orts.Viewer3D.Popups
 
     public sealed class WindowTextFont
     {
-        readonly Font Font;
+        readonly SKFont Font;
         readonly int FontHeight;
         readonly int OutlineSize;
 
@@ -144,12 +179,41 @@ namespace Orts.Viewer3D.Popups
 
         internal WindowTextFont(string fontFamily, float sizeInPt, FontStyle style, int outlineSize)
         {
-            Font = new Font(fontFamily, (int)Math.Round(sizeInPt * 96 / 72), style, GraphicsUnit.Pixel);
-            FontHeight = Font.Height;
+            Font = new SKFont(ResolveTypeface(fontFamily, style), (int)Math.Round(sizeInPt * 96 / 72))
+            {
+                Edging = SKFontEdging.Antialias,
+                Hinting = SKFontHinting.Normal,
+                Subpixel = false,
+            };
+            FontHeight = (int)Math.Ceiling(Font.Spacing);
             OutlineSize = outlineSize;
             Characters = new CharacterGroup(Font, OutlineSize);
             if (Viewer3D.Viewer.Catalog != null)
             EnsureCharacterData(Viewer3D.Viewer.Catalog.GetString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890 \",.-+|!$%&/()=?;:'_[]"));
+        }
+
+        /// <summary>
+        /// Windows font names used by Open Rails, with metric-compatible or similar alternatives found on other systems.
+        /// </summary>
+        static readonly Dictionary<string, string[]> FontSubstitutes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Arial", new[] { "Liberation Sans", "Arimo", "Helvetica", "DejaVu Sans", "Noto Sans" } },
+            { "Consolas", new[] { "Liberation Mono", "Cousine", "DejaVu Sans Mono", "Noto Sans Mono", "Menlo" } },
+            { "Courier New", new[] { "Liberation Mono", "Cousine", "DejaVu Sans Mono" } },
+            { "Segoe UI", new[] { "Noto Sans", "Cantarell", "DejaVu Sans", "Liberation Sans" } },
+        };
+
+        static SKTypeface ResolveTypeface(string fontFamily, FontStyle style)
+        {
+            var skStyle = new SKFontStyle((style & FontStyle.Bold) != 0 ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, (style & FontStyle.Italic) != 0 ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
+            var candidates = new[] { fontFamily }.Concat(FontSubstitutes.TryGetValue(fontFamily, out var substitutes) ? substitutes : Array.Empty<string>());
+            foreach (var candidate in candidates)
+            {
+                var typeface = SKFontManager.Default.MatchFamily(candidate, skStyle);
+                if (typeface != null)
+                    return typeface;
+            }
+            return SKTypeface.FromFamilyName(null, skStyle) ?? SKTypeface.Default;
         }
 
         /// <summary>
@@ -411,9 +475,8 @@ namespace Orts.Viewer3D.Popups
         sealed internal class CharacterGroup
         {
             const int BoxSpacing = 1;
-            const System.Windows.Forms.TextFormatFlags Flags = System.Windows.Forms.TextFormatFlags.NoPadding | System.Windows.Forms.TextFormatFlags.NoPrefix | System.Windows.Forms.TextFormatFlags.SingleLine | System.Windows.Forms.TextFormatFlags.Top;
 
-            readonly Font Font;
+            readonly SKFont Font;
             readonly int OutlineSize;
             readonly char[] Characters;
             public readonly Rectangle[] Boxes;
@@ -422,7 +485,7 @@ namespace Orts.Viewer3D.Popups
             public readonly Vector3[] AbcWidths;
             public Texture2D Texture { get; private set; }
 
-            public CharacterGroup(Font font, int outlineSize)
+            public CharacterGroup(SKFont font, int outlineSize)
             {
                 Font = font;
                 OutlineSize = outlineSize;
@@ -438,7 +501,7 @@ namespace Orts.Viewer3D.Popups
             {
             }
 
-            CharacterGroup(char[] characters, Font mergeFont, int mergeOutlineSize, char[] mergeCharacters, Rectangle[] mergeBoxes, Vector3[] mergeAbcWidths)
+            CharacterGroup(char[] characters, SKFont mergeFont, int mergeOutlineSize, char[] mergeCharacters, Rectangle[] mergeBoxes, Vector3[] mergeAbcWidths)
             {
                 Font = mergeFont;
                 OutlineSize = mergeOutlineSize;
@@ -446,57 +509,54 @@ namespace Orts.Viewer3D.Popups
                 Boxes = new Rectangle[Characters.Length];
                 AbcWidths = new Vector3[Characters.Length];
 
-                // Boring device context for APIs.
-                var hdc = NativeMethods.CreateCompatibleDC(IntPtr.Zero);
-                NativeMethods.SelectObject(hdc, Font.ToHfont());
-                try
+                var mergeIndex = 0;
+                var spacing = BoxSpacing + OutlineSize;
+                var x = spacing;
+                var y = spacing;
+                var height = (int)Math.Ceiling(Font.Spacing) + 1;
+                for (var i = 0; i < Characters.Length; i++)
                 {
-                    // Get character glyph indices to identify those not supported by this font.
-                    var charactersGlyphs = new short[Characters.Length];
-                    if (NativeMethods.GetGlyphIndices(hdc, new String(Characters), Characters.Length, charactersGlyphs, NativeMethods.GgiFlags.MarkNonexistingGlyphs) != Characters.Length) throw new Exception();
-
-                    var mergeIndex = 0;
-                    var spacing = BoxSpacing + OutlineSize;
-                    var x = spacing;
-                    var y = spacing;
-                    var height = (int)Math.Ceiling(Font.GetHeight()) + 1;
-                    for (var i = 0; i < Characters.Length; i++)
+                    // Copy ABC widths from merge data or calculate ourselves.
+                    if ((mergeIndex < mergeCharacters.Length) && (mergeCharacters[mergeIndex] == Characters[i]))
                     {
-                        // Copy ABC widths from merge data or calculate ourselves.
-                        if ((mergeIndex < mergeCharacters.Length) && (mergeCharacters[mergeIndex] == Characters[i]))
-                        {
-                            AbcWidths[i] = mergeAbcWidths[mergeIndex];
-                            mergeIndex++;
-                        }
-                        else if (charactersGlyphs[i] != -1)
-                        {
-                            NativeStructs.AbcFloatWidth characterAbcWidth;
-                            if (!NativeMethods.GetCharABCWidthsFloat(hdc, Characters[i], Characters[i], out characterAbcWidth)) throw new Exception();
-                            AbcWidths[i] = new Vector3(characterAbcWidth.A, characterAbcWidth.B, characterAbcWidth.C);
-                        }
-                        else
-                        {
-                            // This is a bit of a cheat, but is used when the chosen font does not have the character itself but it will render anyway (e.g. through font fallback).
-                            AbcWidths[i] = new Vector3(0, System.Windows.Forms.TextRenderer.MeasureText(String.Format(" {0} ", Characters[i]), Font, System.Drawing.Size.Empty, Flags).Width - System.Windows.Forms.TextRenderer.MeasureText("  ", Font, System.Drawing.Size.Empty, Flags).Width, 0);
-                        }
-                        Boxes[i] = new Rectangle(x, y, (int)(Math.Max(0, AbcWidths[i].X) + AbcWidths[i].Y + Math.Max(0, AbcWidths[i].Z) + 2 * OutlineSize), height + 2 * OutlineSize);
-                        x += Boxes[i].Width + BoxSpacing;
-                        if (x >= 256)
-                        {
-                            x = BoxSpacing;
-                            y += Boxes[i].Height + BoxSpacing;
-                        }
+                        AbcWidths[i] = mergeAbcWidths[mergeIndex];
+                        mergeIndex++;
                     }
+                    else
+                    {
+                        AbcWidths[i] = GetAbcWidths(Characters[i]);
+                    }
+                    Boxes[i] = new Rectangle(x, y, (int)(Math.Max(0, AbcWidths[i].X) + AbcWidths[i].Y + Math.Max(0, AbcWidths[i].Z) + 2 * OutlineSize), height + 2 * OutlineSize);
+                    x += Boxes[i].Width + BoxSpacing;
+                    if (x >= 256)
+                    {
+                        x = BoxSpacing;
+                        y += Boxes[i].Height + BoxSpacing;
+                    }
+                }
 
-                    // TODO: Copy boxes from the merge data.
-                }
-                finally
-                {
-                    // Cleanup.
-                    NativeMethods.DeleteDC(hdc);
-                }
+                // TODO: Copy boxes from the merge data.
                 BoxesMaxRight = Boxes.Max(b => b.Right);
                 BoxesMaxBottom = Boxes.Max(b => b.Bottom);
+            }
+
+            /// <summary>
+            /// Equivalent of Win32 GetCharABCWidthsFloat: A is the left side bearing, B the ink width and C the
+            /// right side bearing, so A + B + C is the advance. Missing glyphs use whatever fallback the font gives.
+            /// </summary>
+            Vector3 GetAbcWidths(char character)
+            {
+                var text = character.ToString();
+                var glyphs = Font.GetGlyphs(text);
+                var widths = new float[glyphs.Length];
+                var bounds = new SKRect[glyphs.Length];
+                Font.GetGlyphWidths(glyphs, widths, bounds);
+                var advance = (float)Math.Round(widths.Sum());
+                if (glyphs.Length == 0 || bounds[0].IsEmpty)
+                    return new Vector3(0, advance, 0);
+                var a = (float)Math.Floor(bounds[0].Left);
+                var b = (float)Math.Ceiling(bounds[0].Right) - a;
+                return new Vector3(a, b, advance - a - b);
             }
 
             public bool ContainsCharacter(char character)
@@ -509,22 +569,31 @@ namespace Orts.Viewer3D.Popups
                 return Array.BinarySearch(Characters, character);
             }
 
-            byte[] GetBitmapData(System.Drawing.Rectangle rectangle)
+            /// <summary>
+            /// Renders all characters as white-on-black into a 32bpp buffer, matching what the GDI version produced.
+            /// </summary>
+            byte[] GetBitmapData(Rectangle rectangle)
             {
-                var bitmap = new System.Drawing.Bitmap(rectangle.Width, rectangle.Height, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
-                var buffer = new byte[4 * rectangle.Width * rectangle.Height];
-                using (var g = System.Drawing.Graphics.FromImage(bitmap))
+                var info = new SKImageInfo(rectangle.Width, rectangle.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+                var buffer = new byte[info.BytesSize];
+                var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+                try
                 {
-                    // Clear to black.
-                    g.FillRectangle(new System.Drawing.SolidBrush(System.Drawing.Color.Black), rectangle);
-
-                    // Draw the text using system text drawing (yay, ClearType).
-                    for (var i = 0; i < Characters.Length; i++)
-                        System.Windows.Forms.TextRenderer.DrawText(g, Characters[i].ToString(), Font, new System.Drawing.Point(Boxes[i].X + OutlineSize, Boxes[i].Y + OutlineSize), System.Drawing.Color.White, Flags);
+                    using (var surface = SKSurface.Create(info, handle.AddrOfPinnedObject(), info.RowBytes))
+                    using (var paint = new SKPaint { Color = SKColors.White, IsAntialias = true })
+                    {
+                        var canvas = surface.Canvas;
+                        canvas.Clear(SKColors.Black);
+                        var baseline = -Font.Metrics.Ascent;
+                        for (var i = 0; i < Characters.Length; i++)
+                            canvas.DrawText(Characters[i].ToString(), Boxes[i].X + OutlineSize, Boxes[i].Y + OutlineSize + baseline, SKTextAlign.Left, Font, paint);
+                        canvas.Flush();
+                    }
                 }
-                var bits = bitmap.LockBits(rectangle, System.Drawing.Imaging.ImageLockMode.ReadOnly, bitmap.PixelFormat);
-                Marshal.Copy(bits.Scan0, buffer, 0, buffer.Length);
-                bitmap.UnlockBits(bits);
+                finally
+                {
+                    handle.Free();
+                }
                 return buffer;
             }
 
@@ -534,7 +603,7 @@ namespace Orts.Viewer3D.Popups
                 if (Texture != null || Characters.Length == 0)
                     return;
 
-                var rectangle = new System.Drawing.Rectangle(0, 0, BoxesMaxRight, BoxesMaxBottom);
+                var rectangle = new Rectangle(0, 0, BoxesMaxRight, BoxesMaxBottom);
                 var buffer = GetBitmapData(rectangle);
 
                 for (var y = 0; y < rectangle.Height; y++)
@@ -587,49 +656,13 @@ namespace Orts.Viewer3D.Popups
         }
     }
 
-    static class NativeStructs
-    {
-        [DebuggerDisplay("{First} + {Second} = {Amount}")]
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        public struct KerningPair
-        {
-            public char First;
-            public char Second;
-            public int Amount;
-        }
-
-        [DebuggerDisplay("{A} + {B} + {C}")]
-        [StructLayout(LayoutKind.Sequential)]
-        public struct AbcFloatWidth
-        {
-            public float A;
-            public float B;
-            public float C;
-        }
-    }
-
     static class NativeMethods
     {
-        [DllImport("gdi32.dll", SetLastError = true)]
-        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForSystem();
 
-        [DllImport("gdi32.dll", SetLastError = true)]
-        public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
-
-        [DllImport("gdi32.dll", SetLastError = true)]
-        public static extern bool DeleteDC(IntPtr hdc);
-
-        [Flags]
-        public enum GgiFlags : uint
-        {
-            None = 0,
-            MarkNonexistingGlyphs = 1,
-        }
-
-        [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        public static extern uint GetGlyphIndices(IntPtr hdc, string text, int textLength, [Out] short[] indices, GgiFlags flags);
-
-        [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        public static extern bool GetCharABCWidthsFloat(IntPtr hdc, uint firstChar, uint lastChar, out NativeStructs.AbcFloatWidth abcFloatWidths);
+        /// <summary>SDL2, exported by MonoGame's native runtime.</summary>
+        [DllImport("mgruntime", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int SDL_GetDisplayDPI(int displayIndex, out float diagonalDpi, out float horizontalDpi, out float verticalDpi);
     }
 }

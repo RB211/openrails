@@ -315,7 +315,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 }
                 else
                 {
-                    container.LoadFromContainerFile(loadFilePath, Wagon.Simulator.BasePath +@"\trains\trainset\");
+                    container.LoadFromContainerFile(loadFilePath, Wagon.Simulator.BasePath +@"/trains/trainset/");
                     ContainerManager.LoadedContainers.Add(loadFilePath, container);
                 }
                 container.ComputeLoadWeight(loadState);
@@ -356,9 +356,9 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                 {
                     foreach (var loadData in loadDataList)
                     {
-                        string loadDataFolder = Wagon.Simulator.BasePath + @"\trains\trainset\" + loadData.Folder;
-                        string loadFilePath = loadDataFolder + @"\" + loadData.Name + ".load-or";
-                        if (!File.Exists(loadFilePath))
+                        string loadDataFolder = Wagon.Simulator.BasePath + @"/trains/trainset/" + loadData.Folder;
+                        string loadFilePath = loadDataFolder + @"/" + loadData.Name + ".load-or";
+                        if (!File.Exists(ORTS.IO.PathResolver.Resolve(loadFilePath)))
                         {
                             Trace.TraceWarning($"Ignored missing load {loadFilePath}");
                             continue;

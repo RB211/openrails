@@ -48,7 +48,7 @@ namespace ORTS.Menu
         /// <param name="filePath">The full name of the .pat file</param>
         internal Path(string filePath)
         {
-            if (File.Exists(filePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 try
                 {
@@ -90,9 +90,9 @@ namespace ORTS.Menu
         {
             var paths = new List<Path>();
             var directory = System.IO.Path.Combine(route.Path, "PATHS");
-            if (Directory.Exists(directory))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
             {
-                foreach (var file in Directory.GetFiles(directory, "*.pat"))
+                foreach (var file in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.pat"))
                 {
                     Path path = null;
                     try

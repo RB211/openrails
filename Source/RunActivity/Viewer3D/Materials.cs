@@ -20,7 +20,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -101,12 +100,12 @@ namespace Orts.Viewer3D
                         {
                             var dds = Path.ChangeExtension(depthPath, ".dds");
                             var ace = Path.ChangeExtension(depthPath, ".ace");
-                            if (File.Exists(dds))
+                            if (File.Exists(ORTS.IO.PathResolver.Resolve(dds)))
                             {
                                 DDSLib.DDSFromFile(dds, GraphicsDevice, true, out Texture2D texture);
                                 return Textures[textureKey] = texture;
                             }
-                            if (File.Exists(ace))
+                            if (File.Exists(ORTS.IO.PathResolver.Resolve(ace)))
                             {
                                 return Textures[textureKey] = Formats.Msts.AceFile.Texture2DFromFile(GraphicsDevice, ace);
                             }
@@ -152,7 +151,7 @@ namespace Orts.Viewer3D
         /// <returns>The <see cref="Texture2D"/> created from the given <paramref name="path"/> or a missing placeholder.</returns>
         public static Texture2D LoadInternal(GraphicsDevice graphicsDevice, string path)
         {
-            if (!File.Exists(path))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
                 Trace.TraceError("Missing internal file: {0}", path);
                 return GetInternalMissingTexture(graphicsDevice);
@@ -180,29 +179,21 @@ namespace Orts.Viewer3D
         {
             if (string.IsNullOrEmpty(path)) return SharedMaterialManager.MissingTexture;
 
-            path = path.ToLowerInvariant();
-            var ext = Path.GetExtension(path);
+            var ext = Path.GetExtension(path).ToLowerInvariant();
 
-            using (var stream = File.OpenRead(path))
+            using (var stream = File.OpenRead(ORTS.IO.PathResolver.Resolve(path)))
             {
                 if (ext == ".bmp" || ext == ".png")
                 {
-                    using (var image = System.Drawing.Image.FromStream(stream))
+                    using (var image = Texture2D.FromStream(graphicsDevice, stream))
                     {
-                        using (var memoryStream = new MemoryStream())
-                        {
-                            var mapRectangle = new System.Drawing.Rectangle
-                            {
-                                Height = MapRectangle.Height,
-                                Width = MapRectangle.Width,
-                                X = MapRectangle.X,
-                                Y = MapRectangle.Y
-                            };
-                            var imageRect = new Bitmap(image).Clone(mapRectangle, image.PixelFormat);
-                            imageRect.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
-                            memoryStream.Seek(0, SeekOrigin.Begin);
-                            return Texture2D.FromStream(graphicsDevice, memoryStream);
-                        }
+                        // Crop the requested region out of the full image.
+                        var region = Rectangle.Intersect(MapRectangle, image.Bounds);
+                        var data = new Color[region.Width * region.Height];
+                        image.GetData(0, region, data, 0, data.Length);
+                        var cropped = new Texture2D(graphicsDevice, region.Width, region.Height, false, SurfaceFormat.Color);
+                        cropped.SetData(data);
+                        return cropped;
                     }
                 }
                 else
@@ -281,15 +272,15 @@ namespace Orts.Viewer3D
             PopupWindowShader = new PopupWindowShader(viewer, viewer.RenderProcess.GraphicsDevice);
             PrecipitationShader = new PrecipitationShader(viewer.RenderProcess.GraphicsDevice);
             SceneryShader = new SceneryShader(viewer.RenderProcess.GraphicsDevice);
-            var microtexPath = viewer.Simulator.RoutePath + @"\TERRTEX\microtex";
+            var microtexPath = viewer.Simulator.RoutePath + @"/TERRTEX/microtex";
             try
             {
-                if (File.Exists(microtexPath + ".dds"))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve(microtexPath + ".dds")))
                 {
                     DDSLib.DDSFromFile(microtexPath + ".dds", viewer.GraphicsDevice, true, out Texture2D microtex);
                     SceneryShader.OverlayTexture = microtex;
                 }
-                else if (File.Exists(microtexPath + ".ace"))
+                else if (File.Exists(ORTS.IO.PathResolver.Resolve(microtexPath + ".ace")))
                 {
                     SceneryShader.OverlayTexture = Formats.Msts.AceFile.Texture2DFromFile(viewer.GraphicsDevice, microtexPath + ".ace");
                 }
@@ -752,7 +743,7 @@ namespace Orts.Viewer3D
             NightTexture = SharedMaterialManager.MissingTexture;
             // <CSComment> if "trainset" is in the path (true for night textures for 3DCabs) deferred load of night textures is disabled 
             if (!String.IsNullOrEmpty(texturePath) && (Options & SceneryMaterialOptions.NightTexture) != 0 && ((!viewer.IsDaytime && !viewer.IsNighttime)
-                || TexturePath.Contains(@"\trainset\")))
+                || TexturePath.Contains(@"/trainset/")))
             {
                 var nightTexturePath = Helpers.GetNightTextureFile(Viewer.Simulator, texturePath);
                 if (!String.IsNullOrEmpty(nightTexturePath))
@@ -1339,8 +1330,8 @@ namespace Orts.Viewer3D
         {
             Texture = new Texture2D(SpriteBatch.GraphicsDevice, 1, 1, false, SurfaceFormat.Color);
             Texture.SetData(new[] { Color.White });
-            Font = Viewer.WindowManager.TextManager.GetScaled("Arial", 12, System.Drawing.FontStyle.Bold, 1);
-            BigFont = Viewer.WindowManager.TextManager.GetScaled("Arial", 24, System.Drawing.FontStyle.Bold, 2);
+            Font = Viewer.WindowManager.TextManager.GetScaled("Arial", 12, Orts.Viewer3D.Popups.FontStyle.Bold, 1);
+            BigFont = Viewer.WindowManager.TextManager.GetScaled("Arial", 24, Orts.Viewer3D.Popups.FontStyle.Bold, 2);
         }
 
         public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)

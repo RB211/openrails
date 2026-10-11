@@ -34,7 +34,7 @@ namespace ORTS.Menu
 
         internal Consist(string filePath, Folder folder)
         {
-            if (File.Exists(filePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 try
                 {
@@ -58,7 +58,7 @@ namespace ORTS.Menu
 
         internal Consist(string filePath, Folder folder, bool reverseConsist)
         {
-            if (File.Exists(filePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 try
                 {
@@ -89,9 +89,9 @@ namespace ORTS.Menu
         {
             var consists = new List<Consist>();
             var directory = System.IO.Path.Combine(System.IO.Path.Combine(folder.Path, "TRAINS"), "CONSISTS");
-            if (Directory.Exists(directory))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
             {
-                foreach (var consist in Directory.GetFiles(directory, "*.con"))
+                foreach (var consist in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.con"))
                 {
                     try
                     {
@@ -184,7 +184,7 @@ namespace ORTS.Menu
             {
                 Name = catalog.GetString("- Any Locomotive -");
             }
-            else if (File.Exists(filePath))
+            else if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 EngineFile engFile;
                 try

@@ -23,6 +23,8 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 worldViewProjection;  // model -> world -> view -> projection
 float4x4 invView;				// inverse view
 
@@ -39,10 +41,10 @@ static float3 offsets[4] = { float3(-0.5f, 0.5f, 0), float3(0.5f, 0.5f, 0), floa
 float4 Fog;
 
 // Textures
-texture particle_Tex;
+Texture2D particle_Tex;
 
 // Texture settings
-sampler ParticleSamp = sampler_state
+SamplerState ParticleSamp = sampler_state
 {
 	texture = (particle_Tex);
 	MagFilter = Linear;
@@ -67,7 +69,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Position	: POSITION;
+	float4 Position	: SV_POSITION;
 	float2 TexCoord : TEXCOORD0;
 	float4 Color_Age : TEXCOORD1;
 };
@@ -163,12 +165,12 @@ void _PSApplyDay2Night(inout float3 Color)
 	Color.rgb *= adjustment;
 }
 
-float4 PSParticles(in VERTEX_OUTPUT In) : COLOR0
+float4 PSParticles(in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	clip(In.Color_Age.a);
 	
 	float alpha = (1 - In.Color_Age.a);
-	float4 tex = tex2D(ParticleSamp, In.TexCoord);
+	float4 tex = particle_Tex.Sample(ParticleSamp, In.TexCoord);
 	tex.rgb *= In.Color_Age.rgb;
 	_PSApplyDay2Night(tex.rgb);
 	tex.a *= alpha;
@@ -181,7 +183,7 @@ technique ParticleEmitterTechnique
 {
 	pass Pass_0
 	{
-		VertexShader = compile vs_4_0_level_9_1 VSParticles();
-		PixelShader = compile ps_4_0_level_9_1 PSParticles();
+		VertexShader = compile VS_LOW VSParticles();
+		PixelShader = compile PS_LOW PSParticles();
 	}
 }

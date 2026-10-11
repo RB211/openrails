@@ -147,11 +147,11 @@ namespace ORTS.Settings
                 }  
             }
 
-            if (File.Exists(definedContentJsonName))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(definedContentJsonName)))
             {
                 try
                 {
-                    var json = File.ReadAllText(definedContentJsonName);
+                    var json = File.ReadAllText(ORTS.IO.PathResolver.Resolve(definedContentJsonName));
 
                     IList<JToken> results = JsonConvert.DeserializeObject<JToken>(json) as IList<JToken>;
                     foreach (JToken resultToken in results)
@@ -253,7 +253,7 @@ namespace ORTS.Settings
 
         public static void directoryDelete(string directoryName, ref bool doingTheSumOfTheFileBytes)
         {
-            if (Directory.Exists(directoryName))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directoryName)))
             {
                 // remove the read only flags,
                 // otherwise the Directory.delete does not work in case read only files exists
@@ -264,7 +264,7 @@ namespace ORTS.Settings
 
         private static void directoryRemoveReadOnlyFlagsAndDeleteFile(string directoryName, ref bool doingTheSumOfTheFileBytes)
         {
-            foreach (string filename in Directory.GetFiles(directoryName))
+            foreach (string filename in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directoryName)))
             {
                 while (doingTheSumOfTheFileBytes)
                 {
@@ -273,13 +273,13 @@ namespace ORTS.Settings
                     System.Threading.Thread.Sleep(10); 
                 }
 
-                _ = new FileInfo(filename)
+                _ = new FileInfo(ORTS.IO.PathResolver.Resolve(filename))
                 {
                     IsReadOnly = false
                 };
                 File.Delete(filename);
             }
-            foreach (string subDirectoryName in Directory.GetDirectories(directoryName))
+            foreach (string subDirectoryName in Directory.GetDirectories(ORTS.IO.PathResolver.Resolve(directoryName)))
             {
                 directoryRemoveReadOnlyFlagsAndDeleteFile(subDirectoryName, ref doingTheSumOfTheFileBytes);
             }

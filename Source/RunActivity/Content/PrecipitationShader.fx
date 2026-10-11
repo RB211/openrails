@@ -23,6 +23,8 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 worldViewProjection;  // model -> world -> view -> projection
 float4x4 invView;              // inverse view
 
@@ -36,9 +38,9 @@ float currentTime;
 static float2 texCoords[4] = { float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1) };
 static float2 offsets[4] = { float2(-0.5f, 0.5f), float2(0.5f, 0.5f), float2(0.5f, -0.5f), float2(-0.5f, -0.5f) };
 
-texture precipitation_Tex;
+Texture2D precipitation_Tex;
 
-sampler PrecipitationSamp = sampler_state
+SamplerState PrecipitationSamp = sampler_state
 {
 	texture = (precipitation_Tex);
 	MagFilter = Linear;
@@ -62,7 +64,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Position	: POSITION;
+	float4 Position	: SV_POSITION;
 	float2 TexCoord : TEXCOORD0;
 };
 
@@ -117,9 +119,9 @@ void _PSApplyDay2Night(inout float4 Color)
 	Color.rgb *= adjustment;
 }
 
-float4 PSPrecipitation(in VERTEX_OUTPUT In) : COLOR0
+float4 PSPrecipitation(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	float4 color = tex2D(PrecipitationSamp, In.TexCoord);
+	float4 color = precipitation_Tex.Sample(PrecipitationSamp, In.TexCoord);
 	_PSApplyDay2Night(color);
 	return color;
 }
@@ -130,7 +132,7 @@ technique Precipitation
 {
 	pass Pass_0
 	{
-		VertexShader = compile vs_4_0_level_9_1 VSPrecipitation();
-		PixelShader = compile ps_4_0_level_9_1 PSPrecipitation();
+		VertexShader = compile VS_LOW VSPrecipitation();
+		PixelShader = compile PS_LOW PSPrecipitation();
 	}
 }

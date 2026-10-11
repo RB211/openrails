@@ -24,7 +24,6 @@ using System.IO;
 using System.Linq;
 using System.Management;
 using System.Threading;
-using System.Windows.Forms;
 using GNU.Gettext;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -187,7 +186,7 @@ namespace Orts.Viewer3D
 
         bool ForceMouseVisible;
         double MouseVisibleTillRealTime;
-        public Cursor ActualCursor = Cursors.Default;
+        public MouseCursor ActualCursor = MouseCursor.Arrow;
         public static Viewport DefaultViewport;
 
         ICabViewMouseControlRenderer MouseChangingControl;
@@ -342,9 +341,9 @@ namespace Orts.Viewer3D
 
             string ORfilepath = System.IO.Path.Combine(Simulator.RoutePath, "OpenRails");
             ContentPath = Game.ContentPath;
-            ENVFile = new EnvironmentFile(Simulator.RoutePath + @"\ENVFILES\" + Simulator.TRK.Tr_RouteFile.Environment.ENVFileName(Simulator.Season, Simulator.WeatherType));
+            ENVFile = new EnvironmentFile(Simulator.RoutePath + @"/ENVFILES/" + Simulator.TRK.Tr_RouteFile.Environment.ENVFileName(Simulator.Season, Simulator.WeatherType));
 
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
             {
                 SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
             }
@@ -353,10 +352,10 @@ namespace Orts.Viewer3D
                 SIGCFG = new SignalConfigurationFile(Simulator.RoutePath + @"\sigcfg.dat", false);
             }
 
-            TrackTypes = new TrackTypesFile(Simulator.RoutePath + @"\TTYPE.DAT");
+            TrackTypes = new TrackTypesFile(Simulator.RoutePath + @"/TTYPE.DAT");
 
-            Tiles = new TileManager(Simulator.RoutePath + @"\TILES\", false);
-            LoTiles = new TileManager(Simulator.RoutePath + @"\LO_TILES\", true);
+            Tiles = new TileManager(Simulator.RoutePath + @"/TILES/", false);
+            LoTiles = new TileManager(Simulator.RoutePath + @"/LO_TILES/", true);
             MilepostUnitsMetric = Simulator.TRK.Tr_RouteFile.MilepostUnitsMetric;
 
             Simulator.AllowedSpeedRaised += (object sender, EventArgs e) =>
@@ -379,7 +378,7 @@ namespace Orts.Viewer3D
             if (Simulator.ActivityRun != null && Simulator.Activity.Tr_Activity.Tr_Activity_File.ActivityRestrictedSpeedZones != null)
             {
                 var speedpostDatFile = Simulator.RoutePath + @"\speedpost.dat";
-                if (File.Exists(speedpostDatFile))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve(speedpostDatFile)))
                 {
                     SpeedpostDatFile = new SpeedpostDatFile(Simulator.RoutePath + @"\speedpost.dat", Simulator.RoutePath + @"\shapes\");
                 }
@@ -934,7 +933,7 @@ namespace Orts.Viewer3D
         private void LoadDefectCarSound(TrainCar car, string filename)
         {
             var smsFilePath = Simulator.BasePath + @"\sound\" + filename;
-            if (!File.Exists(smsFilePath))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
             {
                 Trace.TraceWarning("Cannot find defect car sound file {0}", filename);
                 return;
@@ -1516,14 +1515,14 @@ namespace Orts.Viewer3D
                 }
                 else
                 {
-                    ActualCursor = Cursors.Default;
+                    ActualCursor = MouseCursor.Arrow;
                 }
             }
 
             if (MousePickedControl != null & MousePickedControl != OldMousePickedControl)
                 Simulator.Confirmer.Message(ConfirmLevel.None, String.IsNullOrEmpty(MousePickedControl.ControlLabel) ? MousePickedControl.GetControlName() : MousePickedControl.ControlLabel);
 
-            ActualCursor = RenderProcess.ActualCursor = MousePickedControl != null ? Cursors.Hand : Cursors.Default;
+            ActualCursor = RenderProcess.ActualCursor = MousePickedControl != null ? MouseCursor.Hand : MouseCursor.Arrow;
 
             if (UserInput.IsMouseWheelChanged)
                 MousePickedControl?.HandleUserInput();
@@ -1829,9 +1828,9 @@ namespace Orts.Viewer3D
             if (Visibility == VisibilityState.Hidden)  // Test for Hidden state must come before setting Hidden state.
             {
                 Visibility = VisibilityState.ScreenshotPending;  // Next state else this path would be taken more than once.
-                if (!Directory.Exists(Settings.ScreenshotPath))
+                if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(Settings.ScreenshotPath)))
                     Directory.CreateDirectory(Settings.ScreenshotPath);
-                var fileName = Path.Combine(Settings.ScreenshotPath, System.Windows.Forms.Application.ProductName + " " + DateTime.Now.ToString("yyyy-MM-dd hh-mm-ss")) + ".png";
+                var fileName = Path.Combine(Settings.ScreenshotPath, ApplicationInfo.ProductName + " " + DateTime.Now.ToString("yyyy-MM-dd hh-mm-ss")) + ".png";
                 SaveScreenshotToFile(Game.GraphicsDevice, fileName, false);
                 SaveScreenshot = false; // cancel trigger
             }

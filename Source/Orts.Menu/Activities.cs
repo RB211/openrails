@@ -50,7 +50,7 @@ namespace ORTS.Menu
             {
                 Name = catalog.GetString("+ Explore in Activity Mode +");
             }
-            else if (File.Exists(filePath))
+            else if (File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 var showInList = true;
                 try
@@ -109,9 +109,9 @@ namespace ORTS.Menu
                 activities.Add(new DefaultExploreActivity());
                 activities.Add(new ExploreThroughActivity());
                 var directory = System.IO.Path.Combine(route.Path, "ACTIVITIES");
-                if (Directory.Exists(directory))
+                if (Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
                 {
-                    foreach (var activityFile in Directory.GetFiles(directory, "*.act"))
+                    foreach (var activityFile in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.act"))
                     {
                         try
                         {

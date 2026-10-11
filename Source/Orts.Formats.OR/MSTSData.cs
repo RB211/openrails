@@ -36,11 +36,11 @@ namespace Orts.Formats.OR
             RoutePath = Route;
             TRK = new RouteFile(MSTS.MSTSPath.GetTRKFileName(RoutePath));
             string routePath = Path.Combine(Route, TRK.Tr_RouteFile.FileName);
-            TDB = new TrackDatabaseFile(RoutePath + @"\" + TRK.Tr_RouteFile.FileName + ".tdb");
+            TDB = new TrackDatabaseFile(RoutePath + @"/" + TRK.Tr_RouteFile.FileName + ".tdb");
 
             string ORfilepath = System.IO.Path.Combine(RoutePath, "OpenRails");
 
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
             {
                 SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
             }
@@ -49,14 +49,14 @@ namespace Orts.Formats.OR
                 SIGCFG = new SignalConfigurationFile(RoutePath + @"\sigcfg.dat", false);
             }
 
-            if (Directory.Exists(RoutePath + @"\Openrails") && File.Exists(RoutePath + @"\Openrails\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\Openrails\TSECTION.DAT");
-            else if (Directory.Exists(RoutePath + @"\GLOBAL") && File.Exists(RoutePath + @"\GLOBAL\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\GLOBAL\TSECTION.DAT");
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails/TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(RoutePath + @"/Openrails/TSECTION.DAT");
+            else if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/GLOBAL")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/GLOBAL/TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(RoutePath + @"/GLOBAL/TSECTION.DAT");
             else
-                TSectionDat = new TrackSectionsFile(MstsPath + @"\GLOBAL\TSECTION.DAT");
-            if (File.Exists(RoutePath + @"\TSECTION.DAT"))
-                TSectionDat.AddRouteTSectionDatFile(RoutePath + @"\TSECTION.DAT");
+                TSectionDat = new TrackSectionsFile(MstsPath + @"/GLOBAL/TSECTION.DAT");
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/TSECTION.DAT")))
+                TSectionDat.AddRouteTSectionDatFile(RoutePath + @"/TSECTION.DAT");
             Signals = new AESignals (this, SIGCFG);
         }
     }

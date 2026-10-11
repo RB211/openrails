@@ -617,7 +617,7 @@ namespace Orts.Viewer3D
         /// <param name="loadMipMap">If true it will load the mip-map chain for this texture.</param>
         public static void DDSFromFile(string fileName, GraphicsDevice device, bool loadMipMap, out Texture2D texture)
         {
-            Stream stream = File.OpenRead(fileName);
+            Stream stream = File.OpenRead(ORTS.IO.PathResolver.Resolve(fileName));
             Texture tex;
             InternalDDSFromStream(stream, device, 0, loadMipMap, out tex);
             stream.Close();
@@ -642,7 +642,7 @@ namespace Orts.Viewer3D
         /// <param name="loadMipMap">If true it will load the mip-map chain for this texture.</param>
         public static void DDSFromFile(string fileName, GraphicsDevice device, bool loadMipMap, out TextureCube texture)
         {
-            Stream stream = File.OpenRead(fileName);
+            Stream stream = File.OpenRead(ORTS.IO.PathResolver.Resolve(fileName));
             Texture tex;
             InternalDDSFromStream(stream, device, 0, loadMipMap, out tex);
             stream.Close();
@@ -667,7 +667,7 @@ namespace Orts.Viewer3D
         /// <param name="loadMipMap">If true it will load the mip-map chain for this texture.</param>
         public static void DDSFromFile(string fileName, GraphicsDevice device, bool loadMipMap, out Texture3D texture)
         {
-            Stream stream = File.OpenRead(fileName);
+            Stream stream = File.OpenRead(ORTS.IO.PathResolver.Resolve(fileName));
             Texture tex;
             InternalDDSFromStream(stream, device, 0, loadMipMap, out tex);
             stream.Close();
@@ -747,45 +747,8 @@ namespace Orts.Viewer3D
             }
         }
 
-#if WINDOWS
         [ThreadStatic]
         private static byte[] mipData;
-#else
-
-        static DDSLib()
-        {
-            mipDataSet = new Dictionary<int, byte[]>();
-        }
-
-        private static Dictionary<int, byte[]> mipDataSet;
-        private static byte[] mipData
-        {
-            get
-            {
-                int localThreadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                if (mipDataSet.ContainsKey(localThreadID))
-                {
-                    return mipDataSet[localThreadID];
-                }
-                else
-                {
-                    lock (mipDataSet)
-                    {
-                        mipDataSet.Add(localThreadID, new byte[1]);
-                    }
-                    return mipDataSet[localThreadID];
-                }
-            }
-            set
-            {
-                lock (mipDataSet)
-                {
-                    int localThreadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    mipDataSet[localThreadID] = value;
-                }
-            }
-        }
-#endif
 
         //try to evaluate the xna compatible surface for the present data
         private static SurfaceFormat SurfaceFormatFromLoadFormat(LoadSurfaceFormat loadSurfaceFormat, FourCC compressionFormat, uint pixelFlags, int rgbBitCount)
@@ -2018,7 +1981,7 @@ namespace Orts.Viewer3D
         /// <param name="throwExceptionIfFileExist">Throw an exception if the file exists ?</param>
         public static void DDSToFile(string fileName, bool saveMipMaps, Texture texture, bool throwExceptionIfFileExist)
         {
-            if (throwExceptionIfFileExist && File.Exists(fileName))
+            if (throwExceptionIfFileExist && File.Exists(ORTS.IO.PathResolver.Resolve(fileName)))
             {
                 throw new Exception("The file allready exists and \"throwExceptionIfFileExist\" is true");
             }

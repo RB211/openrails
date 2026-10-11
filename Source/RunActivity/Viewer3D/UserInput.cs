@@ -58,6 +58,10 @@ namespace Orts.Viewer3D
         [DllImport("user32.dll")]
         static extern short GetAsyncKeyState(Keys key);
 
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int index);
+        const int SM_SWAPBUTTON = 23;
+
         public static void Initialize(Game game)
         {
             RDState = new RailDriverState(game);
@@ -73,7 +77,8 @@ namespace Orts.Viewer3D
             // Make sure we have an "idle" (everything released) keyboard and mouse state if the window isn't active.
             KeyboardState = game.IsActive ? new KeyboardState(GetKeysWithPrintScreenFix(Keyboard.GetState())) : new KeyboardState();
             MouseState = game.IsActive ? Mouse.GetState() : new MouseState(0, 0, LastMouseState.ScrollWheelValue, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released);
-            MouseButtonsSwapped = System.Windows.Forms.SystemInformation.MouseButtonsSwapped;
+            // On Linux and macOS the windowing system applies button swapping before we see the events.
+            MouseButtonsSwapped = OperatingSystem.IsWindows() && GetSystemMetrics(SM_SWAPBUTTON) != 0;
 
             MouseSpeedX = Math.Abs(MouseState.X - LastMouseState.X);
             MouseSpeedY = Math.Abs(MouseState.Y - LastMouseState.Y);
@@ -136,7 +141,7 @@ namespace Orts.Viewer3D
             // the print screen key as being down. Something is eating it or something. So here we simply query that
             // key directly and forcibly add it to the list of pressed keys.
             var keys = new List<Keys>(keyboardState.GetPressedKeys());
-            if ((GetAsyncKeyState(Keys.PrintScreen) & 0x8000) != 0)
+            if (OperatingSystem.IsWindows() && (GetAsyncKeyState(Keys.PrintScreen) & 0x8000) != 0)
                 keys.Add(Keys.PrintScreen);
             return keys.ToArray();
         }

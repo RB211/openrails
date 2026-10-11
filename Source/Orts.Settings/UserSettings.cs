@@ -33,9 +33,11 @@ namespace ORTS.Settings
 
         static UserSettings()
         {
-            UserDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ApplicationInfo.ProductName);
+            // On Windows this is %APPDATA% (Roaming). Elsewhere ApplicationData maps to the XDG config directory,
+            // which is meant for settings only; saves, logs and caches belong in the XDG data directory instead.
+            UserDataFolder = Path.Combine(Environment.GetFolderPath(OperatingSystem.IsWindows() ? Environment.SpecialFolder.ApplicationData : Environment.SpecialFolder.LocalApplicationData), ApplicationInfo.ProductName);
             // TODO: If using INI file, move these to application directory as well.
-            if (!Directory.Exists(UserDataFolder)) Directory.CreateDirectory(UserDataFolder);
+            if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(UserDataFolder))) Directory.CreateDirectory(UserDataFolder);
             DeletedSaveFolder = Path.Combine(UserDataFolder, "Deleted Saves");
             SavePackFolder = Path.Combine(UserDataFolder, "Save Packs");
         }
@@ -499,7 +501,7 @@ namespace ORTS.Settings
 
             var directory = Path.Combine(UserSettings.UserDataFolder, "Cache", type);
 
-            if (!Directory.Exists(directory))
+            if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
                 Directory.CreateDirectory(directory);
 
             return Path.Combine(directory, hash + ".cache-or");

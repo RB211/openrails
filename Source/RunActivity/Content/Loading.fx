@@ -23,13 +23,15 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 
 float LoadingPercent;
 
-texture LoadingTexture;
+Texture2D LoadingTexture;
 
-sampler LoadingSampler = sampler_state
+SamplerState LoadingSampler = sampler_state
 {
 	Texture = (LoadingTexture);
 	MagFilter = Linear;
@@ -49,7 +51,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Position  : POSITION;  // position x, y, z, w
+	float4 Position  : SV_POSITION;  // position x, y, z, w
 	float2 TexCoords : TEXCOORD0; // tex coords x, y
 };
 
@@ -77,12 +79,12 @@ VERTEX_OUTPUT VSLoadingBar(in VERTEX_INPUT In)
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
-float4 PSLoading(in VERTEX_OUTPUT In) : COLOR0
+float4 PSLoading(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	return tex2D(LoadingSampler, In.TexCoords);
+	return LoadingTexture.Sample(LoadingSampler, In.TexCoords);
 }
 
-float4 PSLoadingBar(in VERTEX_OUTPUT In) : COLOR0
+float4 PSLoadingBar(in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	const float4 ColorBack = float4(0.5, 0.5, 0.5, 1);
 	const float4 ColorFore = float4(1.0, 1.0, 1.0, 1);
@@ -105,14 +107,14 @@ float4 PSLoadingBar(in VERTEX_OUTPUT In) : COLOR0
 
 technique Loading {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSLoading();
-		PixelShader = compile ps_4_0_level_9_1 PSLoading();
+		VertexShader = compile VS_LOW VSLoading();
+		PixelShader = compile PS_LOW PSLoading();
 	}
 }
 
 technique LoadingBar {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSLoadingBar();
-		PixelShader = compile ps_4_0_level_9_1 PSLoadingBar();
+		VertexShader = compile VS_LOW VSLoadingBar();
+		PixelShader = compile PS_LOW PSLoadingBar();
 	}
 }

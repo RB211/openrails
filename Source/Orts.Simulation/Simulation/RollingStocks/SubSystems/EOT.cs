@@ -49,10 +49,10 @@ namespace Orts.Simulation.RollingStocks.SubSystems
     {
          public FullEOTPaths (string eotPath)
         {
-            var directories = Directory.GetDirectories(eotPath);
+            var directories = Directory.GetDirectories(ORTS.IO.PathResolver.Resolve(eotPath));
             foreach (var directory in directories)
             {
-                var files = Directory.GetFiles(directory, "*.eot");
+                var files = Directory.GetFiles(ORTS.IO.PathResolver.Resolve(directory), "*.eot");
                 foreach (var file in files)
                 {
                     Add(file);

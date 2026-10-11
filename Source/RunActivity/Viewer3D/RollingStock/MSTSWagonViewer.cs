@@ -243,7 +243,7 @@ namespace Orts.Viewer3D.RollingStock
 
             }
 
-            var wagonFolderSlash = Path.GetDirectoryName(car.WagFilePath) + @"\";
+            var wagonFolderSlash = Path.GetDirectoryName(car.WagFilePath) + @"/";
 
             TrainCarShape = car.MainShapeFileName != string.Empty
                 ? new PoseableShape(viewer, wagonFolderSlash + car.MainShapeFileName + '\0' + wagonFolderSlash, car.WorldPosition, ShapeFlags.ShadowCaster)
@@ -1462,10 +1462,10 @@ namespace Orts.Viewer3D.RollingStock
         {
             if (filename == null)
                 return;
-            string smsFilePath = wagonFolderSlash + @"sound\" + filename;
-            if (!File.Exists(smsFilePath))
+            string smsFilePath = wagonFolderSlash + @"sound/" + filename;
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
                 smsFilePath = Viewer.Simulator.BasePath + @"\sound\" + filename;
-            if (!File.Exists(smsFilePath))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
             {
                 Trace.TraceWarning("Cannot find {1} car sound file {0}", filename, wagonFolderSlash);
                 return;
@@ -1532,9 +1532,9 @@ namespace Orts.Viewer3D.RollingStock
             if (filename == null)
                 return;
             string path = Viewer.Simulator.RoutePath + @"\SOUND\" + filename;
-            if (!File.Exists(path))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(path)))
                 path = Viewer.Simulator.BasePath + @"\SOUND\" + filename;
-            if (!File.Exists(path))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
                 Trace.TraceWarning("Cannot find track sound file {0}", filename);
                 return;

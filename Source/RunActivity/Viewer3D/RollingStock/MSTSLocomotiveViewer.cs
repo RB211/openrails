@@ -65,7 +65,7 @@ namespace Orts.Viewer3D.RollingStock
         {
             Locomotive = car;
 
-            string wagonFolderSlash = Path.GetDirectoryName(Locomotive.WagFilePath) + "\\";
+            string wagonFolderSlash = Path.GetDirectoryName(Locomotive.WagFilePath) + "/";
             if (Locomotive.CabSoundFileName != null) LoadCarSound(wagonFolderSlash, Locomotive.CabSoundFileName);
 
             //Viewer.SoundProcess.AddSoundSource(this, new TrackSoundSource(MSTSWagon, Viewer));
@@ -894,7 +894,7 @@ namespace Orts.Viewer3D.RollingStock
             var lightpath = Path.Combine(lightdirectory, Path.GetFileName(FileName));
             var lightTexture = viewer.TextureManager.Get(lightpath);
             LightTextures.Add(FileName, lightTexture);
-            return Directory.Exists(lightdirectory);
+            return Directory.Exists(ORTS.IO.PathResolver.Resolve(lightdirectory));
         }
 
         static Texture2D[] Disassemble(GraphicsDevice graphicsDevice, Texture2D texture, int frameCount, Point frameGrid, string fileName)
@@ -3125,7 +3125,7 @@ namespace Orts.Viewer3D.RollingStock
                 Format = Format2;
             else
                 Format = Format1;
-            DrawFont = Viewer.WindowManager.TextManager.GetExact(digital.FontFamily, Viewer.CabHeightPixels * digital.FontSize / 480, digital.FontStyle == 0 ? System.Drawing.FontStyle.Regular : System.Drawing.FontStyle.Bold);
+            DrawFont = Viewer.WindowManager.TextManager.GetExact(digital.FontFamily, Viewer.CabHeightPixels * digital.FontSize / 480, digital.FontStyle == 0 ? Orts.Viewer3D.Popups.FontStyle.Regular : Orts.Viewer3D.Popups.FontStyle.Bold);
             var xScale = Viewer.CabWidthPixels / 640f;
             var yScale = Viewer.CabHeightPixels / 480f;
             // Cab view position adjusted to allow for letterboxing.
@@ -3851,7 +3851,7 @@ namespace Orts.Viewer3D.RollingStock
         Material FindMaterial(bool Alert)
         {
             string imageName = "";
-            string globalText = Viewer.Simulator.BasePath + @"\GLOBAL\TEXTURES\";
+            string globalText = Viewer.Simulator.BasePath + @"/GLOBAL/TEXTURES/";
             CABViewControlTypes controltype = CVFR.GetControlType().Type;
             Material material = null;
 
@@ -3883,7 +3883,7 @@ namespace Orts.Viewer3D.RollingStock
 
             if (String.IsNullOrEmpty(TrainCarShape.SharedShape.ReferencePath))
             {
-                if (!File.Exists(globalText + imageName))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(globalText + imageName)))
                 {
                     Trace.TraceInformation("Ignored missing " + imageName + " using default. You can copy the " + imageName + " from OR\'s AddOns folder to " + globalText +
                         ", or place it under " + TrainCarShape.SharedShape.ReferencePath);
@@ -3892,13 +3892,13 @@ namespace Orts.Viewer3D.RollingStock
             }
             else
             {
-                if (!File.Exists(TrainCarShape.SharedShape.ReferencePath + @"\" + imageName))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(TrainCarShape.SharedShape.ReferencePath + @"/" + imageName)))
                 {
                     Trace.TraceInformation("Ignored missing " + imageName + " using default. You can copy the " + imageName + " from OR\'s AddOns folder to " + globalText +
                         ", or place it under " + TrainCarShape.SharedShape.ReferencePath);
                     material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, globalText, imageName), (int)(options), 0);
                 }
-                else material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, TrainCarShape.SharedShape.ReferencePath + @"\", imageName), (int)(options), 0);
+                else material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, TrainCarShape.SharedShape.ReferencePath + @"/", imageName), (int)(options), 0);
             }
 
             return material;
@@ -4306,7 +4306,7 @@ namespace Orts.Viewer3D.RollingStock
             height = h;
             CVFR = (CabViewDigitalRenderer)c;
             _Sprite2DCabView = (SpriteBatchMaterial)viewer.MaterialManager.Load("SpriteBatch");
-            _Font = viewer.WindowManager.TextManager.GetExact("Arial", height, System.Drawing.FontStyle.Regular);
+            _Font = viewer.WindowManager.TextManager.GetExact("Arial", height, Orts.Viewer3D.Popups.FontStyle.Regular);
         }
 
     }

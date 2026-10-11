@@ -30,7 +30,7 @@ namespace Orts.Formats.Msts
             Flags = new byte[sampleCount, sampleCount];
             try
             {
-                using (var reader = new BinaryReader(File.OpenRead(fileName)))
+                using (var reader = new BinaryReader(File.OpenRead(ORTS.IO.PathResolver.Resolve(fileName))))
                     for (var z = 0; z < sampleCount; z++)
                         for (var x = 0; x < sampleCount; x++)
                             Flags[x, z] = reader.ReadByte();

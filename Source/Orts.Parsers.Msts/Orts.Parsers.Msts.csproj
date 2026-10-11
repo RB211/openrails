@@ -16,4 +16,7 @@
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Orts.IO/Orts.IO.csproj" />
+  </ItemGroup>
 </Project>

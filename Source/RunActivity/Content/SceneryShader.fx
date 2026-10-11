@@ -23,6 +23,8 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 World;         // model -> world
 float4x4 View;          // world -> view
 float4x4 Projection;    // view -> projection
@@ -30,10 +32,10 @@ float4x4 LightViewProjectionShadowProjection0;  // world -> light view -> light 
 float4x4 LightViewProjectionShadowProjection1;
 float4x4 LightViewProjectionShadowProjection2;
 float4x4 LightViewProjectionShadowProjection3;
-texture  ShadowMapTexture0;
-texture  ShadowMapTexture1;
-texture  ShadowMapTexture2;
-texture  ShadowMapTexture3;
+Texture2D  ShadowMapTexture0;
+Texture2D  ShadowMapTexture1;
+Texture2D  ShadowMapTexture2;
+Texture2D  ShadowMapTexture3;
 float4   ShadowMapLimit;
 float4   ZBias_Lighting;  // x = z-bias, y = diffuse, z = specular, w = step(1, z)
 float4   Fog;  // rgb = color of fog; a = reciprocal of distance from camera, everything is
@@ -53,11 +55,11 @@ float    SignalLightIntensity;
 float4   EyeVector;
 float3   SideVector;
 float    ReferenceAlpha;
-texture  ImageTexture;
-texture  OverlayTexture;
+Texture2D  ImageTexture;
+Texture2D  OverlayTexture;
 float	 OverlayScale;
 
-sampler Image = sampler_state
+SamplerState Image = sampler_state
 {
 	Texture = (ImageTexture);
 	MagFilter = Linear;
@@ -66,7 +68,7 @@ sampler Image = sampler_state
 	MaxAnisotropy = 16;
 };
 
-sampler Overlay = sampler_state
+SamplerState Overlay = sampler_state
 {
 	Texture = (OverlayTexture);
 	MagFilter = Linear;
@@ -77,7 +79,7 @@ sampler Overlay = sampler_state
 	AddressV = Wrap;
 };
 
-sampler ShadowMap0 = sampler_state
+SamplerState ShadowMap0 = sampler_state
 {
 	Texture = (ShadowMapTexture0);
 	MagFilter = Linear;
@@ -85,7 +87,7 @@ sampler ShadowMap0 = sampler_state
 	MipFilter = Linear;
 };
 
-sampler ShadowMap1 = sampler_state
+SamplerState ShadowMap1 = sampler_state
 {
 	Texture = (ShadowMapTexture1);
 	MagFilter = Linear;
@@ -93,7 +95,7 @@ sampler ShadowMap1 = sampler_state
 	MipFilter = Linear;
 };
 
-sampler ShadowMap2 = sampler_state
+SamplerState ShadowMap2 = sampler_state
 {
 	Texture = (ShadowMapTexture2);
 	MagFilter = Linear;
@@ -101,7 +103,7 @@ sampler ShadowMap2 = sampler_state
 	MipFilter = Linear;
 };
 
-sampler ShadowMap3 = sampler_state
+SamplerState ShadowMap3 = sampler_state
 {
 	Texture = (ShadowMapTexture3);
 	MagFilter = Linear;
@@ -143,7 +145,7 @@ struct VERTEX_INPUT_TRANSFER
 
 struct VERTEX_OUTPUT
 {
-	float4 Position     : POSITION;  // position x, y, z, w
+	float4 Position     : SV_POSITION;  // position x, y, z, w
 	float4 RelPosition  : TEXCOORD0; // rel position x, y, z; position z
 	float2 TexCoords    : TEXCOORD1; // tex coords x, y
 	float4 Color        : COLOR0;    // color r, g, b, a
@@ -345,7 +347,7 @@ float _PSGetSpecularEffect(in VERTEX_OUTPUT In)
 // Gets the shadow effect.
 float3 _Level9_1GetShadowEffect(in VERTEX_OUTPUT In)
 {
-	return float3(tex2D(ShadowMap0, In.Shadow.xy).xy, In.Shadow.z);
+	return float3(ShadowMapTexture0.Sample(ShadowMap0, In.Shadow.xy).xy, In.Shadow.z);
 }
 
 float3 _Level9_3GetShadowEffect(in VERTEX_OUTPUT In)
@@ -354,19 +356,19 @@ float3 _Level9_3GetShadowEffect(in VERTEX_OUTPUT In)
 	float3 rv = 0;
 	if (depth < ShadowMapLimit.x) {
 		float3 pos0 = mul(In.Shadow, LightViewProjectionShadowProjection0).xyz;
-		rv = float3(tex2D(ShadowMap0, pos0.xy).xy, pos0.z);
+		rv = float3(ShadowMapTexture0.Sample(ShadowMap0, pos0.xy).xy, pos0.z);
 	} else {
 		if (depth < ShadowMapLimit.y) {
 			float3 pos1 = mul(In.Shadow, LightViewProjectionShadowProjection1).xyz;
-			rv = float3(tex2D(ShadowMap1, pos1.xy).xy, pos1.z);
+			rv = float3(ShadowMapTexture1.Sample(ShadowMap1, pos1.xy).xy, pos1.z);
 		} else {
 			if (depth < ShadowMapLimit.z) {
 				float3 pos2 = mul(In.Shadow, LightViewProjectionShadowProjection2).xyz;
-				rv = float3(tex2D(ShadowMap2, pos2.xy).xy, pos2.z);
+				rv = float3(ShadowMapTexture2.Sample(ShadowMap2, pos2.xy).xy, pos2.z);
 			} else {
 				if (depth < ShadowMapLimit.w) {
 					float3 pos3 = mul(In.Shadow, LightViewProjectionShadowProjection3).xyz;
-					rv = float3(tex2D(ShadowMap3, pos3.xy).xy, pos3.z);
+					rv = float3(ShadowMapTexture3.Sample(ShadowMap3, pos3.xy).xy, pos3.z);
 				}
 			}
 		}
@@ -454,12 +456,12 @@ void _PSSceneryFade(inout float4 Color, in VERTEX_OUTPUT In)
 	Color.a *= saturate((LightVector_ZFar.w - length(In.RelPosition.xyz)) / 50);
 }
 
-float4 PSImage(uniform bool ShaderModel3, uniform bool ClampTexCoords, in VERTEX_OUTPUT In) : COLOR0
+float4 PSImage(uniform bool ShaderModel3, uniform bool ClampTexCoords, in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	const float FullBrightness = 1.0;
 	const float ShadowBrightness = 0.5;
 
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
 	if (ShaderModel3 && ClampTexCoords) {
 		// We need to clamp the rendering to within the [0..1] range only.
 		if (saturate(In.TexCoords.x) != In.TexCoords.x || saturate(In.TexCoords.y) != In.TexCoords.y) {
@@ -486,24 +488,24 @@ float4 PSImage(uniform bool ShaderModel3, uniform bool ClampTexCoords, in VERTEX
 	return float4(litColor, Color.a);
 }
 
-float4 PSImage9_3(in VERTEX_OUTPUT In) : COLOR0
+float4 PSImage9_3(in VERTEX_OUTPUT In) : SV_TARGET0
 {
     return PSImage(true, false, In);
 }
 
-float4 PSImage9_3Clamp(in VERTEX_OUTPUT In) : COLOR0
+float4 PSImage9_3Clamp(in VERTEX_OUTPUT In) : SV_TARGET0
 {
     return PSImage(true, true, In);
 }
 
-float4 PSImage9_1(in VERTEX_OUTPUT In) : COLOR0
+float4 PSImage9_1(in VERTEX_OUTPUT In) : SV_TARGET0
 {
     return PSImage(false, false, In);
 }
 
-float4 PSVegetation(in VERTEX_OUTPUT In) : COLOR0
+float4 PSVegetation(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
     // Alpha testing:
     clip(Color.a - ReferenceAlpha);
 	// Ambient effect applies first; no shadow effect for vegetation; night-time textures cancel out all normal lighting.
@@ -521,12 +523,12 @@ float4 PSVegetation(in VERTEX_OUTPUT In) : COLOR0
 	return float4(litColor, Color.a);
 }
 
-float4 PSTerrain(uniform bool ShaderModel3, in VERTEX_OUTPUT In) : COLOR0
+float4 PSTerrain(uniform bool ShaderModel3, in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	const float FullBrightness = 1.0;
 	const float ShadowBrightness = 0.5;
 
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
 	// Ambient and shadow effects apply first; night-time textures cancel out all normal lighting.
 	float3 litColor = Color.rgb * lerp(ShadowBrightness, FullBrightness, saturate(_PSGetAmbientEffect(In) * _PSGetShadowEffect(ShaderModel3, true, In) + ImageTextureIsNight));
 	// No specular effect for terrain.
@@ -535,7 +537,7 @@ float4 PSTerrain(uniform bool ShaderModel3, in VERTEX_OUTPUT In) : COLOR0
 	// Night-time darkens everything, except night-time textures.
 	litColor *= NightColorModifier;
 	// Overlay image for terrain.
-	litColor.rgb *= tex2D(Overlay, In.TexCoords.xy * OverlayScale).rgb * 2;
+	litColor.rgb *= OverlayTexture.Sample(Overlay, In.TexCoords.xy * OverlayScale).rgb * 2;
 	// Headlights effect use original Color.
 	_PSApplyHeadlights(litColor, Color.rgb, In);
 	// And fogging is last.
@@ -545,21 +547,21 @@ float4 PSTerrain(uniform bool ShaderModel3, in VERTEX_OUTPUT In) : COLOR0
 	return float4(litColor, Color.a);
 }
 
-float4 PSTerrain9_3(in VERTEX_OUTPUT In) : COLOR0
+float4 PSTerrain9_3(in VERTEX_OUTPUT In) : SV_TARGET0
 {
     return PSTerrain(true, In);
 }
 
-float4 PSTerrain9_1(in VERTEX_OUTPUT In) : COLOR0
+float4 PSTerrain9_1(in VERTEX_OUTPUT In) : SV_TARGET0
 {
     return PSTerrain(false, In);
 }
 
-float4 PSDarkShade(in VERTEX_OUTPUT In) : COLOR0
+float4 PSDarkShade(in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	const float ShadowBrightness = 0.5;
 
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
     // Alpha testing:
     clip(Color.a - ReferenceAlpha);
 	// Fixed ambient and shadow effects at darkest level.
@@ -577,11 +579,11 @@ float4 PSDarkShade(in VERTEX_OUTPUT In) : COLOR0
 	return float4(litColor, Color.a);
 }
 
-float4 PSHalfBright(in VERTEX_OUTPUT In) : COLOR0
+float4 PSHalfBright(in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	const float HalfShadowBrightness = 0.75;
 
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
     // Alpha testing:
     clip(Color.a - ReferenceAlpha);
 	// Fixed ambient and shadow effects at mid-dark level.
@@ -599,9 +601,9 @@ float4 PSHalfBright(in VERTEX_OUTPUT In) : COLOR0
 	return float4(litColor, Color.a);
 }
 
-float4 PSFullBright(in VERTEX_OUTPUT In) : COLOR0
+float4 PSFullBright(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
     // Alpha testing:
     clip(Color.a - ReferenceAlpha);
 	// Fixed ambient and shadow effects at brightest level.
@@ -617,9 +619,9 @@ float4 PSFullBright(in VERTEX_OUTPUT In) : COLOR0
 	return float4(litColor, Color.a);
 }
 
-float4 PSSignalLight(in VERTEX_OUTPUT In) : COLOR0
+float4 PSSignalLight(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	float4 Color = tex2D(Image, In.TexCoords.xy);
+	float4 Color = ImageTexture.Sample(Image, In.TexCoords.xy);
     // Alpha testing:
     clip(Color.a - ReferenceAlpha);
 	// No ambient and shadow effects for signal lights.
@@ -639,119 +641,119 @@ float4 PSSignalLight(in VERTEX_OUTPUT In) : COLOR0
 
 technique ImageLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSGeneral9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSImage9_1();
+		VertexShader = compile VS_LOW VSGeneral9_1();
+		PixelShader = compile PS_LOW PSImage9_1();
 	}
 }
 
 technique ImageLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSGeneral9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSImage9_3();
+		VertexShader = compile VS_HIGH VSGeneral9_3();
+		PixelShader = compile PS_HIGH PSImage9_3();
 	}
 }
 
 technique TransferLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSTransfer9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSImage9_1();
+		VertexShader = compile VS_LOW VSTransfer9_1();
+		PixelShader = compile PS_LOW PSImage9_1();
 	}
 }
 
 technique TransferLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSTransfer3();
-		PixelShader = compile ps_4_0_level_9_3 PSImage9_3Clamp();
+		VertexShader = compile VS_HIGH VSTransfer3();
+		PixelShader = compile PS_HIGH PSImage9_3Clamp();
 	}
 }
 
 technique Forest {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSForest();
-		PixelShader = compile ps_4_0_level_9_1 PSVegetation();
+		VertexShader = compile VS_LOW VSForest();
+		PixelShader = compile PS_LOW PSVegetation();
 	}
 }
 
 technique VegetationLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSGeneral9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSVegetation();
+		VertexShader = compile VS_LOW VSGeneral9_1();
+		PixelShader = compile PS_LOW PSVegetation();
 	}
 }
 
 technique VegetationLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSGeneral9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSVegetation();
+		VertexShader = compile VS_HIGH VSGeneral9_3();
+		PixelShader = compile PS_HIGH PSVegetation();
 	}
 }
 
 technique TerrainLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSTerrain9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSTerrain9_1();
+		VertexShader = compile VS_LOW VSTerrain9_1();
+		PixelShader = compile PS_LOW PSTerrain9_1();
 	}
 }
 
 technique TerrainLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSTerrain9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSTerrain9_3();
+		VertexShader = compile VS_HIGH VSTerrain9_3();
+		PixelShader = compile PS_HIGH PSTerrain9_3();
 	}
 }
 
 technique DarkShadeLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSGeneral9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSDarkShade();
+		VertexShader = compile VS_LOW VSGeneral9_1();
+		PixelShader = compile PS_LOW PSDarkShade();
 	}
 }
 
 technique DarkShadeLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSGeneral9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSDarkShade();
+		VertexShader = compile VS_HIGH VSGeneral9_3();
+		PixelShader = compile PS_HIGH PSDarkShade();
 	}
 }
 
 technique HalfBrightLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSGeneral9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSHalfBright();
+		VertexShader = compile VS_LOW VSGeneral9_1();
+		PixelShader = compile PS_LOW PSHalfBright();
 	}
 }
 
 technique HalfBrightLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSGeneral9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSHalfBright();
+		VertexShader = compile VS_HIGH VSGeneral9_3();
+		PixelShader = compile PS_HIGH PSHalfBright();
 	}
 }
 
 technique FullBrightLevel9_1 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSGeneral9_1();
-		PixelShader = compile ps_4_0_level_9_1 PSFullBright();
+		VertexShader = compile VS_LOW VSGeneral9_1();
+		PixelShader = compile PS_LOW PSFullBright();
 	}
 }
 
 technique FullBrightLevel9_3 {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_3 VSGeneral9_3();
-		PixelShader = compile ps_4_0_level_9_3 PSFullBright();
+		VertexShader = compile VS_HIGH VSGeneral9_3();
+		PixelShader = compile PS_HIGH PSFullBright();
 	}
 }
 
 technique SignalLight {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSSignalLight();
-		PixelShader = compile ps_4_0_level_9_1 PSSignalLight();
+		VertexShader = compile VS_LOW VSSignalLight();
+		PixelShader = compile PS_LOW PSSignalLight();
 	}
 }
 
 technique SignalLightGlow {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSSignalLightGlow();
-		PixelShader = compile ps_4_0_level_9_1 PSSignalLight();
+		VertexShader = compile VS_LOW VSSignalLightGlow();
+		PixelShader = compile PS_LOW PSSignalLight();
 	}
 }

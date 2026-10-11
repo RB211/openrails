@@ -90,7 +90,7 @@ namespace Orts.Common.Scripting
             var symbolsName = Path.ChangeExtension(scriptName, "pdb");
             try
             {
-                var syntaxTrees = path.Select(file => CSharpSyntaxTree.ParseText(File.ReadAllText(file), null, file, Encoding.UTF8));
+                var syntaxTrees = path.Select(file => CSharpSyntaxTree.ParseText(File.ReadAllText(ORTS.IO.PathResolver.Resolve(file)), null, file, Encoding.UTF8));
                 var compilation = CSharpCompilation.Create(
                     scriptName,
                     syntaxTrees,
@@ -152,7 +152,7 @@ namespace Orts.Common.Scripting
             }
             catch (Exception error)
             {
-                if (File.Exists(scriptPath) || Directory.Exists(scriptPath))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve(scriptPath)) || Directory.Exists(ORTS.IO.PathResolver.Resolve(scriptPath)))
                     Trace.WriteLine(new FileLoadException(scriptPath, error));
                 else
                     Trace.TraceWarning("Ignored missing script {0}", scriptPath);
@@ -169,9 +169,9 @@ namespace Orts.Common.Scripting
             if (path == null || path == "")
                 return null;
 
-            if (!Directory.Exists(path)) return null;
+            if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(path))) return null;
 
-            var files = Directory.GetFiles(path, "*.cs");
+            var files = Directory.GetFiles(ORTS.IO.PathResolver.Resolve(path), "*.cs");
 
             if (files == null || files.Length == 0) return null;
 

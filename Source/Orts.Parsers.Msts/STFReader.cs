@@ -176,9 +176,9 @@ namespace Orts.Parsers.Msts
         public STFReader(string filename, bool useTree)
         {
             var path = Path.GetDirectoryName(filename);
-            if (Directory.Exists(path))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
-                streamSTF = new StreamReader(filename, true); // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
+                streamSTF = new StreamReader(ORTS.IO.PathResolver.Resolve(filename), true); // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
                 FileName = filename;
                 SimisSignature = streamSTF.ReadLine();
                 LineNumber = 2;
@@ -1929,7 +1929,7 @@ namespace Orts.Parsers.Msts
                         if (purefilename == "[[samename]]")
                             filename = Path.GetDirectoryName(filename) + @"\" + Path.GetFileName(FileName);
                         var includeFileName = Path.GetDirectoryName(FileName) + @"\" + filename;
-                        if (!File.Exists(includeFileName))
+                        if (!File.Exists(ORTS.IO.PathResolver.Resolve(includeFileName)))
                             STFException.TraceWarning(this, string.Format("'{0}' not found", includeFileName));
                         includeReader = new STFReader(includeFileName, false);
                         return ReadItem(skip_mode, string_mode); // Which will recurse down when includeReader is tested
@@ -2811,7 +2811,7 @@ namespace Orts.Parsers.Msts
         /// <para>false - if Tree is not used which signicantly reduces GC</para></param>
         public STFReader(Stream inputStream, string fileName, Encoding encoding, bool useTree) : this()
         {
-            var inputReader = new StreamReader(inputStream, encoding);
+            var inputReader = new StreamReader(ORTS.IO.PathResolver.Resolve(inputStream), encoding);
             InitReader(fileName, useTree, inputReader);
         }
 
@@ -3907,12 +3907,12 @@ namespace Orts.Parsers.Msts
         public StreamReader GetStreamReader(string fileName, out string simisSignature)
         {
             string directory = Path.GetDirectoryName(fileName);
-            if (!Directory.Exists(directory))
+            if (!Directory.Exists(ORTS.IO.PathResolver.Resolve(directory)))
             {
                 throw new DirectoryNotFoundException(directory);
             }
 
-            var stream = new StreamReader(fileName, true); // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
+            var stream = new StreamReader(ORTS.IO.PathResolver.Resolve(fileName), true); // was System.Text.Encoding.Unicode ); but I found some ASCII files, ie GLOBAL\SHAPES\milemarker.s
             simisSignature = stream.ReadLine();
             return stream;
         }

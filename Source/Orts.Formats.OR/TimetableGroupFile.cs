@@ -38,7 +38,7 @@ namespace Orts.Formats.OR
             Description = String.Empty;
             try
             {
-                using (StreamReader scrStream = new StreamReader(filePath, true))
+                using (StreamReader scrStream = new StreamReader(ORTS.IO.PathResolver.Resolve(filePath), true))
                 {
                     MultiTTFilePreliminaryRead(filePath, directory, scrStream);
                     if (String.IsNullOrEmpty(Description)) Description = filePath;
@@ -99,7 +99,7 @@ namespace Orts.Formats.OR
             Description = String.Empty;
             try
             {
-                using (StreamReader scrStream = new StreamReader(filePath, true))
+                using (StreamReader scrStream = new StreamReader(ORTS.IO.PathResolver.Resolve(filePath), true))
                 {
                     MultiTTFileRead(filePath, directory, scrStream);
                     if (String.IsNullOrEmpty(Description)) Description = filePath;

@@ -41,7 +41,7 @@ namespace Orts.Simulation
     {
         public TurntableFile(string filePath, string shapePath, List<MovingTable> movingTables, Simulator simulator)
         {
-            if (!File.Exists(filePath))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(filePath)))
             {
                 return;
             }

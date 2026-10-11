@@ -17,4 +17,7 @@
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Orts.IO/Orts.IO.csproj" />
+  </ItemGroup>
 </Project>

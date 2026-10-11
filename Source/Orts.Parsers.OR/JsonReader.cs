@@ -38,7 +38,7 @@ namespace Orts.Parsers.OR
         /// <param name="tryParse"></param>
         public static void ReadFile(string fileName, Func<JsonReader, bool> tryParse)
         {
-            using (var reader = new JsonTextReader(File.OpenText(fileName)))
+            using (var reader = new JsonTextReader(File.OpenText(ORTS.IO.PathResolver.Resolve(fileName))))
             {
                 new JsonReader(fileName, reader).ReadFile(tryParse);
             }

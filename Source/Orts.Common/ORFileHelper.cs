@@ -44,7 +44,7 @@ namespace Orts.Common
             if (String.IsNullOrEmpty(path))
                 return "";
 
-            return Path.GetDirectoryName(path) + @"\OpenRails\" + Path.GetFileName(path);
+            return Path.GetDirectoryName(path) + @"/OpenRails/" + Path.GetFileName(path);
         }
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace Orts.Common
         {
             string orPath = GetORTSFilePath(path);
 
-            if (File.Exists(orPath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(orPath)))
                 return orPath;
             else
                 return path;

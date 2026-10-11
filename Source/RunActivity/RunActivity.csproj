@@ -598,12 +598,19 @@
     <ProjectReference Include="..\Orts.Simulation\Orts.Simulation.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- TEMP(linux-port): WinForms tool windows, being ported to Avalonia -->
+    <Compile Remove="Viewer3D/Map/MapForm*.cs;Viewer3D/Map/MapDataProvider.cs;Viewer3D/Map/MapThemeProvider.cs;Viewer3D/Debugging/**" />
+    <EmbeddedResource Remove="Viewer3D/Map/*.resx;Viewer3D/Debugging/**" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="EmbedIO" Version="3.5.2" />
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
     <PackageReference Include="MonoGame.Runtime.Linux.$(OrtsGraphicsBackend)" Version="$(MonoGameVersion)" Condition="$(RuntimeIdentifier.StartsWith('linux'))" />
     <PackageReference Include="MonoGame.Runtime.Mac.$(OrtsGraphicsBackend)" Version="$(MonoGameVersion)" Condition="$(RuntimeIdentifier.StartsWith('osx'))" />
     <PackageReference Include="MonoGame.Runtime.Windows.$(OrtsGraphicsBackend)" Version="$(MonoGameVersion)" Condition="$(RuntimeIdentifier.StartsWith('win'))" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="SkiaSharp" Version="$(SkiaSharpVersion)" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="$(SkiaSharpVersion)" />
     <PackageReference Include="RailDriver" Version="0.7.10" />
     <PackageReference Include="System.Management" Version="7.0.0" />
     <PackageReference Include="Unosquare.Swan.Lite" Version="3.1.0" />

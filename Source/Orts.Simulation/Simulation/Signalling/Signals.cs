@@ -151,11 +151,11 @@ namespace Orts.Simulation.Signalling
 
             PrintTCBase(trackDB.TrackNodes);
 
-            if (File.Exists(@"C:\temp\SignalObjects.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\SignalObjects.txt")))
             {
                 File.Delete(@"C:\temp\SignalObjects.txt");
             }
-            if (File.Exists(@"C:\temp\SignalShapes.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\SignalShapes.txt")))
             {
                 File.Delete(@"C:\temp\SignalShapes.txt");
             }
@@ -412,7 +412,7 @@ namespace Orts.Simulation.Signalling
 
             // loop through files, use only extention .w, skip w+1000000+1000000.w file
 
-            foreach (var fileName in Directory.GetFiles(WFilePath, "*.w"))
+            foreach (var fileName in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(WFilePath), "*.w"))
             {
                 if (cancellation.IsCancellationRequested) return; // ping loader watchdog
                 // validate file name a little bit
@@ -507,7 +507,7 @@ namespace Orts.Simulation.Signalling
                             if (!extendedWFileRead)
                             {
                                 WFilePath = ORFileHelper.GetORTSFilePath(fileName);
-                                if (File.Exists(WFilePath))
+                                if (File.Exists(ORTS.IO.PathResolver.Resolve(WFilePath)))
                                 {
                                     // We have an OR-specific addition to world file
                                     WFile.InsertORSpecificData(WFilePath, Tokens);
@@ -1798,7 +1798,7 @@ namespace Orts.Simulation.Signalling
             // Test : print TrackCircuitList
 
 #if DEBUG_PRINT
-            if (File.Exists(@"C:\temp\TCBase.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\TCBase.txt")))
             {
                 File.Delete(@"C:\temp\TCBase.txt");
             }

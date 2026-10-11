@@ -23,12 +23,14 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float3   SideVector;
 float    ImageBlurStep;  // = 1 / shadow map texture width and height
-texture  ImageTexture;
+Texture2D  ImageTexture;
 
-sampler ImageSampler = sampler_state
+SamplerState ImageSampler = sampler_state
 {
 	Texture = (ImageTexture);
 	MagFilter = Linear;
@@ -37,7 +39,7 @@ sampler ImageSampler = sampler_state
 	MaxAnisotropy = 16;
 };
 
-sampler ShadowMapSampler = sampler_state
+SamplerState ShadowMapSampler = sampler_state
 {
 	Texture = (ImageTexture);
 	MagFilter = Linear;
@@ -72,13 +74,13 @@ struct VERTEX_INPUT_BLUR
 
 struct VERTEX_OUTPUT
 {
-	float4 Position       : POSITION;
+	float4 Position       : SV_POSITION;
 	float3 TexCoord_Depth : TEXCOORD0;
 };
 
 struct VERTEX_OUTPUT_BLUR
 {
-	float4 Position     : POSITION;
+	float4 Position     : SV_POSITION;
 	float2 SampleCentre : TEXCOORD0;
 	float2 Sample_01    : TEXCOORD1;
 	float2 Sample_23    : TEXCOORD2;
@@ -153,9 +155,9 @@ VERTEX_OUTPUT_BLUR VSShadowMapVertBlur(in VERTEX_INPUT_BLUR In)
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
-float4 PSShadowMap(in VERTEX_OUTPUT In) : COLOR0
+float4 PSShadowMap(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	float alpha = tex2D(ImageSampler, In.TexCoord_Depth.xy).a;
+	float alpha = ImageTexture.Sample(ImageSampler, In.TexCoord_Depth.xy).a;
 	
 	if(alpha < 0.25)
 		discard;
@@ -163,16 +165,16 @@ float4 PSShadowMap(in VERTEX_OUTPUT In) : COLOR0
 	return float4(In.TexCoord_Depth.z, In.TexCoord_Depth.z * In.TexCoord_Depth.z, 0, 0);
 }
 
-float4 PSShadowMapBlocker() : COLOR0
+float4 PSShadowMapBlocker() : SV_TARGET0
 {
 	return 0;
 }
 
-float4 PSShadowMapBlur(in VERTEX_OUTPUT_BLUR In) : COLOR0
+float4 PSShadowMapBlur(in VERTEX_OUTPUT_BLUR In) : SV_TARGET0
 {
-	float2 centreTap =	tex2D(ShadowMapSampler, In.SampleCentre).rg	* 0.4430448;
-	float2 tap01 =		tex2D(ShadowMapSampler, In.Sample_01).rg * 0.2784776;
-	float2 tap23 =		tex2D(ShadowMapSampler, In.Sample_23).rg * 0.2784776;
+	float2 centreTap =	ImageTexture.Sample(ShadowMapSampler, In.SampleCentre).rg	* 0.4430448;
+	float2 tap01 =		ImageTexture.Sample(ShadowMapSampler, In.Sample_01).rg * 0.2784776;
+	float2 tap23 =		ImageTexture.Sample(ShadowMapSampler, In.Sample_23).rg * 0.2784776;
 		
 	return float4(tap01 + centreTap + tap23, 0, 0);
 }
@@ -181,32 +183,32 @@ float4 PSShadowMapBlur(in VERTEX_OUTPUT_BLUR In) : COLOR0
 
 technique ShadowMap {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSShadowMap();
-		PixelShader = compile ps_4_0_level_9_1 PSShadowMap();
+		VertexShader = compile VS_LOW VSShadowMap();
+		PixelShader = compile PS_LOW PSShadowMap();
 	}
 }
 
 technique ShadowMapForest {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSShadowMapForest();
-		PixelShader = compile ps_4_0_level_9_1 PSShadowMap();
+		VertexShader = compile VS_LOW VSShadowMapForest();
+		PixelShader = compile PS_LOW PSShadowMap();
 	}
 }
 
 technique ShadowMapBlocker {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSShadowMap();
-		PixelShader = compile ps_4_0_level_9_1 PSShadowMapBlocker();
+		VertexShader = compile VS_LOW VSShadowMap();
+		PixelShader = compile PS_LOW PSShadowMapBlocker();
 	}
 }
 
 technique ShadowMapBlur {
 	pass Blur_X {
-		VertexShader = compile vs_4_0_level_9_1 VSShadowMapHorzBlur();
-		PixelShader = compile ps_4_0_level_9_1 PSShadowMapBlur();
+		VertexShader = compile VS_LOW VSShadowMapHorzBlur();
+		PixelShader = compile PS_LOW PSShadowMapBlur();
 	}
 	pass Blur_Y {
-		VertexShader = compile vs_4_0_level_9_1 VSShadowMapVertBlur();
-		PixelShader = compile ps_4_0_level_9_1 PSShadowMapBlur();
+		VertexShader = compile VS_LOW VSShadowMapVertBlur();
+		PixelShader = compile PS_LOW PSShadowMapBlur();
 	}
 }

@@ -61,7 +61,7 @@ namespace Orts.Formats.OR
             Separator = String.Empty;
             try
             {
-                using (StreamReader scrStream = new StreamReader(filePath, true))
+                using (StreamReader scrStream = new StreamReader(ORTS.IO.PathResolver.Resolve(filePath), true))
                 {
                     TTFilePreliminaryRead(filePath, scrStream, Separator);
                 }

@@ -129,7 +129,7 @@ namespace Orts.Common
         public void SaveLog( string filePath ) {
             Stream stream = null;
             try {
-                stream = new FileStream( filePath, FileMode.Create );
+                stream = new FileStream(ORTS.IO.PathResolver.Resolve( filePath), FileMode.Create );
                 // Re-sort based on time as tests show that some commands are deferred.
                 CommandList.Sort( ( x, y ) => x.Time.CompareTo( y.Time ) );
                 CommandSerializer.Serialize( stream, CommandList );
@@ -152,7 +152,7 @@ namespace Orts.Common
         public void LoadLog( string filePath ) {
             Stream stream = null;
             try {
-                stream = new FileStream( filePath, FileMode.Open );
+                stream = new FileStream(ORTS.IO.PathResolver.Resolve( filePath), FileMode.Open );
                 CommandList = CommandSerializer.Deserialize( stream );
             } catch( Newtonsoft.Json.JsonException error ) {
                 // Replay files written by older versions used BinaryFormatter, which .NET no longer supports.

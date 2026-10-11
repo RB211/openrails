@@ -27,13 +27,13 @@ namespace Orts.Common
         public static string FindTrainCarPlugin( string initialFolder, string filename )
         {
             string dllPath = Path.Combine(initialFolder, filename);  // search in trainset folder
-            if (File.Exists(dllPath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(dllPath)))
                 return dllPath;
             string rootFolder = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(initialFolder))), "OpenRails");
-            if( Directory.Exists( rootFolder ) )
+            if( Directory.Exists(ORTS.IO.PathResolver.Resolve( rootFolder )) )
             {
                 dllPath = Path.Combine(rootFolder, filename);
-                if (File.Exists(dllPath))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve(dllPath)))
                     return dllPath;
             }
             return filename;   // then search in OpenRails program folder
@@ -61,7 +61,7 @@ namespace Orts.Common
                 if (path != null)
                 {
                     var fullPath = Path.Combine(path, branch);
-                    if (File.Exists(fullPath))
+                    if (File.Exists(ORTS.IO.PathResolver.Resolve(fullPath)))
                         return fullPath;
                 }
             }

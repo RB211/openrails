@@ -15,7 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.IO;
 
 namespace ORTS.Common
@@ -23,8 +25,11 @@ namespace ORTS.Common
     public static class ApplicationInfo
     {
         public static string ProcessFile => Process.GetCurrentProcess().MainModule.FileName;
-        public static string ProcessDirectory => Path.GetDirectoryName(ProcessFile);
-        static FileVersionInfo VersionInfo => FileVersionInfo.GetVersionInfo(ProcessFile);
+        public static string ProcessDirectory => Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
+        // Read from the managed entry assembly: on Linux and macOS the process file is a native apphost
+        // (or the dotnet host) without Windows version resources.
+        static string EntryAssemblyFile => Assembly.GetEntryAssembly()?.Location is string location && location.Length > 0 ? location : ProcessFile;
+        static FileVersionInfo VersionInfo => FileVersionInfo.GetVersionInfo(EntryAssemblyFile);
         public static string ProductName => VersionInfo.ProductName;
         public static string ApplicationName => VersionInfo.FileDescription;
     }

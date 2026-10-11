@@ -487,7 +487,7 @@ namespace Orts.Viewer3D.RollingStock.Subsystems.ETCS
         }
         public WindowTextFont GetFont(float size, bool bold=false)
         {
-            return DMI.Viewer.WindowManager.TextManager.GetExact("Arial", GetScaledFontSize(size), bold ? System.Drawing.FontStyle.Bold : System.Drawing.FontStyle.Regular);
+            return DMI.Viewer.WindowManager.TextManager.GetExact("Arial", GetScaledFontSize(size), bold ? Orts.Viewer3D.Popups.FontStyle.Bold : Orts.Viewer3D.Popups.FontStyle.Regular);
         }
         /// <summary>
         /// Get scaled font size, increasing it if result is small

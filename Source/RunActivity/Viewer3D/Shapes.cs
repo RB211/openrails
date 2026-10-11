@@ -930,7 +930,7 @@ namespace Orts.Viewer3D
         {
             var h = viewer.Simulator.HazzardManager.AddHazzardIntoGame(hObj.itemId, hObj.FileName);
             if (h == null) return null;
-            return new HazzardShape(viewer, viewer.Simulator.BasePath + @"\Global\Shapes\" + h.HazFile.Tr_HazardFile.FileName + "\0" + viewer.Simulator.BasePath + @"\Global\Textures", position, shapeFlags, hObj, h);
+            return new HazzardShape(viewer, viewer.Simulator.BasePath + @"\Global\Shapes\" + h.HazFile.Tr_HazardFile.FileName + "\0" + viewer.Simulator.BasePath + @"/Global/Textures", position, shapeFlags, hObj, h);
 
         }
 
@@ -1233,7 +1233,7 @@ namespace Orts.Viewer3D
                 }
                 catch
                 {
-                    soundPath = Viewer.Simulator.BasePath + @"\\sound\\containercrane.sms";
+                    soundPath = Path.Combine(Viewer.Simulator.BasePath, "sound", "containercrane.sms");
                     try
                     {
                         Sound = new SoundSource(Viewer, Position.WorldLocation, Events.Source.ORTSContainerCrane, soundPath);
@@ -1247,7 +1247,7 @@ namespace Orts.Viewer3D
             }
             else
             {
-                var soundPath = Viewer.Simulator.BasePath + @"\\sound\\containercrane.sms";
+                var soundPath = Path.Combine(Viewer.Simulator.BasePath, "sound", "containercrane.sms");
                 try
                 {
                     Sound = new SoundSource(Viewer, Position.WorldLocation, Events.Source.ORTSContainerCrane, soundPath);
@@ -2024,20 +2024,20 @@ namespace Orts.Viewer3D
             // commented lines allow reading the animation block from an additional file in an Openrails subfolder
 //            string orFilePath = ORFileHelper.GetORTSFilePath(filePath);
             var sFile = new ShapeFile(filePath, Viewer.Settings.SuppressShapeWarnings);
-//            if (file.ToLower().Contains("turntable") && File.Exists(orFilePath))
+//            if (file.ToLower().Contains("turntable") && File.Exists(ORTS.IO.PathResolver.Resolve(orFilePath)))
 //            {
 //                sFile.ReadAnimationBlock(orFilePath);
 //            }
 
 
             var textureFlags = Helpers.TextureFlags.None;
-            if (File.Exists(FilePath + "d"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(FilePath + "d")))
             {
                 var sdFile = new ShapeDescriptorFile(FilePath + "d");
                 textureFlags = (Helpers.TextureFlags)sdFile.shape.ESD_Alternative_Texture;
                 if (FilePath != null && FilePath.Contains("\\global\\")) textureFlags |= Helpers.TextureFlags.SnowTrack;//roads and tracks are in global, as MSTS will always use snow texture in snow weather
                 HasNightSubObj = sdFile.shape.ESD_SubObj;
-                if ((textureFlags & Helpers.TextureFlags.Night) != 0 && FilePath.Contains("\\trainset\\"))
+                if ((textureFlags & Helpers.TextureFlags.Night) != 0 && FilePath.Contains("/trainset/"))
                     textureFlags |= Helpers.TextureFlags.Underground;
                 SoundFileName = sdFile.shape.ESD_SoundFileName;
                 CustomAnimationFPS = sdFile.shape.ESD_CustomAnimationFPS;

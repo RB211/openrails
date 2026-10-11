@@ -139,9 +139,9 @@ namespace ORTS.Common
             try
             {
                 // /etc/os-release is the standard way to identify a Linux distribution.
-                if (File.Exists("/etc/os-release"))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve("/etc/os-release")))
                 {
-                    var release = File.ReadAllLines("/etc/os-release")
+                    var release = File.ReadAllLines(ORTS.IO.PathResolver.Resolve("/etc/os-release"))
                         .Select(line => line.Split(new[] { '=' }, 2))
                         .Where(parts => parts.Length == 2)
                         .ToDictionary(parts => parts[0], parts => parts[1].Trim('"'));
@@ -167,9 +167,9 @@ namespace ORTS.Common
 
             try
             {
-                if (File.Exists("/proc/cpuinfo"))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve("/proc/cpuinfo")))
                 {
-                    var fields = File.ReadAllLines("/proc/cpuinfo")
+                    var fields = File.ReadAllLines(ORTS.IO.PathResolver.Resolve("/proc/cpuinfo"))
                         .Select(line => line.Split(new[] { ':' }, 2))
                         .Where(parts => parts.Length == 2)
                         .Select(parts => (Key: parts[0].Trim(), Value: parts[1].Trim()))

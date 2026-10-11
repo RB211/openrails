@@ -141,7 +141,7 @@ namespace Orts.Viewer3D
                 return;
 
             string[] pathArray = {Viewer.Simulator.RoutePath, Viewer.Simulator.BasePath};            
-            var fullPath = ORTSPaths.GetFileFromFolders(pathArray, @"SOUND\" + filename);
+            var fullPath = ORTSPaths.GetFileFromFolders(pathArray, @"SOUND/" + filename);
             if (fullPath == null)
             {
                 Trace.TraceWarning("Skipped missing track sound {0}", filename);
@@ -3200,7 +3200,7 @@ namespace Orts.Viewer3D
                     WorldLocation wl = new WorldLocation(TileX, TileZ, fss.Position);
                     foreach (string sms in fss.SoundSourceFileNames)
                     {
-                        var fullPath = ORTSPaths.GetFileFromFolders(pathArray, @"Sound\" + sms);
+                        var fullPath = ORTSPaths.GetFileFromFolders(pathArray, @"Sound/" + sms);
                         if (fullPath != null)
                         {
                             ss = new SoundSource(Viewer, wl, Events.Source.None, fullPath, true);

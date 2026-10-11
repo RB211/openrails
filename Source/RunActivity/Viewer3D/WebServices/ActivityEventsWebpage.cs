@@ -19,10 +19,10 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Media;
 using System.Text;
 using System.Threading.Tasks;
 using EmbedIO.WebSockets;
+using Microsoft.Xna.Framework.Audio;
 using Newtonsoft.Json;
 
 namespace Orts.Viewer3D.WebServices
@@ -35,7 +35,7 @@ namespace Orts.Viewer3D.WebServices
         private bool InitHandled = false;
 
         private bool BeepToBeDone = false;
-        private readonly SoundPlayer SoundPlayerBeep;
+        private readonly SoundEffect SoundPlayerBeep;
 
         private string HeaderPrev = "";
         private string TextPrev = "";
@@ -84,8 +84,7 @@ namespace Orts.Viewer3D.WebServices
             Viewer = viewer;
             AddProtocol("json");
 
-            SoundPlayerBeep = new SoundPlayer(Path.Combine(Viewer.ContentPath, "Beep.wav"));
-            SoundPlayerBeep.LoadAsync();
+            SoundPlayerBeep = SoundEffect.FromFile(ORTS.IO.PathResolver.Resolve(Path.Combine(Viewer.ContentPath, "Beep.wav")));
         }
 
         /// <inheritdoc />

@@ -299,7 +299,7 @@ namespace Orts.Viewer3D.RollingStock.SubSystems
         }
         public WindowTextFont GetFont(float size, bool bold=false)
         {
-            return DPI.Viewer.WindowManager.TextManager.GetExact("Arial", GetScaledFontSize(size), bold ? System.Drawing.FontStyle.Bold : System.Drawing.FontStyle.Regular);
+            return DPI.Viewer.WindowManager.TextManager.GetExact("Arial", GetScaledFontSize(size), bold ? Orts.Viewer3D.Popups.FontStyle.Bold : Orts.Viewer3D.Popups.FontStyle.Regular);
         }
         /// <summary>
         /// Get scaled font size, increasing it if result is small
@@ -738,7 +738,7 @@ namespace Orts.Viewer3D.RollingStock.SubSystems
         Material FindMaterial(bool Alert)
         {
             string imageName = "";
-            string globalText = Viewer.Simulator.BasePath + @"\GLOBAL\TEXTURES\";
+            string globalText = Viewer.Simulator.BasePath + @"/GLOBAL/TEXTURES/";
             CABViewControlTypes controltype = CVFR.GetControlType().Type;
             Material material = null;
 
@@ -755,7 +755,7 @@ namespace Orts.Viewer3D.RollingStock.SubSystems
 
             if (String.IsNullOrEmpty(TrainCarShape.SharedShape.ReferencePath))
             {
-                if (!File.Exists(globalText + imageName))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(globalText + imageName)))
                 {
                     Trace.TraceInformation("Ignored missing " + imageName + " using default. You can copy and unpack the " + imageName + " from OR\'s Documentation\\SampleFiles\\Manual folder to " + globalText +
                         ", or place it under " + TrainCarShape.SharedShape.ReferencePath);
@@ -764,13 +764,13 @@ namespace Orts.Viewer3D.RollingStock.SubSystems
             }
             else
             {
-                if (!File.Exists(TrainCarShape.SharedShape.ReferencePath + @"\" + imageName))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(TrainCarShape.SharedShape.ReferencePath + @"/" + imageName)))
                 {
                     Trace.TraceInformation("Ignored missing " + imageName + " using default. You can copy and unpack the " + imageName + " from OR\'s Documentation\\SampleFiles\\Manual folder to " + globalText +
                         ", or place it under " + TrainCarShape.SharedShape.ReferencePath);
                     material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, globalText, imageName), (int)(options), 0);
                 }
-                else material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, TrainCarShape.SharedShape.ReferencePath + @"\", imageName), (int)(options), 0);
+                else material = Viewer.MaterialManager.Load("Scenery", Helpers.GetTextureFile(Viewer.Simulator, Helpers.TextureFlags.None, TrainCarShape.SharedShape.ReferencePath + @"/", imageName), (int)(options), 0);
             }
 
             return material;

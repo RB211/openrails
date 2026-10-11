@@ -18,8 +18,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using Orts.Processes;
 using ORTS.Common;
@@ -44,18 +44,8 @@ namespace Orts.Viewer3D.Processes
         public float GPUMemoryDedicated { get; private set; }
         public float GPUMemoryShared { get; private set; }
 
-        readonly PerformanceCounterCategory CounterDotNetClrMemory = new PerformanceCounterCategory(".NET CLR Memory");
-        readonly PerformanceCounterCategory CounterProcess = new PerformanceCounterCategory("Process");
-        readonly PerformanceCounterCategory CounterGpuProcessMemory = new PerformanceCounterCategory("GPU Process Memory");
-
-        CounterSample CLRMemoryAllocatedBytesPerSecSample;
-        CounterSample CPUMemoryPrivateSample;
-        CounterSample CPUMemoryWorkingSetSample;
-        CounterSample CPUMemoryWorkingSetPrivateSample;
-        CounterSample CPUMemoryVirtualSample;
-        CounterSample[] GPUMemoryCommittedSamples = new CounterSample[1];
-        CounterSample[] GPUMemoryDedicatedSamples = new CounterSample[1];
-        CounterSample[] GPUMemorySharedSamples = new CounterSample[1];
+        long LastAllocatedBytes;
+        DateTime LastAllocatedTime;
 
         readonly Profiler Profiler = new Profiler("Host");
         readonly ProcessState State = new ProcessState("Host");
@@ -70,6 +60,8 @@ namespace Orts.Viewer3D.Processes
 
             Game = game;
             Thread = new Thread(HostThread);
+            // Set before any thread starts: the viewer derives its loading memory threshold from it.
+            CPUMemoryVirtualLimit = (ulong)GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
         }
 
         public void Start()
@@ -87,9 +79,8 @@ namespace Orts.Viewer3D.Processes
         {
             Profiler.SetThread();
 
-            var memoryStatus = new MEMORYSTATUSEX { Size = 64 };
-            GlobalMemoryStatusEx(memoryStatus);
-            CPUMemoryVirtualLimit = Math.Min(memoryStatus.TotalVirtual, memoryStatus.TotalPhysical);
+            LastAllocatedBytes = GC.GetTotalAllocatedBytes();
+            LastAllocatedTime = DateTime.UtcNow;
 
             while (true)
             {
@@ -130,21 +121,23 @@ namespace Orts.Viewer3D.Processes
             Profiler.Start();
             try
             {
-                var processId = Process.GetCurrentProcess().Id;
+                var now = DateTime.UtcNow;
+                var allocatedBytes = GC.GetTotalAllocatedBytes();
+                var seconds = (now - LastAllocatedTime).TotalSeconds;
+                CLRMemoryAllocatedBytesPerSec = seconds > 0 ? (float)((allocatedBytes - LastAllocatedBytes) / seconds) : 0;
+                LastAllocatedBytes = allocatedBytes;
+                LastAllocatedTime = now;
 
-                var dotNetClrMemory = GetInstanceSamples(CounterDotNetClrMemory, "Process ID", processId, "Allocated Bytes/sec");
-                CLRMemoryAllocatedBytesPerSec = GetValue(ref CLRMemoryAllocatedBytesPerSecSample, dotNetClrMemory[0]);
+                using (var process = Process.GetCurrentProcess())
+                {
+                    CPUMemoryPrivate = process.PrivateMemorySize64;
+                    CPUMemoryWorkingSet = process.WorkingSet64;
+                    CPUMemoryVirtual = process.VirtualMemorySize64;
+                }
+                CPUMemoryWorkingSetPrivate = OperatingSystem.IsLinux() ? ReadLinuxPrivateWorkingSet() : CPUMemoryPrivate;
 
-                var process = GetInstanceSamples(CounterProcess, "ID Process", processId, "Private Bytes", "Working Set", "Working Set - Private", "Virtual Bytes");
-                CPUMemoryPrivate = GetValue(ref CPUMemoryPrivateSample, process[0]);
-                CPUMemoryWorkingSet = GetValue(ref CPUMemoryWorkingSetSample, process[1]);
-                CPUMemoryWorkingSetPrivate = GetValue(ref CPUMemoryWorkingSetPrivateSample, process[2]);
-                CPUMemoryVirtual = GetValue(ref CPUMemoryVirtualSample, process[3]);
-
-                var gpuProcessMemory = GetInstancesSamples(CounterGpuProcessMemory, $"pid_{processId}_", "Total Committed", "Dedicated Usage", "Shared Usage");
-                GPUMemoryCommitted = GetSumValue(ref GPUMemoryCommittedSamples, gpuProcessMemory[0]);
-                GPUMemoryDedicated = GetSumValue(ref GPUMemoryDedicatedSamples, gpuProcessMemory[1]);
-                GPUMemoryShared = GetSumValue(ref GPUMemorySharedSamples, gpuProcessMemory[2]);
+                if (OperatingSystem.IsLinux())
+                    ReadLinuxGpuMemory();
             }
             finally
             {
@@ -152,86 +145,54 @@ namespace Orts.Viewer3D.Processes
             }
         }
 
-        IList<CounterSample> GetInstanceSamples(PerformanceCounterCategory category, string key, long value, params string[] counterNames)
+        /// <summary>
+        /// Resident anonymous memory, the closest Linux equivalent of Windows' "Working Set - Private".
+        /// </summary>
+        static float ReadLinuxPrivateWorkingSet()
         {
-            try
-            {
-                var categoryData = category.ReadCategory();
-                var index = categoryData[key].Values.Cast<InstanceData>().ToList().FindIndex(a => a.RawValue == value);
-                return counterNames.Select(name => categoryData.Contains(name) ? categoryData[name].Values.Cast<InstanceData>().ElementAt(index).Sample : CounterSample.Empty).ToList();
-            }
-            catch
-            {
-                return counterNames.Select(name => CounterSample.Empty).ToList();
-            }
+            foreach (var line in File.ReadLines(ORTS.IO.PathResolver.Resolve("/proc/self/status")))
+                if (line.StartsWith("RssAnon:"))
+                    return ParseKiB(line.Substring(8));
+            return 0;
         }
 
-        IList<CounterSample[]> GetInstancesSamples(PerformanceCounterCategory category, string instancePrefix, params string[] counterNames)
+        /// <summary>
+        /// Reads per-process GPU memory from the DRM client usage stats that Linux kernel drivers (amdgpu,
+        /// i915, xe, nouveau, ...) publish in /proc/self/fdinfo. Each open DRM file is a client; sum them.
+        /// </summary>
+        void ReadLinuxGpuMemory()
         {
-            try
+            float dedicated = 0, shared = 0;
+            var seenClients = new HashSet<string>();
+            foreach (var fdinfo in Directory.EnumerateFiles(ORTS.IO.PathResolver.Resolve("/proc/self/fdinfo")))
             {
-                var categoryData = category.ReadCategory();
-                return counterNames.Select(name => categoryData.Contains(name) ? categoryData[name].Values.Cast<InstanceData>().Where(id => id.InstanceName.StartsWith(instancePrefix)).Select(id => id.Sample).ToArray() : new[] { CounterSample.Empty }).ToList();
+                string[] lines;
+                try { lines = File.ReadAllLines(ORTS.IO.PathResolver.Resolve(fdinfo)); }
+                catch (IOException) { continue; }
+                var clientId = lines.FirstOrDefault(l => l.StartsWith("drm-client-id:"));
+                if (clientId == null || !seenClients.Add(clientId))
+                    continue;
+                foreach (var line in lines)
+                {
+                    // drm-memory-<region> is the older key, drm-resident-<region> the newer one.
+                    if (line.StartsWith("drm-memory-vram:") || line.StartsWith("drm-resident-vram:") || line.StartsWith("drm-resident-local:"))
+                        dedicated += ParseKiB(line.Substring(line.IndexOf(':') + 1));
+                    else if (line.StartsWith("drm-memory-gtt:") || line.StartsWith("drm-resident-gtt:") || line.StartsWith("drm-resident-system:"))
+                        shared += ParseKiB(line.Substring(line.IndexOf(':') + 1));
+                }
             }
-            catch
-            {
-                return counterNames.Select(name => new[] { CounterSample.Empty }).ToList();
-            }
+            GPUMemoryDedicated = dedicated;
+            GPUMemoryShared = shared;
+            GPUMemoryCommitted = dedicated + shared;
         }
 
-        float GetValue(ref CounterSample counterSample, CounterSample nextCounterSample)
+        static float ParseKiB(string value)
         {
-            try
-            {
-                return CounterSample.Calculate(counterSample, nextCounterSample);
-            }
-            catch
-            {
+            var parts = value.Trim().Split(' ');
+            if (!float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number))
                 return 0;
-            }
-            finally
-            {
-                counterSample = nextCounterSample;
-            }
+            var unit = parts.Length > 1 ? parts[1] : "";
+            return unit == "KiB" || unit == "kB" ? number * 1024 : unit == "MiB" ? number * 1024 * 1024 : unit == "GiB" ? number * 1024 * 1024 * 1024 : number;
         }
-
-        float GetSumValue(ref CounterSample[] counterSamples, CounterSample[] nextCounterSamples)
-        {
-            try
-            {
-                var counterSample = new CounterSample(counterSamples.Sum(cs => cs.RawValue), counterSamples[0].BaseValue, counterSamples[0].CounterFrequency, counterSamples[0].SystemFrequency, counterSamples[0].TimeStamp, counterSamples[0].TimeStamp100nSec, counterSamples[0].CounterType, counterSamples[0].CounterTimeStamp);
-                var nextCounterSample = new CounterSample(nextCounterSamples.Sum(cs => cs.RawValue), nextCounterSamples[0].BaseValue, nextCounterSamples[0].CounterFrequency, nextCounterSamples[0].SystemFrequency, nextCounterSamples[0].TimeStamp, nextCounterSamples[0].TimeStamp100nSec, nextCounterSamples[0].CounterType, nextCounterSamples[0].CounterTimeStamp);
-                return CounterSample.Calculate(counterSample, nextCounterSample);
-            }
-            catch
-            {
-                return 0;
-            }
-            finally
-            {
-                counterSamples = nextCounterSamples;
-            }
-        }
-
-        #region Native code
-
-        [StructLayout(LayoutKind.Sequential, Size = 64)]
-        public class MEMORYSTATUSEX
-        {
-            public uint Size;
-            public uint MemoryLoad;
-            public ulong TotalPhysical;
-            public ulong AvailablePhysical;
-            public ulong TotalPageFile;
-            public ulong AvailablePageFile;
-            public ulong TotalVirtual;
-            public ulong AvailableVirtual;
-            public ulong AvailableExtendedVirtual;
-        }
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX buffer);
-
-        #endregion
     }
 }

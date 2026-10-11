@@ -34,7 +34,7 @@ namespace Orts.Parsers.OR
         public TimetableReader(string filePath)
         {
             FilePath = filePath;
-            using (var filestream = new StreamReader(filePath, true))
+            using (var filestream = new StreamReader(ORTS.IO.PathResolver.Resolve(filePath), true))
             {
                 var readLine = filestream.ReadLine();
 

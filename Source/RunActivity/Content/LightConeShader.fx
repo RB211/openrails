@@ -24,6 +24,8 @@
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
 // General values
+#include "ShaderModels.fxh"
+
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 
 float2 Fade; // overall fade (0 = off, 1 = on); transition fade (0 = original, 1 = transition)
@@ -42,7 +44,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Position  : POSITION0;
+	float4 Position  : SV_POSITION;
 	float4 Color     : COLOR0;
 };
 
@@ -59,7 +61,7 @@ VERTEX_OUTPUT VSLightCone(in VERTEX_INPUT In)
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
-float4 PSLightCone(in VERTEX_OUTPUT In) : COLOR0
+float4 PSLightCone(in VERTEX_OUTPUT In) : SV_TARGET0
 {
 	return In.Color;
 }
@@ -74,7 +76,7 @@ float4 PSLightCone(in VERTEX_OUTPUT In) : COLOR0
 
 technique LightCone {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSLightCone();
-		PixelShader = compile ps_4_0_level_9_1 PSLightCone();
+		VertexShader = compile VS_LOW VSLightCone();
+		PixelShader = compile PS_LOW PSLightCone();
 	}
 }

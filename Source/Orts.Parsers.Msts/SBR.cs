@@ -37,7 +37,7 @@ namespace Orts.Parsers.Msts
 
         public static SBR Open(string filename)
         {
-            Stream fb = new FileStream(filename, FileMode.Open, FileAccess.Read);
+            Stream fb = new FileStream(ORTS.IO.PathResolver.Resolve(filename), FileMode.Open, FileAccess.Read);
 
             byte[] buffer = new byte[34];
             fb.Read(buffer, 0, 2);

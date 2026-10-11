@@ -261,7 +261,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
                     Path.Combine(Simulator.BasePath, "SOUND"),
                 };
                     var soundPath = ORTSPaths.GetFileFromFolders(soundPathArray, SoundFileName);
-                    if (File.Exists(soundPath))
+                    if (File.Exists(ORTS.IO.PathResolver.Resolve(soundPath)))
                         Sounds.Add(Script, soundPath);
                 }
 
@@ -915,28 +915,23 @@ namespace Orts.Simulation.RollingStocks.SubSystems
         private T LoadParameter<T>(string sectionName, string keyName, T defaultValue)
         {
             string buffer;
-            int length;
 
-            if (File.Exists(TrainParametersFileName))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(TrainParametersFileName)))
             {
-                buffer = new string('\0', 256);
-                length = NativeMethods.GetPrivateProfileString(sectionName, keyName, null, buffer, buffer.Length, TrainParametersFileName);
+                buffer = IniFile.GetValue(sectionName, keyName, TrainParametersFileName);
 
-                if (length > 0)
+                if (!string.IsNullOrEmpty(buffer))
                 {
-                    buffer = buffer.Trim('\0').Trim();
                     return (T)Convert.ChangeType(buffer, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
                 }
             }
 
-            if (File.Exists(ParametersFileName))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ParametersFileName)))
             {
-                buffer = new string('\0', 256);
-                length = NativeMethods.GetPrivateProfileString(sectionName, keyName, null, buffer, buffer.Length, ParametersFileName);
+                buffer = IniFile.GetValue(sectionName, keyName, ParametersFileName);
 
-                if (length > 0)
+                if (!string.IsNullOrEmpty(buffer))
                 {
-                    buffer = buffer.Trim('\0').Trim();
                     return (T)Convert.ChangeType(buffer, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
                 }
             }

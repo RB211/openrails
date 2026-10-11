@@ -42,7 +42,7 @@ namespace Orts.Formats.Msts
                              if (dataItem != null)
                              {
                                 dataItem = shapePath + dataItem;
-                                if (File.Exists(dataItem))
+                                if (File.Exists(ORTS.IO.PathResolver.Resolve(dataItem)))
                                     TempSpeedShapeNames[0] = dataItem;
                                 else
                                     STFException.TraceWarning(stf, String.Format("Non-existent shape file {0} referenced", dataItem));
@@ -55,7 +55,7 @@ namespace Orts.Formats.Msts
                              if (dataItem != null)
                              {
                                 dataItem = shapePath + dataItem;
-                                if (File.Exists(dataItem))
+                                if (File.Exists(ORTS.IO.PathResolver.Resolve(dataItem)))
                                     TempSpeedShapeNames[1] = dataItem;
                                 else
                                     STFException.TraceWarning(stf, String.Format("Non-existent shape file {0} referenced", dataItem));
@@ -68,7 +68,7 @@ namespace Orts.Formats.Msts
                              if (dataItem != null)
                              {
                                 dataItem = shapePath + dataItem;
-                                if (File.Exists(dataItem))
+                                if (File.Exists(ORTS.IO.PathResolver.Resolve(dataItem)))
                                     TempSpeedShapeNames[2] = dataItem;
                                 else
                                     STFException.TraceWarning(stf, String.Format("Non-existent shape file {0} referenced", dataItem));

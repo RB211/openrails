@@ -2844,7 +2844,7 @@ namespace Orts.Simulation.Physics
 
             var stringBuild = new StringBuilder();
 
-            if (!File.Exists(DataLogFile))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(DataLogFile)))
             {
                 char Separator = (char)(DataLogger.Separators)Enum.Parse(typeof(DataLogger.Separators), Simulator.Settings.DataLoggerSeparator);
 

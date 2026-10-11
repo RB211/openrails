@@ -253,13 +253,13 @@ namespace Orts.Formats.Msts
 
             foreach (string FileName in ScriptFiles)
             {
-                string fullName = String.Concat(RoutePath, @"\", FileName);
+                string fullName = String.Concat(RoutePath, @"/", FileName);
                 int readLineNumber = 0;
 
 #if !DEBUG_ALLOWCRASH
                 try
                 {
-                    using (StreamReader scrStream = new StreamReader(fullName, true))
+                    using (StreamReader scrStream = new StreamReader(ORTS.IO.PathResolver.Resolve(fullName), true))
                     {
 #if DEBUG_PRINT_IN
                         File.AppendAllText(din_fileLoc + @"sigscr.txt", "Reading file : " + fullName + "\n\n");
@@ -273,7 +273,7 @@ namespace Orts.Formats.Msts
                 }
 #else
                 // for test purposes : without exception catch
-                StreamReader scrStream = new StreamReader(fullName, true);
+                StreamReader scrStream = new StreamReader(ORTS.IO.PathResolver.Resolve(fullName), true);
                 sigscrRead(fullName, scrStream, SignalTypes, ref readLineNumber, signalFunctions, ORNormalSubtypes);
                 scrStream.Close();
 #endif

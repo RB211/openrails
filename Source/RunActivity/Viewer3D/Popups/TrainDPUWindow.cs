@@ -364,7 +364,7 @@ namespace Orts.Viewer3D.Popups
                 }
 
                 // Validates rows with windows DPI settings
-                dpiOffset = (System.Drawing.Graphics.FromHwnd(IntPtr.Zero).DpiY / 96) > 1.00f ? 1 : 0;// values from testing
+                dpiOffset = (WindowTextManager.DpiScale) > 1.00f ? 1 : 0;// values from testing
                 var rowCount = labels.Where(x => !string.IsNullOrEmpty(x.FirstCol)).Count() - dpiOffset;
 
                 var desiredHeight = FontToBold ? (Owner.TextFontDefaultBold.Height + 2) * (rowCount + 1)

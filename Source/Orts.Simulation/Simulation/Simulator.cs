@@ -281,7 +281,7 @@ namespace Orts.Simulation
             RoutePathName = Path.GetFileName(RoutePath);
             BasePath = Path.GetDirectoryName(Path.GetDirectoryName(RoutePath));
             DayAmbientLight = (int)Settings.DayAmbientLight;
-            EOTPath = BasePath + @"\TRAINS\ORTS_EOT\";
+            EOTPath = BasePath + @"/TRAINS/ORTS_EOT/";
 
 
             string ORfilepath = System.IO.Path.Combine(RoutePath, "OpenRails");
@@ -306,9 +306,9 @@ namespace Orts.Simulation
             else if (TRK.Tr_RouteFile.SuperElevation.Count > 0 && !TRK.Tr_RouteFile.SuperElevation[0].DefaultStandard)
                 UseSuperElevation = true; // Custom superelevation standard entered, force enable superelevation
 
-            TDB = new TrackDatabaseFile(RoutePath + @"\" + TRK.Tr_RouteFile.FileName + ".tdb");
+            TDB = new TrackDatabaseFile(RoutePath + @"/" + TRK.Tr_RouteFile.FileName + ".tdb");
 
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
             {
                 SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
             }
@@ -317,14 +317,14 @@ namespace Orts.Simulation
                 SIGCFG = new SignalConfigurationFile(RoutePath + @"\sigcfg.dat", false);
             }
 
-            if (Directory.Exists(RoutePath + @"\Openrails") && File.Exists(RoutePath + @"\Openrails\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\Openrails\TSECTION.DAT");
-            else if (Directory.Exists(RoutePath + @"\GLOBAL") && File.Exists(RoutePath + @"\GLOBAL\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\GLOBAL\TSECTION.DAT");
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails/TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(RoutePath + @"/Openrails/TSECTION.DAT");
+            else if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/GLOBAL")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/GLOBAL/TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(RoutePath + @"/GLOBAL/TSECTION.DAT");
             else
-                TSectionDat = new TrackSectionsFile(BasePath + @"\GLOBAL\TSECTION.DAT");
-            if (File.Exists(RoutePath + @"\TSECTION.DAT"))
-                TSectionDat.AddRouteTSectionDatFile(RoutePath + @"\TSECTION.DAT");
+                TSectionDat = new TrackSectionsFile(BasePath + @"/GLOBAL/TSECTION.DAT");
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/TSECTION.DAT")))
+                TSectionDat.AddRouteTSectionDatFile(RoutePath + @"/TSECTION.DAT");
 
 #if ACTIVITY_EDITOR
             //  Where we try to load OR's specific data description (Station, connectors, etc...)
@@ -332,14 +332,14 @@ namespace Orts.Simulation
             orRouteConfig.SetTraveller(TSectionDat, TDB);
 #endif
 
-            var rdbFile = RoutePath + @"\" + TRK.Tr_RouteFile.FileName + ".rdb";
-            if (File.Exists(rdbFile))
+            var rdbFile = RoutePath + @"/" + TRK.Tr_RouteFile.FileName + ".rdb";
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(rdbFile)))
             {
                 RDB = new RoadDatabaseFile(rdbFile);
             }
 
-            string carSpawnFile = RoutePath + @"\carspawn.dat";
-            if (File.Exists(carSpawnFile))
+            string carSpawnFile = RoutePath + @"/carspawn.dat";
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(carSpawnFile)))
             {
                 CarSpawnerLists = new List<CarSpawnerList>();
                 CarSpawnerFile = new CarSpawnerFile(carSpawnFile, RoutePath + @"\shapes\", CarSpawnerLists);
@@ -347,21 +347,21 @@ namespace Orts.Simulation
 
             // Extended car spawner file
             string extCarSpawnFile = ORFileHelper.GetORTSFilePath(carSpawnFile);
-            if (File.Exists(extCarSpawnFile))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(extCarSpawnFile)))
             {
                 if (CarSpawnerLists == null) CarSpawnerLists = new List<CarSpawnerList>();
                 ExtCarSpawnerFile = new ExtCarSpawnerFile(extCarSpawnFile, RoutePath + @"\shapes\", CarSpawnerLists);
             }
 
             // Load animated clocks if file "animated.clocks-or" exists --------------------------------------------------------
-            var clockFile = RoutePath + @"\animated.clocks-or";
-            if (File.Exists(clockFile))
+            var clockFile = RoutePath + @"/animated.clocks-or";
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(clockFile)))
             {
                 new ClocksFile(clockFile, ClockShapeList, RoutePath + @"\shapes\");
             }
 
             // Generate a list of EOTs that may be used to attach at end of train
-            if (Directory.Exists(EOTPath))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(EOTPath)))
             {
                 FullEOTPaths = new FullEOTPaths(EOTPath);
             }
@@ -382,7 +382,7 @@ namespace Orts.Simulation
             // check for existence of activity file in OpenRails subfolder
 
             activityPath = ORFileHelper.GetORTSFilePath(activityPath);
-            if (File.Exists(activityPath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(activityPath)))
             {
                 // We have an OR-specific addition to world file
                 Activity.InsertORSpecificData(activityPath);
@@ -443,12 +443,12 @@ namespace Orts.Simulation
             ContainerManager = new ContainerManager(this);
             if (Activity?.Tr_Activity?.Tr_Activity_Header?.LoadStationsPopulationFile != null)
             {
-                var populationFilePath = RoutePath + @"\Activities\Openrails\" + Activity.Tr_Activity.Tr_Activity_Header.LoadStationsPopulationFile + ".load-stations-loads-or";
+                var populationFilePath = RoutePath + @"/Activities/Openrails/" + Activity.Tr_Activity.Tr_Activity_Header.LoadStationsPopulationFile + ".load-stations-loads-or";
                 LoadStationsPopulationFile = new LoadStationsPopulationFile(populationFilePath);
             }
             Signals = new Signals(this, SIGCFG, cancellation);
             SuperElevation = new SuperElevation(this);
-            TurntableFile = new TurntableFile(RoutePath + @"\openrails\turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
             LevelCrossings = new LevelCrossings(this);
             FuelManager = new FuelManager(this);
             Trains = new TrainList(this);
@@ -486,7 +486,7 @@ namespace Orts.Simulation
             TimetableMode = true;
             Signals = new Signals(this, SIGCFG, cancellation);
             SuperElevation = new SuperElevation(this);
-            TurntableFile = new TurntableFile(RoutePath + @"\openrails\turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
             LevelCrossings = new LevelCrossings(this);
             FuelManager = new FuelManager(this);
             ContainerManager = new ContainerManager(this);
@@ -550,7 +550,7 @@ namespace Orts.Simulation
 
             // initialization of turntables
             ActiveMovingTableIndex = inf.ReadInt32();
-            TurntableFile = new TurntableFile(RoutePath + @"\openrails\turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
             if (MovingTables.Count >= 0)
             {
                 foreach (var movingTable in MovingTables) movingTable.Restore(inf, this);
@@ -800,8 +800,8 @@ namespace Orts.Simulation
         {
             var PlayerServiceFileName = Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Name;
             var srvFile = new ServiceFile(RoutePath + @"\SERVICES\" + PlayerServiceFileName + ".SRV");
-            conFileName = BasePath + @"\TRAINS\CONSISTS\" + srvFile.Train_Config + ".CON";
-            patFileName = RoutePath + @"\PATHS\" + srvFile.PathID + ".PAT";
+            conFileName = BasePath + @"/TRAINS/CONSISTS/" + srvFile.Train_Config + ".CON";
+            patFileName = RoutePath + @"/PATHS/" + srvFile.PathID + ".PAT";
         }
 
 
@@ -1281,8 +1281,8 @@ namespace Orts.Simulation
             srvFile.Name = playerServiceFileName;
             srvFile.Train_Config = playerServiceFileName;
             srvFile.PathID = Path.GetFileNameWithoutExtension(ExplorePathFile);
-            conFileName = BasePath + @"\TRAINS\CONSISTS\" + srvFile.Train_Config + ".CON";
-            patFileName = RoutePath + @"\PATHS\" + srvFile.PathID + ".PAT";
+            conFileName = BasePath + @"/TRAINS/CONSISTS/" + srvFile.Train_Config + ".CON";
+            patFileName = RoutePath + @"/PATHS/" + srvFile.PathID + ".PAT";
             OriginalPlayerTrain = train;
 
             if (conFileName.Contains("tilted")) train.IsTilting = true;
@@ -1309,17 +1309,17 @@ namespace Orts.Simulation
             // add wagons
             foreach (Wagon wagon in conFile.Train.TrainCfg.WagonList)
             {
-                string wagonFolder = BasePath + @"\trains\trainset\" + wagon.Folder;
-                string wagonFilePath = wagonFolder + @"\" + wagon.Name + ".wag"; ;
+                string wagonFolder = BasePath + @"/trains/trainset/" + wagon.Folder;
+                string wagonFilePath = wagonFolder + @"/" + wagon.Name + ".wag"; ;
                 if (wagon.IsEngine)
                     wagonFilePath = Path.ChangeExtension(wagonFilePath, ".eng");
                 else if (wagon.IsEOT)
                 {
-                    wagonFolder = BasePath + @"\trains\orts_eot\" + wagon.Folder;
-                    wagonFilePath = wagonFolder + @"\" + wagon.Name + ".eot";
+                    wagonFolder = BasePath + @"/trains/orts_eot/" + wagon.Folder;
+                    wagonFilePath = wagonFolder + @"/" + wagon.Name + ".eot";
                 }
 
-                if (!File.Exists(wagonFilePath))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(wagonFilePath)))
                 {
                     // First wagon is the player's loco and required, so issue a fatal error message
                     if (wagon == conFile.Train.TrainCfg.WagonList[0])
@@ -1436,8 +1436,8 @@ namespace Orts.Simulation
                 srvFile.Train_Config = playerServiceFileName;
                 srvFile.PathID = Path.GetFileNameWithoutExtension(ExplorePathFile);
             }
-            conFileName = BasePath + @"\TRAINS\CONSISTS\" + srvFile.Train_Config + ".CON";
-            patFileName = RoutePath + @"\PATHS\" + srvFile.PathID + ".PAT";
+            conFileName = BasePath + @"/TRAINS/CONSISTS/" + srvFile.Train_Config + ".CON";
+            patFileName = RoutePath + @"/PATHS/" + srvFile.PathID + ".PAT";
             ConsistFile conFile = new ConsistFile(conFileName, false);
             CurveDurability = conFile.Train.TrainCfg.Durability;   // Finds curve durability of consist based upon the value in consist file
             Player_Traffic_Definition player_Traffic_Definition = Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Player_Traffic_Definition;
@@ -1534,17 +1534,17 @@ namespace Orts.Simulation
                     for (int iWagon = activityObject.Train_Config.TrainCfg.WagonList.Count - 1; iWagon >= 0; --iWagon)
                     {
                         Wagon wagon = (Wagon)activityObject.Train_Config.TrainCfg.WagonList[iWagon];
-                        string wagonFolder = BasePath + @"\trains\trainset\" + wagon.Folder;
-                        string wagonFilePath = wagonFolder + @"\" + wagon.Name + ".wag"; ;
+                        string wagonFolder = BasePath + @"/trains/trainset/" + wagon.Folder;
+                        string wagonFilePath = wagonFolder + @"/" + wagon.Name + ".wag"; ;
                         if (wagon.IsEngine)
                             wagonFilePath = Path.ChangeExtension(wagonFilePath, ".eng");
                         else if (wagon.IsEOT)
                         {
-                            wagonFolder = BasePath + @"\trains\orts_eot\" + wagon.Folder;
-                            wagonFilePath = wagonFolder + @"\" + wagon.Name + ".eot";
+                            wagonFolder = BasePath + @"/trains/orts_eot/" + wagon.Folder;
+                            wagonFilePath = wagonFolder + @"/" + wagon.Name + ".eot";
                         }
 
-                        if (!File.Exists(wagonFilePath))
+                        if (!File.Exists(ORTS.IO.PathResolver.Resolve(wagonFilePath)))
                         {
                             Trace.TraceWarning($"Ignored missing {(wagon.IsEngine ? "engine" : "wagon")} {wagonFilePath} in activity definition {activityObject.Train_Config.TrainCfg.Name}");
                             continue;
@@ -2257,14 +2257,14 @@ namespace Orts.Simulation
             logfilebase = String.Concat(logfilebase, appendix);
             logfilefull = String.Concat(logfilebase, ".csv");
 
-            bool logExists = File.Exists(logfilefull);
+            bool logExists = File.Exists(ORTS.IO.PathResolver.Resolve(logfilefull));
             int logCount = 0;
 
             while (logExists && logCount < 100)
             {
                 logCount++;
                 logfilefull = String.Concat(logfilebase, "_", logCount.ToString("00"), ".csv");
-                logExists = File.Exists(logfilefull);
+                logExists = File.Exists(ORTS.IO.PathResolver.Resolve(logfilefull));
             }
 
             if (logExists) logfilefull = String.Empty;

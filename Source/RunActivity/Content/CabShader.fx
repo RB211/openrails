@@ -23,6 +23,8 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float    NightColorModifier;  // Modifier for nighttime lighting.
 bool     LightOn;       // Dashboard light is on
 float4   Light1Pos;     // Dashboard Light 1 cone position
@@ -31,9 +33,9 @@ float3   Light1Col;     // Light 1 color
 float3   Light2Col;     // Light 2 color
 float2   TexPos;        // Texture bounding rectangle
 float2   TexSize;       // Texture bounding rectangle
-texture  ImageTexture;
+Texture2D  ImageTexture;
 
-sampler ImageSampler = sampler_state
+SamplerState ImageSampler = sampler_state
 {
 	Texture = (ImageTexture);
 };
@@ -54,9 +56,9 @@ struct PIXEL_INPUT
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
-float4 PSCabShader(PIXEL_INPUT In) : COLOR0
+float4 PSCabShader(PIXEL_INPUT In) : SV_TARGET0
 {
-	float4 origColor = tex2D(ImageSampler, In.TexCoords) * In.Color;
+	float4 origColor = ImageTexture.Sample(ImageSampler, In.TexCoords) * In.Color;
 	float3 shadColor = origColor.rgb * NightColorModifier;
 
 	if (LightOn)
@@ -88,6 +90,6 @@ float4 PSCabShader(PIXEL_INPUT In) : COLOR0
 
 technique CabShader {
 	pass Pass_0 {
-		PixelShader = compile ps_4_0_level_9_1 PSCabShader();
+		PixelShader = compile PS_LOW PSCabShader();
 	}
 }

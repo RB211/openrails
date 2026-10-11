@@ -330,12 +330,12 @@ namespace Orts.MultiPlayer
                 url = areas[6].Trim();
                 ParseTrainCars(areas[7].Trim());
                 leadingID = areas[1].Trim();
-                int index = path.LastIndexOf("\\PATHS\\", StringComparison.OrdinalIgnoreCase);
+                int index = path.LastIndexOf("/PATHS/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     path = path.Remove(0, index + 7);
                 }
-                index = con.LastIndexOf("\\CONSISTS\\", StringComparison.OrdinalIgnoreCase);
+                index = con.LastIndexOf("/CONSISTS/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     con = con.Remove(0, index + 10);
@@ -386,12 +386,12 @@ namespace Orts.MultiPlayer
         {
             url = avatar;
             route = MPManager.Simulator.RoutePathName;
-            int index = p.LastIndexOf("\\PATHS\\", StringComparison.OrdinalIgnoreCase);
+            int index = p.LastIndexOf("/PATHS/", StringComparison.OrdinalIgnoreCase);
             if (index > 0)
             {
                 p = p.Remove(0, index + 7);
             }
-            index = c.LastIndexOf("\\CONSISTS\\", StringComparison.OrdinalIgnoreCase);
+            index = c.LastIndexOf("/CONSISTS/", StringComparison.OrdinalIgnoreCase);
             if (index > 0)
             {
                 c = c.Remove(0, index + 10);
@@ -448,7 +448,7 @@ namespace Orts.MultiPlayer
             for (var i = 0; i < cars.Length; i++)
             {
                 var c = cars[i];
-                var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase); 
+                var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase); 
                 {
                     c = c.Remove(0, index + 17);
                 }//c: wagon path without folder name
@@ -518,7 +518,7 @@ namespace Orts.MultiPlayer
                     if (cars.Length != p1Train.Cars.Count) identical = false;
                     if (identical != false)
                     {
-                        string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\";
+                        string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/";
                         for (int i = 0; i < cars.Length; i++)
                         {
                             if (wagonFilePath + cars[i] != p1Train.Cars[i].RealWagFilePath) { identical = false; break; }
@@ -572,7 +572,7 @@ namespace Orts.MultiPlayer
                             if (cars.Length != t.Cars.Count) identical = false;
                             if (identical != false)
                             {
-                                string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\";
+                                string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/";
                                 for (int i = 0; i < cars.Length; i++)
                                 {
                                     if (wagonFilePath + cars[i] != t.Cars[i].RealWagFilePath) { identical = false; break; }
@@ -584,8 +584,8 @@ namespace Orts.MultiPlayer
                                 t.Cars.RemoveRange(0, carsCount);
                                 for (int i = 0; i < cars.Length; i++)
                                 {
-                                    string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\" + cars[i];
-                                    if (!File.Exists(wagonFilePath))
+                                    string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/" + cars[i];
+                                    if (!File.Exists(ORTS.IO.PathResolver.Resolve(wagonFilePath)))
                                     {
                                         Trace.TraceWarning($"Ignored missing rolling stock {wagonFilePath}");
                                         continue;
@@ -666,7 +666,7 @@ namespace Orts.MultiPlayer
                 if (cars.Length != p1Train.Cars.Count) identical = false;
                 if (identical != false)
                 {
-                    string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\";
+                    string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/";
                     for (int i = 0; i < cars.Length; i++)
                     {
                         if (wagonFilePath + cars[i] != p1Train.Cars[i].RealWagFilePath) { identical = false; break; }
@@ -1358,7 +1358,7 @@ namespace Orts.MultiPlayer
             List<LoadData> loadDataList = new List<LoadData>();
             for (var i = 0; i < cars.Length; i++)
             {
-                string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\" + cars[i];
+                string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/" + cars[i];
                 TrainCar car = null;
                 try
                 {
@@ -1439,7 +1439,7 @@ namespace Orts.MultiPlayer
             for (var i = 0; i < cars.Length; i++)
             {
                 var c = cars[i];
-                var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase);
+                var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     c = c.Remove(0, index + 17);
@@ -1585,7 +1585,7 @@ namespace Orts.MultiPlayer
                 List<LoadData> loadDataList = new List<LoadData>();
                 for (var i = 0; i < cars.Length; i++)
                 {
-                    string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\" + cars[i];
+                    string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/" + cars[i];
                     TrainCar car = findCar(train, ids[i]);
 
                     try
@@ -1655,7 +1655,7 @@ namespace Orts.MultiPlayer
 
                 for (var i = 0; i < cars.Length; i++)
                 {
-                    string wagonFilePath = MPManager.Simulator.BasePath + @"\trains\trainset\" + cars[i];
+                    string wagonFilePath = MPManager.Simulator.BasePath + @"/trains/trainset/" + cars[i];
                     TrainCar car = null;
                     try
                     {
@@ -1710,7 +1710,7 @@ namespace Orts.MultiPlayer
             for (var i = 0; i < cars.Length; i++)
             {
                 var c = cars[i];
-                var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase);
+                var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     c = c.Remove(0, index + 17);
@@ -3000,7 +3000,7 @@ namespace Orts.MultiPlayer
             for (var i = 0; i < cars.Length; i++)
             {
                 var c = cars[i];
-                var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase);
+                var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     c = c.Remove(0, index + 17);
@@ -3909,7 +3909,7 @@ namespace Orts.MultiPlayer
                         for (var i = 0; i < Math.Min(20, t.Cars.Count - 1); i++)
                         {
                             var c = t.Cars[i].RealWagFilePath;
-                            var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase);
+                            var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase);
                             if (index > 0)
                             {
                                 c = c.Remove(0, index + 17);
@@ -3946,7 +3946,7 @@ namespace Orts.MultiPlayer
             for (var i = 0; i < cars.Length; i++)
             {
                 var c = cars[i];
-                var index = c.LastIndexOf("\\trains\\trainset\\", StringComparison.OrdinalIgnoreCase);
+                var index = c.LastIndexOf("/trains/trainset/", StringComparison.OrdinalIgnoreCase);
                 if (index > 0)
                 {
                     c = c.Remove(0, index + 17);

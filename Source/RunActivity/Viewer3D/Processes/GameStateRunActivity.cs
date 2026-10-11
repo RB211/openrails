@@ -20,6 +20,7 @@
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Orts.Viewer3D.Common;
 using Orts.Common;
 using Orts.Formats.Msts;
 using Orts.MultiPlayer;
@@ -34,7 +35,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
 
 namespace Orts.Viewer3D.Processes
 {
@@ -94,6 +94,8 @@ namespace Orts.Viewer3D.Processes
             public string[] args;
             public string acttype;
         }
+
+        static string LauncherName => OperatingSystem.IsWindows() ? "OpenRails.exe" : "Menu";
 
         static MapViewer MapForm { get { return Program.MapForm; } set { Program.MapForm = value; } }
         static SoundDebugForm SoundDebugForm { get { return Program.SoundDebugForm; } set { Program.SoundDebugForm = value; } }
@@ -229,11 +231,11 @@ namespace Orts.Viewer3D.Processes
                         break;
 
                     default:
-                        MessageBox.Show("To start " + Application.ProductName + ", please run 'OpenRails.exe'.\n\n"
-                                + "If you are attempting to debug this component, please run 'OpenRails.exe' and execute the scenario you are interested in. "
+                        NativeMessageBox.Show("To start " + ApplicationInfo.ProductName + ", please run '" + LauncherName + "'.\n\n"
+                                + "If you are attempting to debug this component, please run '" + LauncherName + "' and execute the scenario you are interested in. "
                                 + "In the log file, a line with the command-line arguments used will be listed at the top. "
                                 + "You should then configure your debug environment to execute this component with those command-line arguments.",
-                                Application.ProductName + " " + VersionInfo.VersionOrBuild);
+                                ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild);
                         Game.Exit();
                         break;
                 }
@@ -262,59 +264,59 @@ namespace Orts.Viewer3D.Processes
 
                         if (error is IncompatibleSaveException)
                         {
-                            MessageBox.Show(String.Format(
+                            NativeMessageBox.Show(String.Format(
                                 "Save file is incompatible with this version of {0}.\n\n" +
                                 "    {1}\n\n" +
                                 "Saved version: {2}\n" +
                                 "Current version: {3}",
-                                Application.ProductName,
+                                ApplicationInfo.ProductName,
                                 ((IncompatibleSaveException)error).SaveFile,
                                 ((IncompatibleSaveException)error).VersionOrBuild,
                                 VersionInfo.VersionOrBuild),
-                                Application.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                         else if (error is InvalidCommandLine)
-                            MessageBox.Show(String.Format(
+                            NativeMessageBox.Show(String.Format(
                                 "{0} was started with an invalid command-line. {1} Arguments given:\n\n{2}",
-                                Application.ProductName,
+                                ApplicationInfo.ProductName,
                                 error.Message,
                                 String.Join("\n", data.Select(d => "\u2022 " + d).ToArray())),
-                                Application.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         else if (error is Traveller.MissingTrackNodeException)
-                            MessageBox.Show(String.Format("Open Rails detected a track shape index {0} which is not present in tsection.dat and cannot continue.\n\n" +
+                            NativeMessageBox.Show(String.Format("Open Rails detected a track shape index {0} which is not present in tsection.dat and cannot continue.\n\n" +
                                 "The version of standard tsection.dat may be out of date, or this route requires a custom tsection.dat.\n" +
                                 "Please check the route installation instructions to verify the required tsection.dat.",
                                 ((Traveller.MissingTrackNodeException)error).Index));
                         else if (error is FileNotFoundException)
                         {
-                            MessageBox.Show(String.Format(
+                            NativeMessageBox.Show(String.Format(
                                     "An essential file is missing and {0} cannot continue.\n\n" +
                                     "    {1}",
-                                    Application.ProductName, (error as FileNotFoundException).FileName),
-                                    Application.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    ApplicationInfo.ProductName, (error as FileNotFoundException).FileName),
+                                    ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                         else if (error is DirectoryNotFoundException)
                         {
                             // This is a hack to try and extract the actual file name from the exception message. It isn't available anywhere else.
                             var re = new Regex("'([^']+)'").Match(error.Message);
                             var fileName = re.Groups[1].Success ? re.Groups[1].Value : error.Message;
-                            MessageBox.Show(String.Format(
+                            NativeMessageBox.Show(String.Format(
                                     "An essential folder is missing and {0} cannot continue.\n\n" +
                                     "    {1}",
-                                    Application.ProductName, fileName),
-                                    Application.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                    ApplicationInfo.ProductName, fileName),
+                                    ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                         else
                         {
                             var errorSummary = error.GetType().FullName + ": " + error.Message;
                             var logFile = Path.Combine(settings.LoggingPath, settings.LoggingFilename);
-                            var openTracker = MessageBox.Show(String.Format(
+                            var openTracker = NativeMessageBox.Show(String.Format(
                                     "A fatal error has occured and {0} cannot continue.\n\n" +
                                     "    {1}\n\n" +
                                     "This error may be due to bad data or a bug. You can help improve {0} by reporting this error in our bug tracker at http://launchpad.net/or and attaching the log file {2}.\n\n" +
                                     ">>> Click OK to report this error on the {0} bug tracker <<<",
-                                    Application.ProductName, errorSummary, logFile),
-                                    Application.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
+                                    ApplicationInfo.ProductName, errorSummary, logFile),
+                                    ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OKCancel, MessageBoxIcon.Error);
                             if (openTracker == DialogResult.OK)
                                 Process.Start(new ProcessStartInfo { FileName = "https://launchpad.net/or", UseShellExecute = true });
                             // James Ross would prefer to do this:
@@ -391,7 +393,7 @@ namespace Orts.Viewer3D.Processes
             //    MPManager.IsMultiPlayer() && MPManager.IsServer() ? "$Multipl$ " : "" , DateTime.Now);
 
             var saveSet = new SaveSet();  // Sets the filestem for the set of Save files
-            using (BinaryWriter outf = new BinaryWriter(new FileStream(UserSettings.UserDataFolder + "\\" + saveSet.FileStem + ".save", FileMode.Create, FileAccess.Write)))
+            using (BinaryWriter outf = new BinaryWriter(new FileStream(ORTS.IO.PathResolver.Resolve(UserSettings.UserDataFolder + "/" + saveSet.FileStem + ".save"), FileMode.Create, FileAccess.Write)))
             {
                 // Save some version identifiers so we can validate on load.
                 outf.Write(VersionInfo.Version);
@@ -442,7 +444,7 @@ namespace Orts.Viewer3D.Processes
             CopyLog(Path.Combine(UserSettings.UserDataFolder, saveSet.FileStem + ".txt"));
 
             // Copy the evaluation file to the save folder
-            if (File.Exists(Program.EvaluationFilename))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(Program.EvaluationFilename)))
                 File.Copy(Program.EvaluationFilename, Path.Combine(UserSettings.UserDataFolder, saveSet.FileStem + ".evaluation.txt"), true); 
         }
 
@@ -498,7 +500,7 @@ namespace Orts.Viewer3D.Processes
             // First use the .save file to check the validity and extract the route and activity.
             var saveFile = GetSaveFile(args);
             var versionAndBuild = new[] { "", "", "" };
-            using (BinaryReader inf = new BinaryReader(new FileStream(saveFile, FileMode.Open, FileAccess.Read)))
+            using (BinaryReader inf = new BinaryReader(new FileStream(ORTS.IO.PathResolver.Resolve(saveFile), FileMode.Open, FileAccess.Read)))
             {
                 try // Because Restore() methods may try to read beyond the end of an out of date file.
                 {
@@ -597,7 +599,7 @@ namespace Orts.Viewer3D.Processes
 
             // First use the .save file to extract the route and activity.
             string saveFile = GetSaveFile(args);
-            using (BinaryReader inf = new BinaryReader(new FileStream(saveFile, FileMode.Open, FileAccess.Read)))
+            using (BinaryReader inf = new BinaryReader(new FileStream(ORTS.IO.PathResolver.Resolve(saveFile), FileMode.Open, FileAccess.Read)))
             {
                 inf.ReadString();    // Revision
                 inf.ReadString();    // Build
@@ -648,7 +650,7 @@ namespace Orts.Viewer3D.Processes
                     var f = Path.Combine(UserSettings.UserDataFolder, c.FileStem);
                     if (!f.EndsWith(".save"))
                         f += ".save";
-                    if (File.Exists(f))
+                    if (File.Exists(ORTS.IO.PathResolver.Resolve(f)))
                     {
                         previousSaveFile = f;
                         // Move commands after this to the replay command list.
@@ -667,7 +669,7 @@ namespace Orts.Viewer3D.Processes
                 replayCommandList.AddRange(log.CommandList);    // copy the commands before deleting them.
                 log.CommandList.Clear();
                 // But we have no args, so have to get these from the Save
-                using (var inf = new BinaryReader(new FileStream(saveFile, FileMode.Open, FileAccess.Read)))
+                using (var inf = new BinaryReader(new FileStream(ORTS.IO.PathResolver.Resolve(saveFile), FileMode.Open, FileAccess.Read)))
                 {
                     inf.ReadString();    // Revision
                     inf.ReadString();    // Build
@@ -680,7 +682,7 @@ namespace Orts.Viewer3D.Processes
             else
             {
                 // Resume from previous SaveFile and then replay
-                using (var inf = new BinaryReader(new FileStream(previousSaveFile, FileMode.Open, FileAccess.Read)))
+                using (var inf = new BinaryReader(new FileStream(ORTS.IO.PathResolver.Resolve(previousSaveFile), FileMode.Open, FileAccess.Read)))
                 {
                     GetValidSaveVersionAndBuild(settings, saveFile, inf);
 
@@ -715,7 +717,7 @@ namespace Orts.Viewer3D.Processes
                 Trace.TraceWarning("Restoring from a save made by version {1}\n"
                     + "of {0} may be incompatible with current version {2}.\n"
                     + "Please do not report any problems that may result.\n",
-                    Application.ProductName, versionOrBuild, VersionInfo.VersionOrBuild);
+                    ApplicationInfo.ProductName, versionOrBuild, VersionInfo.VersionOrBuild);
             }
             return new[] { version, build, versionOrBuild };
         }
@@ -800,12 +802,12 @@ namespace Orts.Viewer3D.Processes
 
         void InitLogging(UserSettings settings, string[] args, bool appendLog)
         {
-            if (settings.Logging && (settings.LoggingPath.Length > 0) && Directory.Exists(settings.LoggingPath))
+            if (settings.Logging && (settings.LoggingPath.Length > 0) && Directory.Exists(ORTS.IO.PathResolver.Resolve(settings.LoggingPath)))
             {
                 string fileName;
                 try
                 {
-                    fileName = string.Format(settings.LoggingFilename, Application.ProductName, VersionInfo.VersionOrBuild, VersionInfo.Version, VersionInfo.Build, DateTime.Now);
+                    fileName = string.Format(settings.LoggingFilename, ApplicationInfo.ProductName, VersionInfo.VersionOrBuild, VersionInfo.Version, VersionInfo.Build, DateTime.Now);
                 }
                 catch (FormatException)
                 {
@@ -828,7 +830,7 @@ namespace Orts.Viewer3D.Processes
             // Trace.Listeners and Debug.Listeners are the same list.
             Trace.Listeners.Add(ORTraceListener);
 
-            Console.WriteLine("This is a log file for {0}. Please include this file in bug reports.", Application.ProductName);
+            Console.WriteLine("This is a log file for {0}. Please include this file in bug reports.", ApplicationInfo.ProductName);
             LogSeparator();
             if (settings.Logging)
             {
@@ -926,7 +928,7 @@ namespace Orts.Viewer3D.Processes
             // The loading of the cached data doesn't matter if anything goes wrong; we'll simply have no progress bar.
             try
             {
-                using (var data = File.OpenRead(LoadingDataFilePath))
+                using (var data = File.OpenRead(ORTS.IO.PathResolver.Resolve(LoadingDataFilePath)))
                 {
                     using (var reader = new BinaryReader(data))
                     {
@@ -1300,7 +1302,7 @@ namespace Orts.Viewer3D.Processes
 
         string GetMostRecentSave()
         {
-            var directory = new DirectoryInfo(UserSettings.UserDataFolder);
+            var directory = new DirectoryInfo(ORTS.IO.PathResolver.Resolve(UserSettings.UserDataFolder));
             var file = directory.GetFiles("*.save")
              .OrderByDescending(f => f.LastWriteTime)
              .First();
@@ -1552,7 +1554,7 @@ namespace Orts.Viewer3D.Processes
                 }
                 loadingScreen = loadingScreen == null ? defaultScreen : loadingScreen;
                 var path = Path.Combine(Simulator.RoutePath, loadingScreen);
-                if (Path.GetExtension(path) == ".dds" && File.Exists(path))
+                if (Path.GetExtension(path) == ".dds" && File.Exists(ORTS.IO.PathResolver.Resolve(path)))
                 {
                     DDSLib.DDSFromFile(path, gd, true, out texture);
                 }
@@ -1560,18 +1562,18 @@ namespace Orts.Viewer3D.Processes
                 {
                     var alternativeTexture = Path.ChangeExtension(path, ".dds");
 
-                    if (File.Exists(alternativeTexture))
+                    if (File.Exists(ORTS.IO.PathResolver.Resolve(alternativeTexture)))
                     {
                         DDSLib.DDSFromFile(alternativeTexture, gd, true, out texture);
                     }
-                    else if (File.Exists(path))
+                    else if (File.Exists(ORTS.IO.PathResolver.Resolve(path)))
                     {
                         texture = Orts.Formats.Msts.AceFile.Texture2DFromFile(gd, path);
                     }
                     else
                     {
                         path = Path.Combine(Simulator.RoutePath, defaultScreen);
-                        if (File.Exists(path))
+                        if (File.Exists(ORTS.IO.PathResolver.Resolve(path)))
                         {
                             texture = Orts.Formats.Msts.AceFile.Texture2DFromFile(gd, path);
                         }

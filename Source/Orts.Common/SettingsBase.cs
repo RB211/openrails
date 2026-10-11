@@ -34,13 +34,38 @@ namespace ORTS.Common
         public static string RegistryKey { get; private set; }        // ie @"SOFTWARE\OpenRails\ORTS"
         public static string SettingsFilePath { get; private set; }   // ie @"C:\Program Files\Open Rails\OpenRails.ini"
 
+        /// <summary>
+        /// Per-user settings file used on platforms without a registry: $XDG_CONFIG_HOME/OpenRails/OpenRails.ini.
+        /// </summary>
+        public static string UserSettingsFilePath
+        {
+            get
+            {
+                var configHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+                if (string.IsNullOrEmpty(configHome))
+                    configHome = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+                return Path.Combine(configHome, "OpenRails", DefaultSettingsFileName);
+            }
+        }
+
         static SettingsBase()
         {
             // Only one of these is allowed; if the INI file exists, we use that, otherwise we use the registry.
             RegistryKey = DefaultRegistryKey;
             SettingsFilePath = Path.Combine(ApplicationInfo.ProcessDirectory, DefaultSettingsFileName);
-            if (File.Exists(SettingsFilePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(SettingsFilePath)))
                 RegistryKey = null;
+            else if (!OperatingSystem.IsWindows())
+            {
+                // There is no registry; use a per-user INI file in the XDG config directory.
+                RegistryKey = null;
+                SettingsFilePath = UserSettingsFilePath;
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(SettingsFilePath)))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(SettingsFilePath));
+                    File.WriteAllText(SettingsFilePath, "");
+                }
+            }
             else
                 SettingsFilePath = null;
         }

@@ -67,7 +67,7 @@ namespace Orts.Simulation.AIs
             Simulator = simulator;
 
 #if WITH_PATH_DEBUG
-            if (File.Exists(@"C:\temp\checkpath.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\checkpath.txt")))
             {
                 File.Delete(@"C:\temp\checkpath.txt");
             }
@@ -818,9 +818,9 @@ namespace Orts.Simulation.AIs
         public AITrain CreateAITrainDetail(Service_Definition sd, Traffic_Service_Definition trfDef, ServiceFile srvFile, bool isTimetableMode, bool isInitialPlayerTrain)
         {
             // Read consist file
-            string consistFileName = Simulator.BasePath + @"\TRAINS\CONSISTS\" + srvFile.Train_Config + ".CON";
+            string consistFileName = Simulator.BasePath + @"/TRAINS/CONSISTS/" + srvFile.Train_Config + ".CON";
             ConsistFile conFile = new ConsistFile(consistFileName);
-            string pathFileName = Simulator.RoutePath + @"\PATHS\" + srvFile.PathID + ".PAT";
+            string pathFileName = Simulator.RoutePath + @"/PATHS/" + srvFile.PathID + ".PAT";
 
             // Patch Placingproblem - JeroenP
 #if ACTIVITY_EDITOR
@@ -865,18 +865,18 @@ namespace Orts.Simulation.AIs
             foreach (Wagon wagon in conFile.Train.TrainCfg.WagonList)
             {
 
-                string wagonFolder = Simulator.BasePath + @"\trains\trainset\" + wagon.Folder;
-                string wagonFilePath = wagonFolder + @"\" + wagon.Name + ".wag";
+                string wagonFolder = Simulator.BasePath + @"/trains/trainset/" + wagon.Folder;
+                string wagonFilePath = wagonFolder + @"/" + wagon.Name + ".wag";
                 ;
                 if (wagon.IsEngine)
                     wagonFilePath = Path.ChangeExtension(wagonFilePath, ".eng");
                 else if (wagon.IsEOT)
                 {
-                    wagonFolder = Simulator.BasePath + @"\trains\orts_eot\" + wagon.Folder;
-                    wagonFilePath = wagonFolder + @"\" + wagon.Name + ".eot";
+                    wagonFolder = Simulator.BasePath + @"/trains/orts_eot/" + wagon.Folder;
+                    wagonFilePath = wagonFolder + @"/" + wagon.Name + ".eot";
                 }
 
-                if (!File.Exists(wagonFilePath))
+                if (!File.Exists(ORTS.IO.PathResolver.Resolve(wagonFilePath)))
                 {
                     Trace.TraceWarning($"Ignored missing {(wagon.IsEngine ? "engine" : "wagon")} {wagonFilePath} in consist {consistFileName}");
                     continue;

@@ -17,6 +17,7 @@
 
 // This file is the responsibility of the 3D & Environment Team. 
 
+using Orts.Viewer3D.Common;
 using Orts.Common;
 using ORTS.Common;
 using ORTS.Settings;
@@ -26,7 +27,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Windows.Forms;
 
 namespace Orts.Viewer3D.Processes
 {
@@ -242,7 +242,7 @@ namespace Orts.Viewer3D.Processes
             Exit();
             // Show the user that it's all gone horribly wrong.
             if (Settings.ShowErrorDialogs)
-                System.Windows.Forms.MessageBox.Show(error.ToString(), Application.ProductName + " " + VersionInfo.VersionOrBuild);
+                NativeMessageBox.Show(error.ToString(), ApplicationInfo.ProductName + " " + VersionInfo.VersionOrBuild, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

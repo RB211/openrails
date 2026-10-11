@@ -63,7 +63,7 @@ namespace Orts.Formats.Msts
                         else
                         {
                             var dataItem = new CarSpawnerItemData(stf, shapePath);
-                            if (File.Exists(dataItem.name))
+                            if (File.Exists(ORTS.IO.PathResolver.Resolve(dataItem.name)))
                                 spawnerDataItems.Add(dataItem);
                             else
                                 STFException.TraceWarning(stf, String.Format("Non-existent shape file {0} referenced", dataItem.name));

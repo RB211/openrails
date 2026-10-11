@@ -34,7 +34,7 @@ namespace Orts.Formats.Msts
 
         public void Read(string wsfilename, TrItem[] trItems)
         {
-            if (File.Exists(wsfilename))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(wsfilename)))
             {
                 using (STFReader stf = new STFReader(wsfilename, false))
                 {

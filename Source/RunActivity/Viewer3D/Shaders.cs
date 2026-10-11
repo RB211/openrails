@@ -36,7 +36,7 @@ namespace Orts.Viewer3D
         static byte[] GetEffectCode(string filename)
         {
             string filePath = Path.Combine(ApplicationInfo.ProcessDirectory, "Content", filename + ".mgfx");
-            return File.ReadAllBytes(filePath);
+            return File.ReadAllBytes(ORTS.IO.PathResolver.Resolve(filePath));
         }
     }
 

@@ -269,7 +269,7 @@ namespace Orts.Viewer3D
             var WFilePath = viewer.Simulator.RoutePath + @"\World\" + WFileName;
 
             // if there isn't a file, then return with an empty WorldFile object
-            if (!File.Exists(WFilePath))
+            if (!File.Exists(ORTS.IO.PathResolver.Resolve(WFilePath)))
             {
                 if (visible)
                     Trace.TraceWarning("World file missing - {0}", WFilePath);
@@ -281,7 +281,7 @@ namespace Orts.Viewer3D
 
             // check for existence of world file in OpenRails subfolder
             WFilePath = Orts.Common.ORFileHelper.GetORTSFilePath(WFilePath);
-            if (File.Exists(WFilePath))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(WFilePath)))
             {
                 // We have an OR-specific addition to world file
                 WFile.InsertORSpecificData(WFilePath, null);
@@ -344,7 +344,7 @@ namespace Orts.Viewer3D
                         Trace.TraceInformation("Illegal characters in a file path are: \\ / : * ? \" < > |");
                         shapeFilePath = null;
                     }
-                    if (!File.Exists(shapeFilePath))
+                    if (!File.Exists(ORTS.IO.PathResolver.Resolve(shapeFilePath)))
                     {
                         Trace.TraceWarning("{0} scenery object {1} with StaticFlags {3:X8} references non-existent {2}", WFileName, worldObject.UID, shapeFilePath, worldObject.StaticFlags);
                         shapeFilePath = null;

@@ -42,7 +42,7 @@ namespace Orts.Formats.Msts
             }
             else
             {
-                if (!System.IO.File.Exists(filename)) // If not found, skip
+                if (!System.IO.File.Exists(ORTS.IO.PathResolver.Resolve(filename))) // If not found, skip
                 {
                     shape = null;
                     return;

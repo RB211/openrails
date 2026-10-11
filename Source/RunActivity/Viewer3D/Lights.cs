@@ -156,11 +156,11 @@ namespace Orts.Viewer3D
 
         string DefineFullTexturePath(string textureName, bool searchSpecificTexture = false)
         {
-            if (File.Exists(Path.Combine(Path.GetDirectoryName(Car.WagFilePath), textureName)))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(Path.Combine(Path.GetDirectoryName(Car.WagFilePath), textureName))))
                 return Path.Combine(Path.GetDirectoryName(Car.WagFilePath), textureName);
             if (searchSpecificTexture)
                 Trace.TraceWarning("Could not find light graphic {0} at {1}", textureName, Path.Combine(Path.GetDirectoryName(Car.WagFilePath), textureName));
-            if (File.Exists(Path.Combine(Viewer.ContentPath, textureName)))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(Path.Combine(Viewer.ContentPath, textureName))))
                 return Path.Combine(Viewer.ContentPath, textureName);
             return Path.Combine(Viewer.ContentPath, "LightGlow.png");
         }

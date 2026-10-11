@@ -23,11 +23,13 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float2   Fade;          // overall fade (0 = off, 1 = on); transition fade (0 = original, 1 = transition)
-texture  LightGlowTexture;
+Texture2D  LightGlowTexture;
 
-sampler LightGlowSampler = sampler_state
+SamplerState LightGlowSampler = sampler_state
 {
 	Texture = (LightGlowTexture);
 	MagFilter = Linear;
@@ -54,7 +56,7 @@ struct VERTEX_INPUT
 
 struct VERTEX_OUTPUT
 {
-	float4 Position  : POSITION0;
+	float4 Position  : SV_POSITION;
 	float4 Color     : COLOR0;
 	float2 TexCoords : TEXCOORD0;
 };
@@ -85,9 +87,9 @@ VERTEX_OUTPUT VSLightGlow(in VERTEX_INPUT In)
 
 ////////////////////    P I X E L   S H A D E R S    ///////////////////////////
 
-float4 PSLightGlow(in VERTEX_OUTPUT In) : COLOR0
+float4 PSLightGlow(in VERTEX_OUTPUT In) : SV_TARGET0
 {
-	return In.Color * tex2D(LightGlowSampler, In.TexCoords.xy);
+	return In.Color * LightGlowTexture.Sample(LightGlowSampler, In.TexCoords.xy);
 }
 
 ////////////////////    T E C H N I Q U E S    /////////////////////////////////
@@ -100,7 +102,7 @@ float4 PSLightGlow(in VERTEX_OUTPUT In) : COLOR0
 
 technique LightGlow {
 	pass Pass_0 {
-		VertexShader = compile vs_4_0_level_9_1 VSLightGlow();
-		PixelShader = compile ps_4_0_level_9_1 PSLightGlow();
+		VertexShader = compile VS_LOW VSLightGlow();
+		PixelShader = compile PS_LOW PSLightGlow();
 	}
 }

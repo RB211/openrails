@@ -153,6 +153,51 @@ namespace ORTS.Settings
         static extern int GetKeyNameText(int scanCode, [Out] char[] name, int nameLength);
         #endregion
 
+        #region Scan code table (non-Windows)
+        // Open Rails stores keys as PC set-1 scan codes: 0x00-0x7F plain, 0x80 | code for E0-prefixed keys,
+        // and 0x100 | code for E1-prefixed keys (Pause). On Windows, MapVirtualKey translates them using the
+        // current layout; elsewhere this table gives the same results as Windows does for a US layout.
+        static readonly Dictionary<int, Keys> ScanCodeKeys = new Dictionary<int, Keys>
+        {
+            { 0x01, Keys.Escape }, { 0x02, Keys.D1 }, { 0x03, Keys.D2 }, { 0x04, Keys.D3 }, { 0x05, Keys.D4 },
+            { 0x06, Keys.D5 }, { 0x07, Keys.D6 }, { 0x08, Keys.D7 }, { 0x09, Keys.D8 }, { 0x0A, Keys.D9 },
+            { 0x0B, Keys.D0 }, { 0x0C, Keys.OemMinus }, { 0x0D, Keys.OemPlus }, { 0x0E, Keys.Back }, { 0x0F, Keys.Tab },
+            { 0x10, Keys.Q }, { 0x11, Keys.W }, { 0x12, Keys.E }, { 0x13, Keys.R }, { 0x14, Keys.T }, { 0x15, Keys.Y },
+            { 0x16, Keys.U }, { 0x17, Keys.I }, { 0x18, Keys.O }, { 0x19, Keys.P }, { 0x1A, Keys.OemOpenBrackets },
+            { 0x1B, Keys.OemCloseBrackets }, { 0x1C, Keys.Enter }, { 0x1D, Keys.LeftControl }, { 0x1E, Keys.A },
+            { 0x1F, Keys.S }, { 0x20, Keys.D }, { 0x21, Keys.F }, { 0x22, Keys.G }, { 0x23, Keys.H }, { 0x24, Keys.J },
+            { 0x25, Keys.K }, { 0x26, Keys.L }, { 0x27, Keys.OemSemicolon }, { 0x28, Keys.OemQuotes }, { 0x29, Keys.OemTilde },
+            { 0x2A, Keys.LeftShift }, { 0x2B, Keys.OemPipe }, { 0x2C, Keys.Z }, { 0x2D, Keys.X }, { 0x2E, Keys.C },
+            { 0x2F, Keys.V }, { 0x30, Keys.B }, { 0x31, Keys.N }, { 0x32, Keys.M }, { 0x33, Keys.OemComma },
+            { 0x34, Keys.OemPeriod }, { 0x35, Keys.OemQuestion }, { 0x36, Keys.RightShift }, { 0x37, Keys.Multiply },
+            { 0x38, Keys.LeftAlt }, { 0x39, Keys.Space }, { 0x3A, Keys.CapsLock },
+            { 0x3B, Keys.F1 }, { 0x3C, Keys.F2 }, { 0x3D, Keys.F3 }, { 0x3E, Keys.F4 }, { 0x3F, Keys.F5 }, { 0x40, Keys.F6 },
+            { 0x41, Keys.F7 }, { 0x42, Keys.F8 }, { 0x43, Keys.F9 }, { 0x44, Keys.F10 }, { 0x45, Keys.NumLock }, { 0x46, Keys.Scroll },
+            // Like Windows, the keypad's plain scan codes map to the navigation keys.
+            { 0x47, Keys.Home }, { 0x48, Keys.Up }, { 0x49, Keys.PageUp }, { 0x4A, Keys.Subtract }, { 0x4B, Keys.Left },
+            { 0x4D, Keys.Right }, { 0x4E, Keys.Add }, { 0x4F, Keys.End }, { 0x50, Keys.Down }, { 0x51, Keys.PageDown },
+            { 0x52, Keys.Insert }, { 0x53, Keys.Delete }, { 0x56, Keys.OemBackslash }, { 0x57, Keys.F11 }, { 0x58, Keys.F12 },
+            { 0x9C, Keys.Enter }, { 0x9D, Keys.RightControl }, { 0xB5, Keys.Divide }, { 0xB7, Keys.PrintScreen },
+            { 0xB8, Keys.RightAlt }, { 0xC7, Keys.Home }, { 0xC8, Keys.Up }, { 0xC9, Keys.PageUp }, { 0xCB, Keys.Left },
+            { 0xCD, Keys.Right }, { 0xCF, Keys.End }, { 0xD0, Keys.Down }, { 0xD1, Keys.PageDown }, { 0xD2, Keys.Insert },
+            { 0xD3, Keys.Delete }, { 0xDB, Keys.LeftWindows }, { 0xDC, Keys.RightWindows }, { 0xDD, Keys.Apps },
+            { 0x11D, Keys.Pause },
+        };
+
+        // Display names matching what Windows' GetKeyNameText gives for a US layout, where they differ from the XNA names.
+        static readonly Dictionary<int, string> ScanCodeNames = new Dictionary<int, string>
+        {
+            { 0x01, "Esc" }, { 0x02, "1" }, { 0x03, "2" }, { 0x04, "3" }, { 0x05, "4" }, { 0x06, "5" }, { 0x07, "6" },
+            { 0x08, "7" }, { 0x09, "8" }, { 0x0A, "9" }, { 0x0B, "0" }, { 0x0C, "-" }, { 0x0D, "=" }, { 0x0E, "Backspace" },
+            { 0x1A, "[" }, { 0x1B, "]" }, { 0x1D, "Ctrl" }, { 0x27, ";" }, { 0x28, "'" }, { 0x29, "`" }, { 0x2A, "Shift" },
+            { 0x2B, "\\" }, { 0x33, "," }, { 0x34, "." }, { 0x35, "/" }, { 0x36, "Right Shift" }, { 0x37, "Num *" },
+            { 0x38, "Alt" }, { 0x3A, "Caps Lock" }, { 0x45, "Num Lock" }, { 0x46, "Scroll Lock" }, { 0x4A, "Num -" },
+            { 0x4E, "Num +" }, { 0x56, "\\" }, { 0x9C, "Num Enter" }, { 0x9D, "Right Ctrl" }, { 0xB5, "Num /" },
+            { 0xB7, "Prnt Scrn" }, { 0xB8, "Right Alt" }, { 0xC9, "PageUp" }, { 0xD1, "PageDown" }, { 0xDB, "Left Windows" },
+            { 0xDC, "Right Windows" }, { 0xDD, "Application" },
+        };
+        #endregion
+
         // Keyboard scancodes are basically constant; some keyboards have extra buttons (e.g. UK ones tend to have an
         // extra button next to Left Shift) or move one or two around (e.g. UK ones tend to move 0x2B down one row)
         // but generally this layout is right. Numeric keypad omitted as most keys are just duplicates of the main
@@ -662,6 +707,9 @@ namespace ORTS.Settings
 
         public static Keys GetScanCodeKeys(int scanCode)
         {
+            if (!OperatingSystem.IsWindows())
+                return ScanCodeKeys.TryGetValue(scanCode, out var key) ? key : Keys.None;
+
             var sc = scanCode;
             if (scanCode >= 0x0100)
                 sc = 0xE100 | (scanCode & 0x7F);
@@ -673,9 +721,21 @@ namespace ORTS.Settings
         public static string GetScanCodeKeyName(int scanCode)
         {
             var xnaName = Enum.GetName(typeof(Keys), GetScanCodeKeys(scanCode));
-            var keyNameBuffer = new char[32];
-            var keyNameLength = GetKeyNameText(scanCode << 16, keyNameBuffer, keyNameBuffer.Length);
-            var keyName = new string(keyNameBuffer, 0, keyNameLength);
+            var keyName = "";
+            if (OperatingSystem.IsWindows())
+            {
+                var keyNameBuffer = new char[32];
+                var keyNameLength = GetKeyNameText(scanCode << 16, keyNameBuffer, keyNameBuffer.Length);
+                keyName = new string(keyNameBuffer, 0, keyNameLength);
+            }
+            else if (ScanCodeNames.TryGetValue(scanCode, out var name))
+            {
+                return name;
+            }
+            else if (!String.IsNullOrEmpty(xnaName) && xnaName != nameof(Keys.None))
+            {
+                return xnaName;
+            }
 
             if (keyName.Length > 0)
             {

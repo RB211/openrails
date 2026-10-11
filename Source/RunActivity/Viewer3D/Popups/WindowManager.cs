@@ -81,13 +81,13 @@ namespace Orts.Viewer3D.Popups
             PopupWindowMaterial = (PopupWindowMaterial)Viewer.MaterialManager.Load("PopupWindow");
             SpriteBatchMaterial = (SpriteBatchMaterial)Viewer.MaterialManager.Load("SpriteBatch");
             TextManager = new WindowTextManager();
-            TextFontDefault = TextManager.GetScaled("Arial", 10, System.Drawing.FontStyle.Regular);
-            TextFontDefaultBold = TextManager.GetScaled("Arial", 10, System.Drawing.FontStyle.Bold);
-            TextFontDefaultOutlined = TextManager.GetScaled("Arial", 10, System.Drawing.FontStyle.Regular, 1);
-            TextFontMonoSpacedBold = TextManager.GetScaled("Consolas", 11.29f, System.Drawing.FontStyle.Bold);
-            TextFontMonoSpacedOutlined = TextManager.GetScaled("Consolas", 10, System.Drawing.FontStyle.Regular, 1);
-            TextFontSmall = TextManager.GetScaled("Arial", 8, System.Drawing.FontStyle.Regular);
-            TextFontSmallOutlined = TextManager.GetScaled("Arial", 8, System.Drawing.FontStyle.Regular, 1);
+            TextFontDefault = TextManager.GetScaled("Arial", 10, Orts.Viewer3D.Popups.FontStyle.Regular);
+            TextFontDefaultBold = TextManager.GetScaled("Arial", 10, Orts.Viewer3D.Popups.FontStyle.Bold);
+            TextFontDefaultOutlined = TextManager.GetScaled("Arial", 10, Orts.Viewer3D.Popups.FontStyle.Regular, 1);
+            TextFontMonoSpacedBold = TextManager.GetScaled("Consolas", 11.29f, Orts.Viewer3D.Popups.FontStyle.Bold);
+            TextFontMonoSpacedOutlined = TextManager.GetScaled("Consolas", 10, Orts.Viewer3D.Popups.FontStyle.Regular, 1);
+            TextFontSmall = TextManager.GetScaled("Arial", 8, Orts.Viewer3D.Popups.FontStyle.Regular);
+            TextFontSmallOutlined = TextManager.GetScaled("Arial", 8, Orts.Viewer3D.Popups.FontStyle.Regular, 1);
 
             SpriteBatch = new SpriteBatch(Viewer.GraphicsDevice);
 

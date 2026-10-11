@@ -39,14 +39,14 @@ namespace ORTS.Menu
 
         public static List<Folder> GetFolders(UserSettings settings)
         {
-            var folderDataFile = UserSettings.UserDataFolder + @"\folder.dat";
+            var folderDataFile = UserSettings.UserDataFolder + @"/folder.dat";
             var folders = new List<Folder>();
 
-            if (settings.Folders.Folders.Count == 0 && File.Exists(folderDataFile))
+            if (settings.Folders.Folders.Count == 0 && File.Exists(ORTS.IO.PathResolver.Resolve(folderDataFile)))
             {
                 try
                 {
-                    using (var inf = new BinaryReader(File.Open(folderDataFile, FileMode.Open)))
+                    using (var inf = new BinaryReader(File.Open(ORTS.IO.PathResolver.Resolve(folderDataFile), FileMode.Open)))
                     {
                         var count = inf.ReadInt32();
                         for (var i = 0; i < count; ++i)

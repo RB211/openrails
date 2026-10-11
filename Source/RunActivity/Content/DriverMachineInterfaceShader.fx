@@ -23,13 +23,15 @@
 
 ////////////////////    G L O B A L   V A L U E S    ///////////////////////////
 
+#include "ShaderModels.fxh"
+
 float4   LimitAngle;   // radian, x: target speed (colored start), y: permitted speed (pointer end), z: intervention speed, w: release speed
 
 float4   LimitColor;   // dark grey, white or yellow
 float4   PointerColor; // medium grey, white, yellow or red
 float4	 InterventionColor; // yellow or red
 
-texture  ImageTexture;
+Texture2D  ImageTexture;
 
 // Color RGB values are from ETCS specification
 static const float4 DarkGreyColor = float4(0.333333, 0.333333, 0.333333, 1); // Dark grey gauge between -149 and -144 deg.
@@ -46,7 +48,7 @@ static const float radiusLimitPointer = 117 * 117;
 static const float radiusNeedleCenter = 26 * 26; // Radius in ETCS is 25
 static const float2 center = float2(140, 150); // ETCS display size is 280x300
 
-sampler ImageSampler = sampler_state
+SamplerState ImageSampler = sampler_state
 {
 	Texture = (ImageTexture);
 };
@@ -67,10 +69,10 @@ struct PIXEL_INPUT
 
 ////////////////////     P I X E L   S H A D E R S    //////////////////////////
 
-float4 PSCircularSpeedGauge(PIXEL_INPUT In) : COLOR0
+float4 PSCircularSpeedGauge(PIXEL_INPUT In) : SV_TARGET0
 {
 	float4 returnColor;
-	float4 origColor = tex2D(ImageSampler, In.TexCoords) * In.Color;
+	float4 origColor = ImageTexture.Sample(ImageSampler, In.TexCoords) * In.Color;
 
 	float2 dist = center - In.TexCoords;
 	float radius = dist.x * dist.x + dist.y * dist.y;
@@ -139,6 +141,6 @@ float4 PSCircularSpeedGauge(PIXEL_INPUT In) : COLOR0
 
 technique CircularSpeedGauge {
 	pass Pass_0 {
-		PixelShader = compile ps_4_0_level_9_3 PSCircularSpeedGauge();
+		PixelShader = compile PS_HIGH PSCircularSpeedGauge();
 	}
 }

@@ -135,11 +135,11 @@ namespace Orts.Formats.OR
 
             PrintTCBase(trackDB.TrackNodes);
 
-            if (File.Exists(@"C:\temp\SignalObjects.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\SignalObjects.txt")))
             {
                 File.Delete(@"C:\temp\SignalObjects.txt");
             }
-            if (File.Exists(@"C:\temp\SignalShapes.txt"))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(@"C:\temp\SignalShapes.txt")))
             {
                 File.Delete(@"C:\temp\SignalShapes.txt");
             }
@@ -276,7 +276,7 @@ namespace Orts.Formats.OR
 
             // loop through files, use only extention .w, skip w+1000000+1000000.w file
 
-            foreach (var fileName in Directory.GetFiles(WFilePath, "*.w"))
+            foreach (var fileName in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(WFilePath), "*.w"))
             {
                 // validate file name a little bit
 

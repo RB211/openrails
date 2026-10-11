@@ -346,22 +346,22 @@ namespace Orts.Viewer3D
         /// <returns>Bool indicating if custom track profiles were found (returns FALSE if the only profile is the default profile)</returns>
         public static bool CreateTrackProfile(Viewer viewer, string routePath, out List<TRPFile> trpFiles)
         {
-            string path = routePath + @"\TrackProfiles";
+            string path = routePath + @"/TrackProfiles";
             List<string> profileNames = new List<string>();
             trpFiles = new List<TRPFile>();
 
-            if (Directory.Exists(path))
+            if (Directory.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
                 // The file called "TrProfile" should be used as the default track profile, if present
-                string xmlDefault = path + @"\TrProfile.xml";
-                string stfDefault = path + @"\TrProfile.stf";
+                string xmlDefault = path + @"/TrProfile.xml";
+                string stfDefault = path + @"/TrProfile.stf";
 
-                if (File.Exists(xmlDefault))
+                if (File.Exists(ORTS.IO.PathResolver.Resolve(xmlDefault)))
                 {
                     trpFiles.Add(new TRPFile(viewer, xmlDefault));
                     profileNames.Add(Path.GetFileNameWithoutExtension(xmlDefault));
                 }
-                else if (File.Exists(stfDefault))
+                else if (File.Exists(ORTS.IO.PathResolver.Resolve(stfDefault)))
                 {
                     trpFiles.Add(new TRPFile(viewer, stfDefault));
                     profileNames.Add(Path.GetFileNameWithoutExtension(stfDefault));
@@ -370,8 +370,8 @@ namespace Orts.Viewer3D
                     trpFiles.Add(new TRPFile(viewer, ""));
 
                 // Get all .xml/.stf files that start with "TrProfile"
-                string[] xmlProfiles = Directory.GetFiles(path, "TrProfile*.xml");
-                string[] stfProfiles = Directory.GetFiles(path, "TrProfile*.stf");
+                string[] xmlProfiles = Directory.GetFiles(ORTS.IO.PathResolver.Resolve(path), "TrProfile*.xml");
+                string[] stfProfiles = Directory.GetFiles(ORTS.IO.PathResolver.Resolve(path), "TrProfile*.stf");
 
                 foreach (string xmlProfile in xmlProfiles)
                 {
@@ -422,7 +422,7 @@ namespace Orts.Viewer3D
                 TrackProfile = new TrProfile(viewer);
                 return;
             }
-            FileInfo fileInfo = new FileInfo(filespec);
+            FileInfo fileInfo = new FileInfo(ORTS.IO.PathResolver.Resolve(filespec));
             if (!fileInfo.Exists)
             {
                 TrackProfile = new TrProfile(viewer); // Default profile if no file

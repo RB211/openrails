@@ -21,7 +21,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Orts.Simulation;
@@ -622,13 +621,13 @@ namespace Orts.Viewer3D.Popups
             var activityname = owner.Viewer.Simulator.Activity.Tr_Activity.Tr_Activity_Header.Name.ToString().Trim();
 
             //Create file.
-            if (!lDebriefEvalFile) wDbfEval = new StreamWriter(File.Open(Program.EvaluationFilename, FileMode.Create), System.Text.Encoding.UTF8);
+            if (!lDebriefEvalFile) wDbfEval = new StreamWriter(File.Open(ORTS.IO.PathResolver.Resolve(Program.EvaluationFilename), FileMode.Create), System.Text.Encoding.UTF8);
 
             labeltext = "";
             //--------------------------------------------------------------------------------
             writeline();
             LogSeparator(80);
-            consolewltext("This is a Debrief Eval for " + Application.ProductName);
+            consolewltext("This is a Debrief Eval for " + ApplicationInfo.ProductName);
             LogSeparator(80);
             //--------------------------------------------------------------------------------
             consolewltext("Version      = " + (VersionInfo.Version.Length > 0 ? VersionInfo.Version : "<none>"));
@@ -1371,7 +1370,7 @@ namespace Orts.Viewer3D.Popups
             line = scrollbox.AddLayoutHorizontalLineOfText();
             line.Add(new Label(line.RemainingWidth, line.RemainingHeight, Viewer.Catalog.GetString("Car Weight (front on left):"), LabelAlignment.Left));
             scrollbox.AddSpace(scrollbox.RemainingWidth, 2);
-            var hscrollbox = scrollbox.AddLayoutScrollboxHorizontal(SystemInformation.HorizontalScrollBarHeight + spriteHeight + 2);
+            var hscrollbox = scrollbox.AddLayoutScrollboxHorizontal((int)(17 * WindowTextManager.DpiScale) + spriteHeight + 2) /* 17px = Windows default horizontal scrollbar height at 96 DPI */;
             var vbox = hscrollbox.AddLayoutVertical(carInfoList.Count * spriteWidth + 2);
             var weightbox = vbox.AddLayoutHorizontal(spriteHeight + 2);
             foreach (var car in carInfoList)
