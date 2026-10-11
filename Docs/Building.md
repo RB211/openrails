@@ -234,13 +234,61 @@ For guidance on contributing, see [https://github.com/openrails/openrails/blob/m
 
 ## Linux
 
-The menu (Source/Menu) uses Avalonia, so it builds and runs natively on Linux with the .NET 10 SDK:
+Open Rails builds and runs natively on Linux. The simulator renders with Vulkan through MonoGame 3.8.6, and the menu and the contributed tools use Avalonia.
+
+### Prerequisites
+
+- .NET 10 SDK
+- A Vulkan 1.3 driver (Mesa RADV, ANV or NVIDIA)
+- OpenAL Soft (`libopenal.so.1`; the `openal` package on most distributions)
+- Optional: `zenity` or `kdialog`. SDL uses them to show error dialogs under Wayland.
+
+### Building and running
 
 ```
-dotnet build Source/Menu/Menu.csproj
-Program/Menu
+cd Source
+dotnet build ORTS.sln
+../Program/Menu
 ```
 
-On Linux there is no `OpenRails.exe`: the Launcher project (which only checks the Windows prerequisites and then starts the menu) and the Updater (in-place updating is Windows-only) are skipped when building on other platforms, so run `Program/Menu` directly. Settings are kept in an INI file in the per-user configuration folder (`$XDG_CONFIG_HOME`, usually `~/.config`) instead of the registry.
+There is no `OpenRails.exe` on Linux, so run `Program/Menu` directly. The Launcher only checks Windows prerequisites and the Updater only updates in place, so both are skipped when building on other platforms. The simulator can also be started directly. Hold Alt while pressing Start in the menu to copy its command line, for example:
 
-Holding Alt while pressing Start (or Resume) copies the RunActivity command line to the clipboard instead of starting the simulator, which is handy for debugging.
+```
+Program/RunActivity -start -explorer "<path>.pat" "<consist>.con" 12:00 1 0
+```
+
+Shaders are compiled for the selected graphics backend as part of the RunActivity build. The default backend is Vulkan; build with `-p:OrtsGraphicsBackend=DX12` to select Direct3D 12 on Windows.
+
+### Where things are kept
+
+| What | Linux location |
+| --- | --- |
+| Settings | `$XDG_CONFIG_HOME/OpenRails/OpenRails.ini` (usually `~/.config`). An `OpenRails.ini` next to the program takes priority, as on Windows. |
+| Saves, logs, caches | `~/.local/share/Open Rails` |
+| Log file | Desktop folder if there is one, otherwise the folder above |
+
+### Content
+
+MSTS and Open Rails content written on Windows uses `\` as the path separator and inconsistent letter case. Open Rails resolves both when reading files (see `ORTS.IO.PathResolver`), so content can be used as installed without renaming anything.
+
+### MonoGame native runtime
+
+MonoGame 3.8.6's Vulkan runtime has two problems that stop the simulator from starting on some systems:
+
+- On AMD GPUs it asks for the `D24_UNORM_S8_UINT` depth format, which the driver does not support. The first draw then crashes.
+- When the window is resized during a frame, it loses track of the open render pass, and the next clear crashes inside the driver. Tiling window managers resize new windows immediately, so this usually happens.
+
+Until a MonoGame release fixes these, a locally built runtime can be used in place of the one from NuGet:
+
+```
+dotnet build ORTS.sln -p:OrtsMgRuntimeOverride=/path/to/libmgruntime.so
+```
+
+### Known issues
+
+- Model instancing is turned off on Vulkan, because per-instance vertex data draws nothing with MonoGame 3.8.6. Scenery is drawn without batching, which is slower on dense routes.
+- The loader thread holds a lock against frame rendering while it creates GPU resources, because MonoGame's Vulkan backend deadlocks otherwise. Loading new scenery can therefore make rendering stutter briefly.
+- Keys are mapped from scan codes using a US layout table. On other layouts, keys bound to letters keep their physical position.
+- RailDriver hardware is only supported on Windows.
+- Replay files (`.replay`) written by earlier versions cannot be read, because `BinaryFormatter` no longer exists in .NET. Saves themselves are not affected.
+- Self-update is Windows-only. On Linux, update by installing a new build.
