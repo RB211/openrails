@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.Editing.Charts.PathChartWindow"
+        Title="Charting the path"
+        Background="White"
+        Width="1500" Height="400">
+    <Grid RowDefinitions="*,Auto,*,30">
+        <Grid Grid.Row="0" Grid.Column="0" RowDefinitions="20,*,20" ColumnDefinitions="57,*">
+            <Canvas Grid.Row="0" Grid.Column="0" Name="MileMarkersLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="0" Grid.Column="1" Name="MileMarkersCanvas" ClipToBounds="True"/>
+
+            <Canvas Grid.Row="1" Grid.Column="0" Name="HeightLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="1" Grid.Column="1" Name="HeightCanvas" ClipToBounds="True"/>
+
+            <Canvas Grid.Row="2" Grid.Column="0" Name="DistanceLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="2" Grid.Column="1" Name="DistanceCanvas" ClipToBounds="True"/>
+        </Grid>
+
+        <GridSplitter Grid.Row="1" Grid.Column="0" Height="3" HorizontalAlignment="Stretch" Background="Gray" VerticalAlignment="Center" ResizeDirection="Rows"/>
+
+        <Grid Grid.Row="2" Grid.Column="0" RowDefinitions="*,20,30" ColumnDefinitions="57,*">
+            <Canvas Grid.Row="0" Grid.Column="0" Name="GradeLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="0" Grid.Column="1" Name="GradeCanvas" ClipToBounds="True" SizeChanged="Window_SizeChanged"/>
+
+            <Canvas Grid.Row="1" Grid.Column="0" Name="SpeedMarkersLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="1" Grid.Column="1" Name="SpeedMarkersCanvas" ClipToBounds="True"/>
+
+            <Canvas Grid.Row="2" Grid.Column="0" Name="CurvatureLegend" ClipToBounds="True"/>
+            <Canvas Grid.Row="2" Grid.Column="1" Name="CurvatureCanvas" ClipToBounds="True"/>
+        </Grid>
+
+        <DockPanel Grid.Row="3" Grid.Column="0">
+            <Button DockPanel.Dock="Left" Height="25" Content="Save json" Click="SaveJson_Click" Padding="4,0" VerticalContentAlignment="Center">
+                <ToolTip.Tip>
+                    <StackPanel>
+                        <TextBlock>Save the data of the chart in json format into a .js file.</TextBlock>
+                        <TextBlock>The saved data can then be used to show the chart on an HTML5 canvas.</TextBlock>
+                    </StackPanel>
+                </ToolTip.Tip>
+            </Button>
+            <ScrollBar Name="ChartScrollbar" Minimum="0" Maximum="0.0001" Margin="10,4,10,4"
+                   Orientation="Horizontal" Value="0" ViewportSize="0.9999" AllowAutoHide="False" ValueChanged="ChartScrollbar_ValueChanged"/>
+        </DockPanel>
+    </Grid>
+</Window>

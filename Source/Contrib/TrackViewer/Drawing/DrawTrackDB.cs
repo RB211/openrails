@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -67,21 +67,24 @@ namespace ORTS.TrackViewer.Drawing
             RouteName = TRK.Tr_RouteFile.Name;
 
             messageDelegate(TrackViewer.catalog.GetString("Loading track database .tdb ..."));
-            TrackDatabaseFile TDB = new TrackDatabaseFile(routePath + @"\" + TRK.Tr_RouteFile.FileName + ".tdb");
+            TrackDatabaseFile TDB = new TrackDatabaseFile(CaseInsensitivePath.Resolve(Path.Combine(routePath, TRK.Tr_RouteFile.FileName + ".tdb")));
             this.TrackDB = TDB.TrackDB;
 
             messageDelegate(TrackViewer.catalog.GetString("Loading tsection.dat ..."));
             string BasePath = Path.GetDirectoryName(Path.GetDirectoryName(routePath));
-            if (Directory.Exists(routePath + @"\Openrails") && File.Exists(routePath + @"\Openrails\TSECTION.DAT"))
-                TsectionDat = new TrackSectionsFile(routePath + @"\Openrails\TSECTION.DAT");
-            else if (Directory.Exists(routePath + @"\GLOBAL") && File.Exists(routePath + @"\GLOBAL\TSECTION.DAT"))
-                TsectionDat = new TrackSectionsFile(routePath + @"\GLOBAL\TSECTION.DAT");
+            string orTsection = CaseInsensitivePath.Resolve(Path.Combine(routePath, "Openrails", "TSECTION.DAT"));
+            string routeGlobalTsection = CaseInsensitivePath.Resolve(Path.Combine(routePath, "GLOBAL", "TSECTION.DAT"));
+            string routeTsection = CaseInsensitivePath.Resolve(Path.Combine(routePath, "TSECTION.DAT"));
+            if (File.Exists(orTsection))
+                TsectionDat = new TrackSectionsFile(orTsection);
+            else if (File.Exists(routeGlobalTsection))
+                TsectionDat = new TrackSectionsFile(routeGlobalTsection);
             else
-                TsectionDat = new TrackSectionsFile(BasePath + @"\GLOBAL\TSECTION.DAT");
-            if (File.Exists(routePath + @"\TSECTION.DAT"))
-                TsectionDat.AddRouteTSectionDatFile(routePath + @"\TSECTION.DAT");
+                TsectionDat = new TrackSectionsFile(CaseInsensitivePath.Resolve(Path.Combine(BasePath, "GLOBAL", "TSECTION.DAT")));
+            if (File.Exists(routeTsection))
+                TsectionDat.AddRouteTSectionDatFile(routeTsection);
 
-            string roadTrackFileName = routePath + @"\" + TRK.Tr_RouteFile.FileName + ".rdb";
+            string roadTrackFileName = CaseInsensitivePath.Resolve(Path.Combine(routePath, TRK.Tr_RouteFile.FileName + ".rdb"));
             try
             {
                 messageDelegate(TrackViewer.catalog.GetString("Loading road track database .rdb ..."));
@@ -93,14 +96,15 @@ namespace ORTS.TrackViewer.Drawing
             {
             }
 
-            string ORfilepath = System.IO.Path.Combine(routePath, "OpenRails");
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            string orSigcfg = CaseInsensitivePath.Resolve(System.IO.Path.Combine(routePath, "OpenRails", "sigcfg.dat"));
+            string routeSigcfg = CaseInsensitivePath.Resolve(System.IO.Path.Combine(routePath, "sigcfg.dat"));
+            if (File.Exists(orSigcfg))
             {
-                SigcfgFile = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
+                SigcfgFile = new SignalConfigurationFile(orSigcfg, true);
             }
-            else if (File.Exists(routePath + @"\sigcfg.dat"))
+            else if (File.Exists(routeSigcfg))
             {
-                SigcfgFile = new SignalConfigurationFile(routePath + @"\sigcfg.dat", false);
+                SigcfgFile = new SignalConfigurationFile(routeSigcfg, false);
             }
             else
             {
@@ -110,12 +114,12 @@ namespace ORTS.TrackViewer.Drawing
             // read the activity location events and add them to the TrackDB.TrItemTable
 
             ActivityNames.Clear();
-            var directory = System.IO.Path.Combine(routePath, "ACTIVITIES");
+            var directory = CaseInsensitivePath.Resolve(System.IO.Path.Combine(routePath, "ACTIVITIES"));
             if (System.IO.Directory.Exists(directory))
             {
                 int index = TrackDB.TrItemTable.Length;
                 List<TrItem> eventItems = new List<TrItem>();
-                foreach (var file in Directory.GetFiles(directory, "*.act"))
+                foreach (var file in Directory.GetFiles(directory, "*.act", CaseInsensitivePath.IgnoreCase))
                 {
                     try
                     {
@@ -169,7 +173,7 @@ namespace ORTS.TrackViewer.Drawing
             if (signalFileNames == null)
             {
                 signalFileNames = new Dictionary<uint, string>();
-                var WFilePath = this.storedRoutePath + @"\WORLD\";
+                var WFilePath = CaseInsensitivePath.Resolve(Path.Combine(this.storedRoutePath, "WORLD"));
 
                 var Tokens = new List<TokenID>
                 {
@@ -179,7 +183,7 @@ namespace ORTS.TrackViewer.Drawing
                 string[] wfiles;
                 try
                 {
-                    wfiles = Directory.GetFiles(WFilePath, "*.w");
+                    wfiles = Directory.GetFiles(WFilePath, "*.w", CaseInsensitivePath.IgnoreCase);
                 }
                 catch
                 {

@@ -1,36 +1,24 @@
-﻿// COPYRIGHT 2014 by the Open Rails project.
-// 
+// COPYRIGHT 2014 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 //
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
-using System.Windows.Forms.Integration;
-using System.Text.RegularExpressions;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 
 namespace ORTS.TrackViewer.UserInterface
 {
@@ -49,13 +37,18 @@ namespace ORTS.TrackViewer.UserInterface
     }
 
     /// <summary>
-    /// Interaction logic for SearchWindow.xaml
-    /// This contains the callbacks needed for the (small) searchwindow/searchcontrol
+    /// Interaction logic for SearchControl.axaml
+    /// This contains the callbacks needed for the (small) searchwindow/searchcontrol.
+    /// Lives on the Avalonia UI thread; the actual search is done on the game thread.
     /// </summary>
     public sealed partial class SearchControl : Window
     {
-        TrackViewer trackViewer;
-        SearchableItem searchItem;
+        readonly TrackViewer trackViewer;
+        readonly SearchableItem searchItem;
+
+        /// <summary>Parameterless constructor for the XAML loader only</summary>
+        public SearchControl() { InitializeComponent(); }
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -66,22 +59,21 @@ namespace ORTS.TrackViewer.UserInterface
             InitializeComponent();
             this.trackViewer = trackViewer;
             this.searchItem = searchItem;
-            textboxIndex.Focus();
-            this.Top = trackViewer.Window.ClientBounds.Top + 20;
-            this.Left = trackViewer.Window.ClientBounds.Left + 0;
+            Dialogs.DigitsOnly(textboxIndex);
+            Opened += (s, e) => textboxIndex.Focus();
             switch (searchItem)
             {
                 case SearchableItem.TrackNode:
-                    labelType.Content = "trackNode index = ";
+                    labelType.Text = "trackNode index = ";
                     break;
                 case SearchableItem.TrackItem:
-                    labelType.Content = "trackItem index = ";
+                    labelType.Text = "trackItem index = ";
                     break;
                 case SearchableItem.TrackNodeRoad:
-                    labelType.Content = "road trackNode index = ";
+                    labelType.Text = "road trackNode index = ";
                     break;
                 case SearchableItem.TrackItemRoad:
-                    labelType.Content = "road trackItem index = ";
+                    labelType.Text = "road trackItem index = ";
                     break;
             }
         }
@@ -91,30 +83,32 @@ namespace ORTS.TrackViewer.UserInterface
         /// </summary>
         private void ButtonSearch_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (!int.TryParse(textboxIndex.Text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.CurrentCulture, out int index))
+            {   // clear text if not an integer. Should not happen because we limit possible input
+                textboxIndex.Text = "";
+                return;
+            }
+            SearchableItem item = searchItem;
+            TrackViewer viewer = trackViewer;
+            GameThread.Post(() =>
             {
-                int Index = Convert.ToInt32(textboxIndex.Text, System.Globalization.CultureInfo.CurrentCulture);
-                switch (searchItem)
+                if (viewer.DrawTrackDB == null) return;
+                switch (item)
                 {
                     case SearchableItem.TrackNode:
-                        trackViewer.CenterAroundTrackNode(Index);
+                        viewer.CenterAroundTrackNode(index);
                         break;
                     case SearchableItem.TrackItem:
-                        trackViewer.CenterAroundTrackItem(Index);
+                        viewer.CenterAroundTrackItem(index);
                         break;
                     case SearchableItem.TrackNodeRoad:
-                        trackViewer.CenterAroundTrackNodeRoad(Index);
+                        viewer.CenterAroundTrackNodeRoad(index);
                         break;
                     case SearchableItem.TrackItemRoad:
-                        trackViewer.CenterAroundTrackItemRoad(Index);
+                        viewer.CenterAroundTrackItemRoad(index);
                         break;
-
                 }
-            }
-            catch
-            {   // clear text if not an integer. Should not happen because we limt possible input
-                textboxIndex.Text = "";
-            }
+            });
         }
 
         private void ButtonCancel_Click(object sender, RoutedEventArgs e)
@@ -122,22 +116,12 @@ namespace ORTS.TrackViewer.UserInterface
             this.Close();
         }
 
-
-        /// <summary>
-        /// Make sure we only allow digits to be typed
-        /// </summary>
-        private void NumberValidationTextBox(object sender, TextCompositionEventArgs e)
-        {
-            Regex regex = new Regex("[^0-9]+");
-            e.Handled = regex.IsMatch(e.Text);
-        }
-
         /// <summary>
         /// Handle an enter/return press on the textbox. If return is pressed, just do the same as the search button.
         /// </summary>
         private void OnKeyDownHandler(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Return)
+            if (e.Key == Key.Return || e.Key == Key.Enter)
             {
                 ButtonSearch_Click(sender, e);
             }

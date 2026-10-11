@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.UserInterface.SearchControl"
+        SizeToContent="WidthAndHeight" CanResize="False" Title="Search">
+    <StackPanel Orientation="Vertical" Margin="8" Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Name="labelType" VerticalAlignment="Center">TrackNode:</TextBlock>
+            <TextBox Name="textboxIndex" Width="100" KeyDown="OnKeyDownHandler"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+            <Button Name="buttonCancel" Click="ButtonCancel_Click" IsCancel="True">Cancel</Button>
+            <Button Name="buttonSearch" Click="ButtonSearch_Click">Search</Button>
+        </StackPanel>
+    </StackPanel>
+</Window>

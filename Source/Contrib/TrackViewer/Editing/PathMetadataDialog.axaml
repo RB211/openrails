@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.Editing.PathMetadataDialog"
+        SizeToContent="WidthAndHeight" CanResize="False" Title="Path metadata">
+    <StackPanel Orientation="Vertical" Margin="8" Spacing="4">
+        <StackPanel Orientation="Horizontal">
+            <Label Content="Path ID" HorizontalAlignment="Left" Width="130" VerticalAlignment="Center"/>
+            <TextBox Name="pathID" Width="240" GotFocus="PathX_GotFocus"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <Label Content="Path name" HorizontalAlignment="Left" Width="130" VerticalAlignment="Center"/>
+            <TextBox Name="pathName" Width="240" GotFocus="PathX_GotFocus"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <Label Content="Path start" HorizontalAlignment="Left" Width="130" VerticalAlignment="Center"/>
+            <TextBox Name="pathStart" Width="240" GotFocus="PathX_GotFocus"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <Label Content="Path end" HorizontalAlignment="Left" Width="130" VerticalAlignment="Center"/>
+            <TextBox Name="pathEnd" Width="240" GotFocus="PathX_GotFocus"/>
+        </StackPanel>
+        <CheckBox Name="pathIsPlayerPath" Margin="130,0,0,0" Content="Player path"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+            <Button Content=" OK " Name="buttonOK" Click="ButtonOK_Click"/>
+            <Button Content=" Cancel " Name="buttonCancel" Click="ButtonCancel_Click" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

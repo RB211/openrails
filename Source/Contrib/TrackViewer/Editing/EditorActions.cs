@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -20,8 +20,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows;
-using System.Windows.Controls;
+using ORTS.TrackViewer.UserInterface;
 using Orts.Formats.Msts;
 using ORTS.Common;
 using ORTS.TrackViewer.Drawing;
@@ -39,8 +38,10 @@ namespace ORTS.TrackViewer.Editing
     public abstract class EditorAction
     {
         #region public fields
-        /// <summary>The MenuItem that can be added to a context menu</summary>
-        public MenuItem ActionMenuItem { get; private set; }
+        /// <summary>The header to use in the (context) menu</summary>
+        public string Header { get; private set; }
+        /// <summary>The name of the icon (texture) to use in the (context) menu, or null</summary>
+        public string IconName { get; private set; }
         #endregion
 
         #region private/protected fields
@@ -75,22 +76,8 @@ namespace ORTS.TrackViewer.Editing
         /// <param name="pngFileName">The name of the png icon to use</param>
         protected EditorAction(string menuHeader, string pngFileName)
         {
-            ActionMenuItem = new MenuItem
-            {
-                Header = menuHeader,
-                IsCheckable = false
-            };
-            ActionMenuItem.Click += new RoutedEventHandler(ContextExecuteAction_Click);
-
-            if (!string.IsNullOrEmpty(pngFileName))
-            {
-                ActionMenuItem.Icon = new System.Windows.Controls.Image
-                {
-                    Source = BitmapImageManager.Instance.GetImage(pngFileName),
-                    Width = 14,
-                    Height = 14,
-                };
-            }
+            Header = menuHeader;
+            IconName = string.IsNullOrEmpty(pngFileName) ? null : pngFileName;
 
             ModificationTools = new ModificationTools();
         }
@@ -112,19 +99,7 @@ namespace ORTS.TrackViewer.Editing
             bool canExecute =
                 ORTS.TrackViewer.Properties.Settings.Default.showTrainpath
                 && CanExecuteAction();
-            ActionMenuItem.Visibility = canExecute ? Visibility.Visible : Visibility.Collapsed;
-
             return canExecute;
-        }
-
-        /// <summary>
-        /// Callback that is called when the user clicks on the menuitem connected to this action
-        /// </summary>
-        /// <param name="sender">Sender that generates the event, not used</param>
-        /// <param name="e">(routed) event arguments, not used</param>
-        private void ContextExecuteAction_Click(object sender, RoutedEventArgs e)
-        {
-            DoAction();
         }
 
         /// <summary>
@@ -165,7 +140,7 @@ namespace ORTS.TrackViewer.Editing
         /// </summary>
         public override string ToString()
         {
-            return this.ActionMenuItem.Header.ToString();
+            return this.Header;
         }
     }
     #endregion
@@ -431,12 +406,21 @@ namespace ORTS.TrackViewer.Editing
             {
                 nodeToEdit.WaitTimeS = 602; // some initial value: 10 minutes, 2 seconds
             }
-            WaitPointDialog waitDialog = new WaitPointDialog(MouseX, MouseY, nodeToEdit.WaitTimeS);
-            TrackViewer.Localize(waitDialog);
-            if (waitDialog.ShowDialog() == true)
+            int mouseX = MouseX;
+            int mouseY = MouseY;
+            int currentWaitTimeS = nodeToEdit.WaitTimeS;
+            Dialogs.ShowModal(() =>
             {
-                nodeToEdit.WaitTimeS = waitDialog.GetWaitTime();
-            }
+                WaitPointDialog waitDialog = new WaitPointDialog(mouseX, mouseY, currentWaitTimeS);
+                TrackViewer.Localize(waitDialog);
+                return waitDialog;
+            }, (window) =>
+            {
+                var waitDialog = (WaitPointDialog)window;
+                if (!waitDialog.DialogResult) return;
+                int newWaitTimeS = waitDialog.GetWaitTime();
+                GameThread.Post(() => nodeToEdit.WaitTimeS = newWaitTimeS);
+            });
         }
     }
     #endregion

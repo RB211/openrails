@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -20,7 +20,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
-using System.Windows.Forms;
+using ORTS.TrackViewer.UserInterface;
 
 namespace ORTS.TrackViewer.Editing
 {
@@ -42,9 +42,9 @@ namespace ORTS.TrackViewer.Editing
         /// The user will be prompted for the path and possibly other things just to make sure
         /// </summary>
         /// <param name="trainpath">The path itself, that needs to be written</param>
-        public static void WritePatFile(Trainpath trainpath)
+        public static void WritePatFile(Trainpath trainpath, Action whenDone = null)
         {
-            if (trainpath == null) return;
+            if (trainpath == null) { whenDone?.Invoke(); return; }
 
             if (trainpath.IsBroken)
             {
@@ -55,22 +55,29 @@ namespace ORTS.TrackViewer.Editing
             if (trainpath.FirstNode == null)
             {
                 DisplayNoPathAvailable();
+                whenDone?.Invoke();
                 return;
             }
 
-            if (UserCancelledBecauseOfUnfinishedPath(trainpath)) return;
-
-            if (GetFileName(trainpath))
+            IfUserDoesNotCancelBecauseOfUnfinishedPath(trainpath, (cancelled) =>
             {
-                WritePatFileDirect(trainpath);
-            }
+                if (cancelled) { whenDone?.Invoke(); return; }
+
+                GetFileName(trainpath, (gotFileName) =>
+                {
+                    if (gotFileName)
+                    {
+                        WritePatFileDirect(trainpath);
+                    }
+                    whenDone?.Invoke();
+                });
+            });
         }
 
         /// <summary>
-        /// Write the path to file. This will need to confirm to the MSTS definition for .pat files.
-        /// No additional user checks on filename, etc.
+        /// Write the .pat file directly to the file defined in the trainpath
         /// </summary>
-        /// <param name="trainpath">The path itself, that needs to be written</param>
+        /// <param name="trainpath">The path to write</param>
         public static void WritePatFileDirect(Trainpath trainpath)
         {
             CreatePDPsAndTrpathNodes(trainpath);
@@ -81,32 +88,31 @@ namespace ORTS.TrackViewer.Editing
 
         static void DisplayNoPathAvailable()
         {
-            MessageBox.Show(TrackViewer.catalog.GetString("Path does not even have a start node.\nSaving is not possible."),
-                        TrackViewer.catalog.GetString("Trackviewer Path Editor"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Dialogs.ShowMessage(TrackViewer.catalog.GetString("Path does not even have a start node.\nSaving is not possible."),
+                        TrackViewer.catalog.GetString("Trackviewer Path Editor"));
         }
 
-        static bool UserCancelledBecauseOfUnfinishedPath(Trainpath trainpath)
+        static void IfUserDoesNotCancelBecauseOfUnfinishedPath(Trainpath trainpath, Action<bool> withCancelled)
         {
             List<string> cancelReasons = new List<string>();
             if (!trainpath.HasEnd) cancelReasons.Add(TrackViewer.catalog.GetString("* The path does not have a well-defined end-point"));
             //if (trainpath.IsBroken) cancelReasons.Add(TrackViewer.catalog.GetString("* The path has broken nodes or links"));
             if (trainpath.FirstNodeOfTail!=null) cancelReasons.Add(TrackViewer.catalog.GetString("* The path has a stored and not-yet reconnected tail"));
             
-            if (cancelReasons.Count == 0) return false;
+            if (cancelReasons.Count == 0) { withCancelled(false); return; }
 
             string message = TrackViewer.catalog.GetString("The current path is not finished:") + "\n";
             message += String.Join("\n", cancelReasons.ToArray());
             message += "\n" + TrackViewer.catalog.GetString("Do you want to continue?");
 
-            DialogResult dialogResult = MessageBox.Show(message, 
-                        TrackViewer.catalog.GetString("Trackviewer Path Editor"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
-            return (dialogResult == DialogResult.Cancel);
+            Dialogs.Ask(message, TrackViewer.catalog.GetString("Trackviewer Path Editor"), MessageButtons.OKCancel,
+                (dialogResult) => withCancelled(dialogResult != MessageResult.OK));
 
         }
 
         static void InformUserPathIsBroken()
         {
-            MessageBox.Show(
+            Dialogs.ShowMessage(
                 TrackViewer.catalog.GetString("Saving broken paths might not always work correctly.") + "\n" +
                 TrackViewer.catalog.GetString("The MSTS format for defining broken paths is not understood very well.") + "\n" +
                 TrackViewer.catalog.GetString("Reopening it in TrackViewer, however, is likely to work."));
@@ -117,28 +123,21 @@ namespace ORTS.TrackViewer.Editing
         /// </summary>
         /// <param name="trainpath">The current path to get the default file path and name</param>
         /// <returns>Boolean describing whether user wants to write to file or not.</returns>
-        static bool GetFileName(Trainpath trainpath)
+        static void GetFileName(Trainpath trainpath, Action<bool> withResult)
         {
-            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog
-            {
-                OverwritePrompt = true,
-                InitialDirectory = Path.GetDirectoryName(trainpath.FilePath),
-                FileName = trainpath.PathId,
-                DefaultExt = ".pat",
-                Filter = "PAT Files (.pat)|*.pat"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                trainpath.FilePath = dlg.FileName;
-                return true;
-            }
-            return false;
+            Dialogs.SaveFile(TrackViewer.catalog.GetString("Save path"), trainpath.PathId + ".pat", ".pat", "PAT Files (.pat)",
+                Path.GetDirectoryName(trainpath.FilePath), (fileName) =>
+                {
+                    if (String.IsNullOrEmpty(fileName))
+                    {
+                        withResult(false);
+                        return;
+                    }
+                    trainpath.FilePath = fileName;
+                    withResult(true);
+                });
         }
 
-        /// <summary>
-        /// Run through all path nodes and create the trackPDPs and the trPathNodes
-        /// </summary>
-        /// <param name="trainpath">The path itself, that needs to be written</param>
         static void CreatePDPsAndTrpathNodes(Trainpath trainpath)
         {
             trackPDPs = new List<string>();
@@ -322,32 +321,18 @@ namespace ORTS.TrackViewer.Editing
         /// <param name="stationNames">String array containing the names of the stations.</param>
         public void SaveToFile(string[] stationNames)
         {
-            string fullFilePath = GetFileName();
-            if (String.IsNullOrEmpty(fullFilePath)) return;
+            Dialogs.SaveFile(TrackViewer.catalog.GetString("Save station names"), "stations.txt", ".txt", "Text documents (.txt)", null, (fullFilePath) =>
+            {
+                if (String.IsNullOrEmpty(fullFilePath)) return;
 
-            System.IO.StreamWriter file = new System.IO.StreamWriter(fullFilePath, false, System.Text.Encoding.Unicode);
-            foreach (string stationName in stationNames)
-            {
-                file.WriteLine(stationName);
-            }
-            file.Close();
-        }
-
-        static string GetFileName()
-        {
-            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog
-            {
-                OverwritePrompt = true,
-                //dlg.InitialDirectory = Path.GetDirectoryName(trainpath.FilePath);
-                FileName = "stations.txt",
-                DefaultExt = ".txt",
-                Filter = "Text documents (.txt)|*.txt"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                return dlg.FileName;
-            }
-            return String.Empty;
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(fullFilePath, false, System.Text.Encoding.Unicode))
+                {
+                    foreach (string stationName in stationNames)
+                    {
+                        file.WriteLine(stationName);
+                    }
+                }
+            });
         }
     }
 }

@@ -1,37 +1,31 @@
-﻿// COPYRIGHT 2014, 2015 by the Open Rails project.
-// 
+// COPYRIGHT 2014, 2015 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
+//
+// The status bar at the bottom of the window. Originally a WPF StatusBar docked in the WinForms game window;
+// it is now drawn with MonoGame (on the game thread) so it can be updated every frame without any marshalling.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Windows.Forms.Integration;
+using Microsoft.Xna.Framework;
 
 using Orts.Formats.Msts;
 using ORTS.Common;
-using ORTS.TrackViewer.Properties;
 using ORTS.TrackViewer.Editing;
 using ORTS.TrackViewer.Drawing;
 
@@ -39,17 +33,36 @@ using ORTS.TrackViewer.Drawing;
 namespace ORTS.TrackViewer.UserInterface
 {
     /// <summary>
-    /// Interaction logic for StatusBarControl.xaml
     /// The statusbar at the bottom of the screen shows informational things like location, track items and possibly
     /// details on the track section, the path, ....
     /// Most of the items have a dedicated place in the statusbar. For flexibility the last item is simply a string
     /// that can contain various items (depending on the users setting/choice as well as for debug during development
     /// </summary>
-    public sealed partial class StatusBarControl : UserControl, IDisposable
+    public sealed class StatusBarControl
     {
         /// <summary>Height of the statusbar in pixels</summary>
-        public int StatusbarHeight { get; private set; }
-        private ElementHost elementHost;
+        public int StatusbarHeight => Font.Height + 8;
+
+        private TextFont Font => FontManager.Instance.UIFont;
+
+        private int screenWidth;
+        private int yBottom;
+
+        // The texts of the various fields
+        private string tileXZ = "";
+        private string locationX = "";
+        private string locationZ = "";
+        private string statusTrIndex = "";
+        private string statusTrItemType = "";
+        private string statusTrItemIndex = "";
+        private string statusTrItemLocationX = "";
+        private string statusTrItemLocationZ = "";
+        private readonly StringBuilder statusAdditional = new StringBuilder();
+
+        private static readonly Color background = new Color(240, 240, 240);
+        private static readonly Color separatorColor = new Color(190, 190, 190);
+        private static readonly Color fieldBorder = new Color(160, 160, 160);
+        private static readonly Color textColor = new Color(20, 20, 20);
 
         /// <summary>
         /// Constructor for the statusbar
@@ -57,19 +70,6 @@ namespace ORTS.TrackViewer.UserInterface
         /// <param name="trackViewer">Track viewer object that contains all the information we want to show the status for</param>
         public StatusBarControl(TrackViewer trackViewer)
         {
-            InitializeComponent();
-
-            StatusbarHeight = (int) tvStatusbar.Height;
-
-            //ElementHost object helps us to connect a WPF User Control.
-            elementHost = new ElementHost
-            {
-                Location = new System.Drawing.Point(0, 0),
-                TabIndex = 1,
-                Child = this
-            };
-            System.Windows.Forms.Control.FromHandle(trackViewer.Window.Handle).Controls.Add(elementHost);
-
         }
 
         /// <summary>
@@ -80,8 +80,8 @@ namespace ORTS.TrackViewer.UserInterface
         /// <param name="yBottom">Y-value in screen pixels at the bottom of the statusbar</param>
         public void SetScreenSize(int width, int height, int yBottom)
         {
-            elementHost.Location = new System.Drawing.Point(0, yBottom-height);
-            elementHost.Size = new System.Drawing.Size(width, height);
+            this.screenWidth = width;
+            this.yBottom = yBottom;
         }
 
         /// <summary>
@@ -95,6 +95,8 @@ namespace ORTS.TrackViewer.UserInterface
 
             SetMouseLocationStatus(mouseLocation);
 
+            if (trackViewer.DrawTrackDB == null) return;
+
             SetTrackIndexStatus(trackViewer);
 
             SetTrackItemStatus(trackViewer);
@@ -107,18 +109,66 @@ namespace ORTS.TrackViewer.UserInterface
         }
 
         /// <summary>
+        /// Draw the status bar. Must be called between SpriteBatch Begin and End.
+        /// </summary>
+        public void Draw()
+        {
+            int height = StatusbarHeight;
+            int top = yBottom - height;
+            BasicShapes.FillRectangle(new Rectangle(0, top, screenWidth, height), background);
+            BasicShapes.FillRectangle(new Rectangle(0, top, screenWidth, 1), separatorColor);
+
+            int textY = top + (height - Font.Height) / 2;
+            int x = 6;
+            int charWidth = Math.Max(1, Font.MeasureString("0"));
+
+            void Field(string text, int minChars, bool rightAlign, bool boxed)
+            {
+                int width = Math.Max(minChars * charWidth, Font.MeasureString(text));
+                if (boxed)
+                {
+                    BasicShapes.DrawRectangleOutline(new Rectangle(x - 2, top + 3, width + 6, height - 6), fieldBorder);
+                }
+                int textX = rightAlign ? x + width - Font.MeasureString(text) : x;
+                BasicShapes.DrawString(Font, new Point(textX, textY), textColor, text);
+                x += width + 8;
+            }
+            void Separator()
+            {
+                BasicShapes.FillRectangle(new Rectangle(x, top + 4, 1, height - 8), separatorColor);
+                x += 8;
+            }
+
+            Field(tileXZ, 12, false, false);
+            Separator();
+            Field(locationX, 9, true, false);
+            Field(locationZ, 9, true, false);
+            Separator();
+            Field(TrackViewer.catalog.GetString("Trackindex"), 0, false, false);
+            Field(statusTrIndex, 5, true, true);
+            Separator();
+            Field(TrackViewer.catalog.GetString("Item"), 0, false, false);
+            Field(statusTrItemType, 10, false, true);
+            Field(statusTrItemIndex, 5, true, true);
+            Field(statusTrItemLocationX, 8, true, true);
+            Field(statusTrItemLocationZ, 8, true, true);
+            Separator();
+            Field(statusAdditional.ToString(), 0, false, false);
+        }
+
+        /// <summary>
         /// Update the status of the track index
         /// </summary>
         /// <param name="trackViewer"></param>
         private void SetTrackIndexStatus(TrackViewer trackViewer)
         {
+            statusTrIndex = "";
             Drawing.CloseToMouseTrack closestTrack = trackViewer.DrawTrackDB.ClosestTrack;
             if (closestTrack == null) return;
             TrackNode tn = closestTrack.TrackNode;
             if (tn == null) return;
-            statusTrIndex.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            statusTrIndex = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0} ", tn.Index);
-            //debug: statusAdditional.Text += Math.Sqrt((double)trackViewer.drawTrackDB.closestTrack.ClosestMouseDistanceSquared);
         }
 
         /// <summary>
@@ -126,7 +176,7 @@ namespace ORTS.TrackViewer.UserInterface
         /// </summary>
         private void ResetAdditionalText()
         {
-            statusAdditional.Text = String.Empty;
+            statusAdditional.Clear();
         }
 
         /// <summary>
@@ -136,8 +186,8 @@ namespace ORTS.TrackViewer.UserInterface
         private void SetTrackItemStatus(TrackViewer trackViewer)
         {
             // Track items: clear first
-            statusTrItemType.Text = statusTrItemIndex.Text =
-                statusTrItemLocationX.Text = statusTrItemLocationZ.Text = string.Empty;
+            statusTrItemType = statusTrItemIndex =
+                statusTrItemLocationX = statusTrItemLocationZ = string.Empty;
 
             ORTS.TrackViewer.Drawing.CloseToMouseItem closestItem = trackViewer.DrawTrackDB.ClosestTrackItem;
             ORTS.TrackViewer.Drawing.CloseToMouseJunctionOrEnd closestJunction = trackViewer.DrawTrackDB.ClosestJunctionOrEnd;
@@ -146,7 +196,7 @@ namespace ORTS.TrackViewer.UserInterface
             {
                 closestPoint = closestItem;
             }
-            else if (closestJunction.JunctionOrEndNode != null)
+            else if (closestJunction != null && closestJunction.JunctionOrEndNode != null)
             {
                 closestPoint = closestJunction;
             }
@@ -157,12 +207,12 @@ namespace ORTS.TrackViewer.UserInterface
 
             if (closestPoint != null)
             {
-                statusTrItemType.Text = closestPoint.Description;
-                statusTrItemIndex.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                statusTrItemType = closestPoint.Description;
+                statusTrItemIndex = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0} ", closestPoint.Index);
-                statusTrItemLocationX.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                statusTrItemLocationX = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0,3:F3} ", closestPoint.X);
-                statusTrItemLocationZ.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                statusTrItemLocationZ = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                     "{0,3:F3} ", closestPoint.Z);
                 AddSignalStatus(trackViewer, closestPoint.Description, closestPoint.Index);
                 AddNamesStatus(trackViewer, closestPoint.Description, closestPoint.Index);
@@ -177,11 +227,11 @@ namespace ORTS.TrackViewer.UserInterface
         /// <param name="mouseLocation"></param>
         private void SetMouseLocationStatus(WorldLocation mouseLocation)
         {
-            tileXZ.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            tileXZ = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0,-7} {1,-7}", mouseLocation.TileX, mouseLocation.TileZ);
-            LocationX.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            locationX = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0,3:F3} ", mouseLocation.Location.X);
-            LocationZ.Text = string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            locationZ = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 "{0,3:F3} ", mouseLocation.Location.Z);
         }
 
@@ -193,7 +243,7 @@ namespace ORTS.TrackViewer.UserInterface
         {
             if (Properties.Settings.Default.statusShowVectorSections)
             {
-                TrVectorSection tvs = trackViewer.DrawTrackDB.ClosestTrack.VectorSection;
+                TrVectorSection tvs = trackViewer.DrawTrackDB.ClosestTrack?.VectorSection;
                 if (tvs == null) return;
                 uint shapeIndex = tvs.ShapeIndex;
                 string shapeName = "Unknown:" + shapeIndex.ToString(System.Globalization.CultureInfo.CurrentCulture);
@@ -224,7 +274,7 @@ namespace ORTS.TrackViewer.UserInterface
                     {
                     }
                 }
-                statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                     " VectorSection ({3}/{4}) filename={2} Index={0} shapeIndex={1}",
                     tvs.SectionIndex, shapeIndex, shapeName,
                         trackViewer.DrawTrackDB.ClosestTrack.TrackVectorSectionIndex + 1,
@@ -244,38 +294,39 @@ namespace ORTS.TrackViewer.UserInterface
                 {
                     //gather some info on path status
                     List<string> statusItems = new List<string>();
-                    
+
                     if (trackViewer.PathEditor.HasEndingPath) statusItems.Add("good end");
                     if (trackViewer.PathEditor.HasBrokenPath) statusItems.Add("broken");
                     if (trackViewer.PathEditor.HasModifiedPath) statusItems.Add("modified");
                     if (trackViewer.PathEditor.HasStoredTail) statusItems.Add("stored tail");
-                    
+
                     string pathStatus = String.Join(", ", statusItems.ToArray());
-                    
+
                     ORTS.TrackViewer.Editing.TrainpathNode curNode = trackViewer.PathEditor.CurrentNode;
-                    
-                    statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                    if (curNode == null) return;
+
+                    statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                         " {0} ({4}): TVNs=[{1} {2}] (type={3})",
                         trackViewer.PathEditor.FileName, curNode.NextMainTvnIndex, curNode.NextSidingTvnIndex,
                         curNode.NodeType, pathStatus);
 
                     if (curNode.IsBroken)
                     {
-                        statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                             " Broken: {0} ", curNode.BrokenStatusString());
                     }
                     TrainpathVectorNode curVectorNode = curNode as TrainpathVectorNode;
                     if (curVectorNode != null && curNode.NodeType == TrainpathNodeType.Stop)
                     {
-                        statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                        statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                             " (wait-time={0}s)",
                             curVectorNode.WaitTimeS);
                     }
-            
+
                 }
                 else
                 {
-                    statusAdditional.Text += "Invalid path";
+                    statusAdditional.Append("Invalid path");
                 }
             }
         }
@@ -290,7 +341,8 @@ namespace ORTS.TrackViewer.UserInterface
             {
                 TrPathNode curNode = trackViewer.DrawPATfile.CurrentNode;
                 TrackPDP curPDP = trackViewer.DrawPATfile.CurrentPdp;
-                statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                if (curNode == null || curPDP == null) return;
+                statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                     " {7}: {3}, {4} [{1} {2}] [{5} {6}] <{0}>",
                     curNode.pathFlags, (int)curNode.nextMainNode, (int)curNode.nextSidingNode,
                     curPDP.X, curPDP.Z, curPDP.junctionFlag, curPDP.invalidFlag, trackViewer.DrawPATfile.FileName);
@@ -304,7 +356,7 @@ namespace ORTS.TrackViewer.UserInterface
         {
             if (Properties.Settings.Default.statusShowFPS)
             {
-                statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                     " FPS={0:F1} ", trackViewer.FrameRate.SmoothedValue);
             }
         }
@@ -317,7 +369,7 @@ namespace ORTS.TrackViewer.UserInterface
         {
             if (Properties.Settings.Default.statusShowTerrain && (trackViewer.drawTerrain != null))
             {
-                statusAdditional.Text += trackViewer.drawTerrain.StatusInformation;
+                statusAdditional.Append(trackViewer.drawTerrain.StatusInformation);
             }
         }
 
@@ -331,8 +383,8 @@ namespace ORTS.TrackViewer.UserInterface
         {
             if (!Properties.Settings.Default.statusShowSignal) return;
             if (!String.Equals(description, "signal")) return;
-            statusAdditional.Text += "signal shape = ";
-            statusAdditional.Text += trackViewer.RouteData.GetSignalFilename(index);
+            statusAdditional.Append("signal shape = ");
+            statusAdditional.Append(trackViewer.RouteData.GetSignalFilename(index));
         }
 
         /// <summary>
@@ -349,7 +401,7 @@ namespace ORTS.TrackViewer.UserInterface
             TrItem item = trackViewer.RouteData.TrackDB.TrItemTable[index];
             PlatformItem platform = item as PlatformItem;
             if (platform == null) return;
-            statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                 "{0} ({1})", platform.Station, platform.ItemName);
         }
 
@@ -359,7 +411,7 @@ namespace ORTS.TrackViewer.UserInterface
         /// <param name="trackViewer">The trackviewer we need to find the trackDB</param>
         /// <param name="description">The description of the item we might want to show, needed to make sure it is a proper item</param>
         /// <param name="index">The index of the item to show</param>
-        /// 
+        ///
         private void AddEventNamesStatus(TrackViewer trackViewer, string description, uint index)
         {
             if (!String.Equals(description, "event")) return;
@@ -370,7 +422,7 @@ namespace ORTS.TrackViewer.UserInterface
 
             if (!Properties.Settings.Default.statusShowEventNames) return;
 
-            statusAdditional.Text += string.Format(System.Globalization.CultureInfo.CurrentCulture,
+            statusAdditional.AppendFormat(System.Globalization.CultureInfo.CurrentCulture,
                 "{0}", eventItem.ItemName);
         }
 
@@ -380,7 +432,7 @@ namespace ORTS.TrackViewer.UserInterface
         /// <param name="trackViewer">The trackviewer we need to find the trackDB</param>
         /// <param name="description">The description of the item we might want to show, needed to make sure it is a proper item</param>
         /// <param name="index">The index of the item to show</param>
-        /// 
+        ///
         private void CheckEventRightMouseClick(TrackViewer trackViewer, string description, uint index)
         {
             if (!String.Equals(description, "event")) return;
@@ -391,40 +443,11 @@ namespace ORTS.TrackViewer.UserInterface
 
             if (!(trackViewer.PathEditor != null && trackViewer.PathEditor.EditingIsActive))
             {
-                if (TVUserInput.IsMouseRightButtonPressed())
+                if (TVUserInput.IsMouseRightButtonPressed() && !trackViewer.InputCapturedByUserInterface)
                 {
-                    MessageBox.Show(eventItem.SData2, eventItem.ItemName);
+                    Dialogs.ShowMessage(eventItem.SData2, eventItem.ItemName);
                 }
             }
         }
-
-        #region IDisposable
-        private bool disposed;
-        /// <summary>
-        /// Implementing IDisposable
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        void Dispose(bool disposing)
-        {
-            if (!disposed)
-            {
-                disposed = true; // to prevent infinite loop. Probably elementHost should not be part of this class
-                if (disposing)
-                {
-                    // Dispose managed resources.
-                    elementHost.Dispose();
-                }
-
-                // There are no unmanaged resources to release, but
-                // if we add them, they need to be released here.
-            }
-            disposed = true;
-        }
-        #endregion
     }
 }

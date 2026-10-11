@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014 by the Open Rails project.
+// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -28,7 +28,6 @@
 //#define DEBUG_USER_INPUT
 
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Microsoft.Xna.Framework.Input;
 
 namespace ORTS.TrackViewer.UserInterface
@@ -53,9 +52,6 @@ namespace ORTS.TrackViewer.UserInterface
         /// <summary>Return the current y-location of the mouse pointer</summary>
         public static int MouseLocationY { get { return MouseState.Y; } }
 
-        [DllImport("user32.dll")]
-        static extern short GetAsyncKeyState(Keys key);
-
         /// <summary>
         /// Call this to update the mouse and keyboard states.
         /// </summary>
@@ -65,7 +61,7 @@ namespace ORTS.TrackViewer.UserInterface
             LastKeyboardState = KeyboardState;
             LastMouseState = MouseState;
             // Make sure we have an "idle" (everything released) keyboard and mouse state if the window isn't active.
-            KeyboardState = new KeyboardState(GetKeysWithPrintScreenFix(Keyboard.GetState()));
+            KeyboardState = Keyboard.GetState();
             MouseState = Mouse.GetState();
             /* this part might be needed for message composing
             if (LastKeyboardState != KeyboardState  && ComposingMessage)
@@ -116,15 +112,28 @@ namespace ORTS.TrackViewer.UserInterface
 #endif
         }
 
-        static Keys[] GetKeysWithPrintScreenFix(KeyboardState keyboardState)
+        /// <summary>
+        /// Return whether the given key has been pressed since the last update
+        /// </summary>
+        public static bool IsKeyPressed(Keys key)
         {
-            // When running in fullscreen, Win32's GetKeyboardState (the API behind Keyboard.GetState()) never returns
-            // the print screen key as being down. Something is eating it or something. So here we simply query that
-            // key directly and forcibly add it to the list of pressed keys.
-            List<Keys> keys = new List<Keys>(keyboardState.GetPressedKeys());
-            if ((GetAsyncKeyState(Keys.PrintScreen) & 0x8000) != 0)
-                keys.Add(Keys.PrintScreen);
-            return keys.ToArray();
+            return KeyboardState.IsKeyDown(key) && !LastKeyboardState.IsKeyDown(key);
+        }
+
+        /// <summary>
+        /// Return whether any (non-modifier) key is down
+        /// </summary>
+        public static bool AnyKeyDown()
+        {
+            foreach (Keys key in KeyboardState.GetPressedKeys())
+            {
+                if (key != Keys.LeftShift && key != Keys.RightShift && key != Keys.LeftControl && key != Keys.RightControl
+                    && key != Keys.LeftAlt && key != Keys.RightAlt)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

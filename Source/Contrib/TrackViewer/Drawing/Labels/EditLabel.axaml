@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.Drawing.Labels.EditLabel"
+        SizeToContent="WidthAndHeight" CanResize="False" Title="Label">
+    <StackPanel Orientation="Vertical" Margin="8" Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Name="labelType" VerticalAlignment="Center">Label text:</TextBlock>
+            <TextBox Name="textboxLabel" Width="220" KeyDown="OnKeyDownHandler"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+            <Button Name="buttonCancel" Click="ButtonCancel_Click" IsCancel="True">Cancel</Button>
+            <Button Name="buttonSearch" Click="ButtonOK_Click">OK</Button>
+            <Button Name="buttonDelete" Click="ButtonDelete_Click">Delete label</Button>
+        </StackPanel>
+    </StackPanel>
+</Window>

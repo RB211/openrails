@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2015, 2018 by the Open Rails project.
+// COPYRIGHT 2015, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -21,53 +21,51 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Shapes;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Media;
 
 using Newtonsoft.Json;
 
 using ORTS.Common;
 
 using ORTS.TrackViewer.Drawing;
+using ORTS.TrackViewer.UserInterface;
 
 
 namespace ORTS.TrackViewer.Editing.Charts
 {
     #region DrawPathChart
     /// <summary>
-    /// Wrapper class for drawing charts of paths. This class make sure the data is updated, and also the actual window is shown or closed as needed
+    /// Wrapper class for drawing charts of paths. This class make sure the data is updated, and also the actual window is shown or closed as needed.
+    /// This class is used on the game thread; the chart window itself lives on the Avalonia UI thread. The chart data
+    /// (PathChartData) is locked while it is being updated (game thread) or drawn (UI thread).
     /// </summary>
     public class DrawPathChart
     {
         /// <summary>Does the chart window have focus (actived) or not</summary>
-        public bool IsActived { get { return this.chartWindow.IsActivated; } }
-        
+        public bool IsActived { get { return chartWindowIsActive; } }
+
         // Injection dependencies
         private PathEditor pathEditor;
         private ORTS.TrackViewer.Drawing.RouteData routeData;
 
         //
         private PathChartData pathData;
-        private PathChartWindow chartWindow;
+        private PathChartWindow chartWindow; // only to be touched on the UI thread
+        private volatile bool chartWindowIsActive;
 
-        private bool ChartWindowIsOpen { get { return chartWindow.Visibility == Visibility.Visible; } }
+        private bool ChartWindowIsOpen { get; set; }
 
-        // save window title from properies, so that the window's title can be changed when the selected path is changed
-        private readonly String WindowTitle;
+        // save window title, so that the window's title can be changed when the selected path is changed
+        private readonly String WindowTitle = TrackViewer.catalog.GetString("Charting the path");
 
         /// <summary>
         /// Constructor
         /// </summary>
         public DrawPathChart()
         {
-            chartWindow = new PathChartWindow
-            {
-                OnJsonSaveClick = OnJsonSave
-            };
-            TrackViewer.Localize(chartWindow);
-            if (WindowTitle == null) WindowTitle = chartWindow.Title;
         }
 
         /// <summary>
@@ -112,14 +110,39 @@ namespace ORTS.TrackViewer.Editing.Charts
             {
                 InitChartData();
             }
+            ChartWindowIsOpen = true;
             OnPathChanged();
             if (pathData == null)
             {   // it path is broken, OnPathChanged performed a close
                 return;
             }
-            chartWindow.Title = String.Format("{0}: {1}", WindowTitle, pathEditor.CurrentTrainPath.PathName);
-            chartWindow.Show();
+            string title = String.Format("{0}: {1}", WindowTitle, pathEditor.CurrentTrainPath.PathName);
+            PathChartData data = pathData;
+            UiThread.Post(() =>
+            {
+                EnsureWindow();
+                chartWindow.SetData(data);
+                chartWindow.Title = title;
+                chartWindow.Show();
+                chartWindow.Activate();
+                chartWindow.Draw();
+            });
+        }
 
+        /// <summary>
+        /// Create the window if needed. Only on the UI thread.
+        /// </summary>
+        private void EnsureWindow()
+        {
+            if (chartWindow != null) return;
+            chartWindow = new PathChartWindow
+            {
+                OnJsonSaveClick = () => GameThread.Post(OnJsonSave)
+            };
+            chartWindow.Activated += (s, e) => chartWindowIsActive = true;
+            chartWindow.Deactivated += (s, e) => chartWindowIsActive = false;
+            chartWindow.Hidden += () => { chartWindowIsActive = false; GameThread.Post(() => ChartWindowIsOpen = false); };
+            TrackViewer.Localize(chartWindow);
         }
 
         /// <summary>
@@ -127,7 +150,9 @@ namespace ORTS.TrackViewer.Editing.Charts
         /// </summary>
         public void Close()
         {
-            chartWindow.Hide();
+            ChartWindowIsOpen = false;
+            chartWindowIsActive = false;
+            UiThread.Post(() => chartWindow?.Hide());
             pathData = null; // release memory, and do not do further update processing
         }
 
@@ -142,12 +167,6 @@ namespace ORTS.TrackViewer.Editing.Charts
         private void InitChartData()
         {
             this.pathData = new PathChartData(this.routeData);
-            chartWindow.SetCanvasData("height", new HeightChart(this.pathData));
-            chartWindow.SetCanvasData("grade", new GradeChart(this.pathData));
-            chartWindow.SetCanvasData("curvature", new CurvatureChart(this.pathData));
-            chartWindow.SetCanvasData("distance", new DistanceChart(this.pathData));
-            chartWindow.SetCanvasData("milemarkers", new MileMarkersChart(this.pathData));
-            chartWindow.SetCanvasData("speedmarkers", new SpeedlimitsChart(this.pathData));
         }
 
         private void OnPathChanged()
@@ -164,18 +183,28 @@ namespace ORTS.TrackViewer.Editing.Charts
                 Close();
                 return;
             }
-            pathData.Update(trainpath);
-            chartWindow.Title = String.Format("{0}: {1}", WindowTitle, pathEditor.CurrentTrainPath.PathName);
-            chartWindow.Draw();
+            lock (pathData)
+            {
+                pathData.Update(trainpath);
+            }
+            string title = String.Format("{0}: {1}", WindowTitle, pathEditor.CurrentTrainPath.PathName);
+            PathChartData data = pathData;
+            UiThread.Post(() =>
+            {
+                if (chartWindow == null) return;
+                chartWindow.SetData(data);
+                chartWindow.Title = title;
+                chartWindow.Draw();
+            });
         }
-        
+
         /// <summary>
         /// Zoom the chart window
         /// </summary>
         /// <param name="zoomSteps">The number of zoom steps (negative for zooming in)</param>
         public void Zoom(int zoomSteps)
         {
-            this.chartWindow.ZoomChange(Math.Exp(-0.1*zoomSteps));
+            UiThread.Post(() => this.chartWindow?.ZoomChange(Math.Exp(-0.1 * zoomSteps)));
         }
 
         /// <summary>
@@ -184,23 +213,19 @@ namespace ORTS.TrackViewer.Editing.Charts
         /// <param name="shiftSteps">The number of zoom steps (negative for shifting left)</param>
         public void Shift(int shiftSteps)
         {
-            this.chartWindow.Shift(shiftSteps);
+            UiThread.Post(() => this.chartWindow?.Shift(shiftSteps));
         }
 
         #region Save to JSON
         private void OnJsonSave()
         {
-            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog
+            Dialogs.SaveFile(TrackViewer.catalog.GetString("Save chart data"), "pathchartdata.js", ".js", "Javascript Files (.js)", null, (fileName) =>
             {
-                OverwritePrompt = true,
-                FileName = "pathchartdata.js",
-                DefaultExt = ".js",
-                Filter = "Javascript Files (.js)|*.js"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                WriteJson(dlg.FileName);
-            }
+                if (!String.IsNullOrEmpty(fileName))
+                {
+                    WriteJson(fileName);
+                }
+            });
         }
 
         /// <summary>
@@ -209,7 +234,7 @@ namespace ORTS.TrackViewer.Editing.Charts
         /// <param name="completeFileName">The filename to write to</param>
         public void WriteJson(string completeFileName)
         {
-            if (!this.pathData.HasPath)
+            if (this.pathData == null || !this.pathData.HasPath)
             {
                 return;
             }
@@ -228,7 +253,10 @@ namespace ORTS.TrackViewer.Editing.Charts
                 wr.Write("var pathchartdata = ");
                 using (JsonWriter writer = new JsonTextWriter(wr))
                 {
-                    serializer.Serialize(writer, this.pathData);
+                    lock (pathData)
+                    {
+                        serializer.Serialize(writer, this.pathData);
+                    }
                 }
             }
         }
@@ -308,8 +336,8 @@ namespace ORTS.TrackViewer.Editing.Charts
                 return;
             }
 
-            canvasWidth = drawingCanvas.ActualWidth;
-            canvasHeight = drawingCanvas.ActualHeight;
+            canvasWidth = drawingCanvas.Bounds.Width;
+            canvasHeight = drawingCanvas.Bounds.Height;
 
             this.zoomRatioLeft = zoomRatioStart;
             this.zoomRatioRight = zoomRatioStop;
@@ -341,10 +369,8 @@ namespace ORTS.TrackViewer.Editing.Charts
             {
                 Stroke = lineBrush,
                 StrokeThickness = 1,
-                X1 = x1,
-                X2 = x2,
-                Y1 = y1,
-                Y2 = y2
+                StartPoint = new Point(x1, y1),
+                EndPoint = new Point(x2, y2),
             };
             RenderOptions.SetEdgeMode(line, EdgeMode.Aliased);
             drawingCanvas.Children.Add(line);
@@ -358,10 +384,7 @@ namespace ORTS.TrackViewer.Editing.Charts
         /// <param name="repeatPreviousPoint">True if only vertical and horizontal lines are drawn (from one point to anohter).</param>
         protected void DrawDataPolyLine(Canvas drawingCanvas, Func<PathChartPoint, float> getField, bool repeatPreviousPoint)
         {
-            SolidColorBrush blackBrush = new SolidColorBrush
-            {
-                Color = Colors.Black
-            };
+            SolidColorBrush blackBrush = new SolidColorBrush(Colors.Black);
 
             Polyline dataPolyLine = new Polyline
             {
@@ -369,7 +392,7 @@ namespace ORTS.TrackViewer.Editing.Charts
                 StrokeThickness = 1
             };
 
-            var points = new PointCollection();
+            var points = new List<Point>();
             double lastY = ScaledY(0d);
             foreach (PathChartPoint sourcePoint in this.pathData.PathChartPoints)
             {
@@ -467,6 +490,7 @@ namespace ORTS.TrackViewer.Editing.Charts
             Canvas.SetLeft(textBlock, centerX - textBlock.DesiredSize.Height/2);
             Canvas.SetTop(textBlock, bottomY); 
             textBlock.RenderTransform = new RotateTransform(-90);
+            textBlock.RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative); // WPF rotates around the top-left
 
             drawingCanvas.Children.Add(textBlock);
         }
@@ -485,7 +509,7 @@ namespace ORTS.TrackViewer.Editing.Charts
             {
                 Width = imageSize,
                 Height = imageSize,
-                Fill = new ImageBrush(BitmapImageManager.Instance.GetImage(imageName))
+                Fill = new ImageBrush(BitmapImageManager.Instance.GetImage(imageName)) { Stretch = Stretch.Uniform }
             };
             Canvas.SetLeft(rect, centerX-imageSize/2);
             Canvas.SetTop(rect, centerY-imageSize/2);

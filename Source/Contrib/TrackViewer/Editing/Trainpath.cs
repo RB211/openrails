@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -23,7 +23,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
 
 using Orts.Formats.Msts;
 using Orts.Simulation;
@@ -187,8 +186,8 @@ namespace ORTS.TrackViewer.Editing
             PathFile patFile = new PathFile(filePath);
             if (PatFileIsIncomplete(patFile))
             {
-                MessageBox.Show("The .pat file is somehow incomplete. Cannot load the path.",
-                        "Trackviewer Path Editor", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ORTS.TrackViewer.UserInterface.Dialogs.ShowMessage("The .pat file is somehow incomplete. Cannot load the path.",
+                        "Trackviewer Path Editor");
                 return;
             }
 
