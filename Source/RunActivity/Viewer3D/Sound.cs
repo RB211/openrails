@@ -730,6 +730,7 @@ namespace Orts.Viewer3D
             if (smsFilePath == null)
                 return;
 
+            smsFilePath = ORTS.IO.PathResolver.Resolve(smsFilePath);
             SMSFolder = Path.GetDirectoryName(smsFilePath);
             SMSFileName = Path.GetFileName(smsFilePath);
             Orts.Formats.Msts.SoundManagmentFile smsFile = Orts.Formats.Msts.SharedSMSFileManager.Get(smsFilePath);
@@ -778,6 +779,7 @@ namespace Orts.Viewer3D
             if (wavFilePath == null)
                 return;
 
+            wavFilePath = ORTS.IO.PathResolver.Resolve(wavFilePath);
             WavFolder = Path.GetDirectoryName(wavFilePath);
             WavFileName = Path.GetFileName(wavFilePath);
             SMSFolder = WavFolder;

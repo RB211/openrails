@@ -60,8 +60,10 @@ namespace Orts.Common
             {
                 if (path != null)
                 {
-                    var fullPath = Path.Combine(path, branch);
-                    if (File.Exists(ORTS.IO.PathResolver.Resolve(fullPath)))
+                    // Return the real path: content paths may contain '\' and the wrong case, and callers
+                    // take the directory of the result (e.g. sound files are relative to their .sms file).
+                    var fullPath = ORTS.IO.PathResolver.Resolve(Path.Combine(path, branch));
+                    if (File.Exists(fullPath))
                         return fullPath;
                 }
             }
