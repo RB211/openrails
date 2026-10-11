@@ -2,11 +2,18 @@
   <PropertyGroup>
     <Version Condition="'$(DesignTimeBuild)' != 'true' OR '$(BuildingProject)' == 'true'">0.0.$([System.DateTime]::UtcNow.Date.Subtract($([System.DateTime]::Parse("2000-01-01"))).TotalDays).$([System.Math]::Floor($([MSBuild]::Divide($([System.DateTime]::UtcNow.TimeOfDay.TotalSeconds), 2))))</Version>
     <AssemblyVersion Condition="'$(DesignTimeBuild)' != 'true' OR '$(BuildingProject)' == 'true'">0.0.$([System.DateTime]::UtcNow.Date.Subtract($([System.DateTime]::Parse("2000-01-01"))).TotalDays).$([System.Math]::Floor($([MSBuild]::Divide($([System.DateTime]::UtcNow.TimeOfDay.TotalSeconds), 2))))</AssemblyVersion>
-    <OutputPath>$(MSBuildThisFileDirectory)\..\Program\</OutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)/../Program/</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' AND $([MSBuild]::IsOSPlatform('OSX'))">osx-arm64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Graphics backend: Vulkan everywhere by default; DX12 can be selected on Windows with -p:OrtsGraphicsBackend=DX12 -->
+    <OrtsGraphicsBackend Condition="'$(OrtsGraphicsBackend)' == ''">Vulkan</OrtsGraphicsBackend>
+    <MonoGameVersion>3.8.6</MonoGameVersion>
+    <!-- Must match the version Avalonia.Skia depends on -->
+    <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
   </PropertyGroup>
 </Project>

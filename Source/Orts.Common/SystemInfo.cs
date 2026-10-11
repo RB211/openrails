@@ -24,17 +24,12 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
-using SharpDX.DXGI;
 
 namespace ORTS.Common
 {
     public static class SystemInfo
     {
         static readonly Regex NameAndVersionRegex = new Regex("^(.*?) +([0-9.]+)$");
-        static readonly NativeStructs.MemoryStatusExtended MemoryStatusExtended = new NativeStructs.MemoryStatusExtended()
-        {
-            Size = 64
-        };
 
         static SystemInfo()
         {
@@ -52,6 +47,14 @@ namespace ORTS.Common
                 Version = runtime.Groups[2].Value,
             };
 
+            if (System.OperatingSystem.IsWindows())
+                InitializeWindows();
+            else
+                InitializeUnix();
+        }
+
+        static void InitializeWindows()
+        {
             try
             {
                 // Almost nothing will correctly identify Windows 11 at this point, so we have to use WMI.
@@ -72,8 +75,7 @@ namespace ORTS.Common
                 Trace.WriteLine(error);
             }
 
-            NativeMethods.GlobalMemoryStatusEx(MemoryStatusExtended);
-            InstalledMemoryMB = (int)(MemoryStatusExtended.TotalPhysical / 1024 / 1024);
+            InstalledMemoryMB = (int)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024 / 1024);
 
             try
             {
@@ -90,16 +92,14 @@ namespace ORTS.Common
                 Trace.WriteLine(error);
             }
 
-            // The WMI data for AdapterRAM is unreliable, so we have to use DXGI to get the real numbers.
-            // Alas, DXGI doesn't give us the manufacturer name for the adapter, so we combine it with WMI.
-            var descriptions = new Factory1().Adapters.Select(adapter => adapter.Description).ToArray();
+            // The WMI data for AdapterRAM is unreliable (it is capped at 4 GB), but it is all we have without DXGI.
             try
             {
                 GPUs = new ManagementClass("Win32_VideoController").GetInstances().Cast<ManagementObject>().Select(adapter => new GPU
                 {
                     Name = (string)adapter["Name"],
                     Manufacturer = (string)adapter["AdapterCompatibility"],
-                    MemoryMB = (uint)((long)descriptions.FirstOrDefault(desc => desc.Description == (string)adapter["Name"]).DedicatedVideoMemory / 1024 / 1024),
+                    MemoryMB = (uint)(Convert.ToInt64(adapter["AdapterRAM"] ?? 0L) / 1024 / 1024),
                 }).ToList();
             }
             catch (Exception error)
@@ -132,12 +132,71 @@ namespace ORTS.Common
             }
         }
 
+        static void InitializeUnix()
+        {
+            var osName = RuntimeInformation.OSDescription;
+            var osVersion = Environment.OSVersion.Version.ToString();
+            try
+            {
+                // /etc/os-release is the standard way to identify a Linux distribution.
+                if (File.Exists("/etc/os-release"))
+                {
+                    var release = File.ReadAllLines("/etc/os-release")
+                        .Select(line => line.Split(new[] { '=' }, 2))
+                        .Where(parts => parts.Length == 2)
+                        .ToDictionary(parts => parts[0], parts => parts[1].Trim('"'));
+                    if (release.TryGetValue("NAME", out var name)) osName = name;
+                    if (release.TryGetValue("VERSION_ID", out var version)) osVersion = version;
+                    else if (release.TryGetValue("BUILD_ID", out var build)) osVersion = build;
+                }
+            }
+            catch (Exception error)
+            {
+                Trace.WriteLine(error);
+            }
+            OperatingSystem = new Platform
+            {
+                Name = osName,
+                Version = osVersion,
+                Architecture = RuntimeInformation.OSArchitecture.ToString(),
+                Language = CultureInfo.CurrentUICulture.IetfLanguageTag,
+                Languages = new[] { CultureInfo.CurrentUICulture.Name },
+            };
+
+            InstalledMemoryMB = (int)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1024 / 1024);
+
+            try
+            {
+                if (File.Exists("/proc/cpuinfo"))
+                {
+                    var fields = File.ReadAllLines("/proc/cpuinfo")
+                        .Select(line => line.Split(new[] { ':' }, 2))
+                        .Where(parts => parts.Length == 2)
+                        .Select(parts => (Key: parts[0].Trim(), Value: parts[1].Trim()))
+                        .ToList();
+                    var mhz = fields.Where(f => f.Key == "cpu MHz").Select(f => double.TryParse(f.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0).DefaultIfEmpty(0).Max();
+                    CPUs.Add(new CPU
+                    {
+                        Name = fields.FirstOrDefault(f => f.Key == "model name").Value ?? "Unknown",
+                        Manufacturer = fields.FirstOrDefault(f => f.Key == "vendor_id").Value ?? "Unknown",
+                        ThreadCount = (uint)Environment.ProcessorCount,
+                        MaxClockMHz = (uint)mhz,
+                    });
+                }
+            }
+            catch (Exception error)
+            {
+                Trace.WriteLine(error);
+            }
+            // GPUs are reported by the graphics backend once it has started.
+        }
+
         public static readonly Platform Application;
         public static readonly Platform Runtime;
-        public static readonly Platform OperatingSystem;
-        public static readonly int InstalledMemoryMB;
-        public static readonly List<CPU> CPUs = new List<CPU>();
-        public static readonly List<GPU> GPUs = new List<GPU>();
+        public static Platform OperatingSystem { get; private set; }
+        public static int InstalledMemoryMB { get; private set; }
+        public static List<CPU> CPUs { get; private set; } = new List<CPU>();
+        public static List<GPU> GPUs { get; private set; } = new List<GPU>();
         public static readonly List<string> Direct3DFeatureLevels = new List<string>();
 
         public static void WriteSystemDetails(TextWriter output)
@@ -177,27 +236,8 @@ namespace ORTS.Common
             public uint MemoryMB;
         }
 
-        static class NativeStructs
-        {
-            [StructLayout(LayoutKind.Sequential, Size = 64)]
-            public class MemoryStatusExtended
-            {
-                public uint Size;
-                public uint MemoryLoad;
-                public ulong TotalPhysical;
-                public ulong AvailablePhysical;
-                public ulong TotalPageFile;
-                public ulong AvailablePageFile;
-                public ulong TotalVirtual;
-                public ulong AvailableVirtual;
-                public ulong AvailableExtendedVirtual;
-            }
-        }
-
         static class NativeMethods
         {
-            [DllImport("kernel32.dll", SetLastError = true)]
-            public static extern bool GlobalMemoryStatusEx([In, Out] NativeStructs.MemoryStatusExtended buffer);
 
             public const uint D3D11_SDK_VERSION = 7;
 

@@ -87,6 +87,12 @@ namespace ORTS.Updater
             BasePath = basePath;
             ProductName = productName;
             ProductVersion = productVersion;
+
+            // In-place updating replaces signed Windows executables, so it is only supported on Windows.
+            // On other platforms, updates come from the system package manager or a new download.
+            if (!OperatingSystem.IsWindows())
+                return;
+
             try
             {
                 Settings = new UpdateSettings();

@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <AssemblyName>Contrib.ActivityEditor</AssemblyName>
     <ApplicationIcon>..\..\..\ORTS.ico</ApplicationIcon>
@@ -82,9 +82,6 @@
     <ProjectReference Include="..\LibAE\LibAE.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.UpgradeAssistant.Extensions.Default.Analyzers" Version="0.4.355802">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.1.303" />
+    <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
   </ItemGroup>
 </Project>

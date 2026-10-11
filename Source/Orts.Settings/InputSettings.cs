@@ -26,6 +26,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using SkiaSharp;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -249,18 +250,23 @@ namespace ORTS.Settings
             var keyWidth = 50;
             var keyHeight = 4 * keyWidth;
             var keySpacing = 5;
-            var keyFontLabel = new System.Drawing.Font(System.Drawing.SystemFonts.MessageBoxFont.FontFamily, keyHeight * 0.33f, System.Drawing.GraphicsUnit.Pixel);
-            var keyFontCommand = new System.Drawing.Font(System.Drawing.SystemFonts.MessageBoxFont.FontFamily, keyHeight * 0.22f, System.Drawing.GraphicsUnit.Pixel);
-            var keyboardLayoutBitmap = new System.Drawing.Bitmap(KeyboardLayout[0].Length * keyWidth, KeyboardLayout.Length * keyHeight);
-            using (var g = System.Drawing.Graphics.FromImage(keyboardLayoutBitmap))
+            using (var typeface = SKTypeface.Default)
+            using (var keyFontLabel = new SKFont(typeface, keyHeight * 0.33f))
+            using (var keyFontCommand = new SKFont(typeface, keyHeight * 0.22f))
+            using (var surface = SKSurface.Create(new SKImageInfo(KeyboardLayout[0].Length * keyWidth, KeyboardLayout.Length * keyHeight)))
+            using (var fill = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true })
+            using (var stroke = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black })
+            using (var text = new SKPaint { Color = SKColors.Black, IsAntialias = true })
             {
+                var canvas = surface.Canvas;
+                canvas.Clear(SKColors.Transparent);
+                var commandLineHeight = keyFontCommand.Spacing;
                 DrawKeyboardMap(null, (keyBox, keyScanCode, keyName) =>
                 {
                     var keyCommands = GetScanCodeCommands(keyScanCode);
-                    var keyCommandNames = String.Join("\n", keyCommands.Select(c => String.Join(" ", GetPrettyCommandName(c).Split(' ').Skip(1).ToArray())).ToArray());
+                    var keyCommandNames = keyCommands.Select(c => String.Join(" ", GetPrettyCommandName(c).Split(' ').Skip(1).ToArray())).ToArray();
 
                     var keyColor = GetScanCodeColor(keyScanCode);
-                    var keyTextColor = System.Drawing.Brushes.Black;
                     if (keyColor == Color.Transparent)
                     {
                         keyColor = Color.White;
@@ -275,13 +281,23 @@ namespace ORTS.Settings
                     Scale(ref keyBox, keyWidth, keyHeight);
                     keyBox.Inflate(-keySpacing, -keySpacing);
 
-                    g.FillRectangle(new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb((int)keyColor.PackedValue)), keyBox.Left, keyBox.Top, keyBox.Width, keyBox.Height);
-                    g.DrawRectangle(System.Drawing.Pens.Black, keyBox.Left, keyBox.Top, keyBox.Width, keyBox.Height);
-                    g.DrawString(keyName, keyFontLabel, keyTextColor, keyBox.Right - g.MeasureString(keyName, keyFontLabel).Width + keySpacing, keyBox.Top - 3 * keySpacing);
-                    g.DrawString(keyCommandNames, keyFontCommand, keyTextColor, keyBox.Left, keyBox.Bottom - keyCommands.Count() * keyFontCommand.Height);
+                    fill.Color = new SKColor(keyColor.R, keyColor.G, keyColor.B, keyColor.A);
+                    canvas.DrawRect(keyBox.Left, keyBox.Top, keyBox.Width, keyBox.Height, fill);
+                    canvas.DrawRect(keyBox.Left, keyBox.Top, keyBox.Width, keyBox.Height, stroke);
+                    var labelWidth = keyFontLabel.MeasureText(keyName);
+                    canvas.DrawText(keyName, keyBox.Right - labelWidth + keySpacing, keyBox.Top - 3 * keySpacing - keyFontLabel.Metrics.Ascent, SKTextAlign.Left, keyFontLabel, text);
+                    var y = keyBox.Bottom - keyCommandNames.Length * commandLineHeight - keyFontCommand.Metrics.Ascent;
+                    foreach (var line in keyCommandNames)
+                    {
+                        canvas.DrawText(line, keyBox.Left, y, SKTextAlign.Left, keyFontCommand, text);
+                        y += commandLineHeight;
+                    }
                 });
+                using (var image = surface.Snapshot())
+                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                using (var stream = File.Create(filePath))
+                    data.SaveTo(stream);
             }
-            keyboardLayoutBitmap.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
         }
 
         public static void Scale(ref Rectangle rectangle, int scaleX, int scaleY)

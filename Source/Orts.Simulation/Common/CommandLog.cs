@@ -22,7 +22,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Orts.Common
 {
@@ -131,10 +130,9 @@ namespace Orts.Common
             Stream stream = null;
             try {
                 stream = new FileStream( filePath, FileMode.Create );
-                BinaryFormatter formatter = new BinaryFormatter();
                 // Re-sort based on time as tests show that some commands are deferred.
                 CommandList.Sort( ( x, y ) => x.Time.CompareTo( y.Time ) );
-                formatter.Serialize( stream, CommandList );
+                CommandSerializer.Serialize( stream, CommandList );
             } catch( IOException ) {
                 // Do nothing but warn, ignoring errors.
                 Trace.TraceWarning( "SaveLog error writing command log " + filePath );
@@ -155,8 +153,11 @@ namespace Orts.Common
             Stream stream = null;
             try {
                 stream = new FileStream( filePath, FileMode.Open );
-                BinaryFormatter formatter = new BinaryFormatter();
-                CommandList = (List<ICommand>)formatter.Deserialize( stream );
+                CommandList = CommandSerializer.Deserialize( stream );
+            } catch( Newtonsoft.Json.JsonException error ) {
+                // Replay files written by older versions used BinaryFormatter, which .NET no longer supports.
+                Trace.TraceWarning( "LoadLog cannot read command log " + filePath + ": " + error.Message );
+                CommandList = new List<ICommand>();
             } catch( IOException ) {
                 // Do nothing but warn, ignoring errors.
                 Trace.TraceWarning( "LoadLog error reading command log " + filePath );
