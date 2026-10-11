@@ -28,13 +28,25 @@ namespace ORTS.Common
     public static class VersionInfo
     {
         /// <summary>Full version, e.g. stable: "1.4", testing: "T1.4-1-g1234567", unstable: "U2021.01.01-0000", local: ""</summary>
-        public static readonly string Version = GetVersion("OpenRails.exe");
+        public static readonly string Version = GetVersion(GetVersionFileName());
 
         /// <summary>Full build, e.g. "0.0.5223.24629 (2014-04-20 13:40:58Z)"</summary>
-        public static readonly string Build = GetBuild("OpenRails.exe");
+        public static readonly string Build = GetBuild(GetVersionFileName());
 
         /// <summary>Version, but if "", returns Build</summary>
         public static readonly string VersionOrBuild = GetVersionOrBuild();
+
+        /// <summary>
+        /// The file carrying the version: the Windows launcher OpenRails.exe, which doesn't exist on other platforms,
+        /// so there the version of this assembly (which is built with the same version) is used.
+        /// </summary>
+        static string GetVersionFileName()
+        {
+            const string launcher = "OpenRails.exe";
+            if (File.Exists(Path.Combine(ApplicationInfo.ProcessDirectory, launcher)))
+                return launcher;
+            return Path.GetFileName(typeof(VersionInfo).Assembly.Location);
+        }
 
         static string GetVersion(string fileName)
         {

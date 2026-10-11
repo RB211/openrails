@@ -112,13 +112,15 @@ namespace ORTS.Menu
                         // The first activity in Marias Pass is "Explore Longhale" which leads to a "Broken Path" message.
                         // The message then confuses users new to ORTS who have just installed it along with MSTS,
                         // see https://bugs.launchpad.net/or/+bug/1345172 and https://bugs.launchpad.net/or/+bug/128547
-                        if (!file.EndsWith(@"ROUTES\USA1\PATHS\aftstrm(traffic03).pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA1\PATHS\aftstrmtraffic01.pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA1\PATHS\aiphwne2.pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA1\PATHS\aiwnphex.pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA1\PATHS\blizzard(traffic).pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA2\PATHS\longhale.pat", StringComparison.OrdinalIgnoreCase)
-                            && !file.EndsWith(@"ROUTES\USA2\PATHS\long-haul west (blizzard).pat", StringComparison.OrdinalIgnoreCase)
+                        // Compare with '/' separators so that this works whatever the platform's separator.
+                        var normalizedFile = file.Replace('\\', '/');
+                        if (!normalizedFile.EndsWith("ROUTES/USA1/PATHS/aftstrm(traffic03).pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA1/PATHS/aftstrmtraffic01.pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA1/PATHS/aiphwne2.pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA1/PATHS/aiwnphex.pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA1/PATHS/blizzard(traffic).pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA2/PATHS/longhale.pat", StringComparison.OrdinalIgnoreCase)
+                            && !normalizedFile.EndsWith("ROUTES/USA2/PATHS/long-haul west (blizzard).pat", StringComparison.OrdinalIgnoreCase)
                             )
                         {
                             paths.Add(path);

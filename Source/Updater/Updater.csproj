@@ -12,6 +12,8 @@
     <Product>Open Rails</Product>
     <Copyright>Copyright © 2009 - 2022</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <!-- In-place updating is only supported on Windows. -->
+    <OrtsWindowsOnly>true</OrtsWindowsOnly>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <DocumentationFile>..\..\Program\Updater.xml</DocumentationFile>

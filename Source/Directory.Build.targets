@@ -1,0 +1,8 @@
+<Project>
+  <!--
+    Projects which only make sense on Windows set <OrtsWindowsOnly>true</OrtsWindowsOnly>.
+    On other platforms their build targets are replaced with no-ops, so that the whole solution
+    still builds there (e.g. on Linux, where you run Program/Menu directly instead of OpenRails.exe).
+  -->
+  <Import Project="WindowsOnly.targets" Condition="'$(OrtsWindowsOnly)' == 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))" />
+</Project>
