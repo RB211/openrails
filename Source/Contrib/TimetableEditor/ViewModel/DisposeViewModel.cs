@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
 using Orts.TimetableEditor.Model;
 
 namespace Orts.TimetableEditor.ViewModel

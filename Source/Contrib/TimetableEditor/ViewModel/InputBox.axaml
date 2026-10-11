@@ -1,0 +1,17 @@
+<Window x:Class="Orts.TimetableEditor.Views.InputBox"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="InputBox" CanResize="False" WindowStartupLocation="CenterOwner" SizeToContent="WidthAndHeight">
+    <Grid RowDefinitions="Auto,Auto,Auto,44" MinWidth="300" Margin="4">
+        <TextBlock x:Name="Question"/>
+        <TextBox Grid.Row="1" x:Name="Input" Margin="0 4"/>
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,*">
+            <CheckBox x:Name="HasValue" Content="Has Value" Margin="0 0 5 0" Click="HasValue_Click" IsChecked="False"/>
+            <TextBox Grid.Column="1" x:Name="InputValue" IsVisible="False"/>
+        </Grid>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="OK_Button" Width="70" Content="OK" Margin="30 0" Click="OK_Button_Click" IsDefault="True" HorizontalContentAlignment="Center"/>
+            <Button Width="70" Content="Cancel" IsCancel="True" Margin="30 0" Click="Cancel_Button_Click" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

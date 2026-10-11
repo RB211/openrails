@@ -1,0 +1,100 @@
+<Window x:Class="Orts.TimetableEditor.Views.TrainView"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Orts.TimetableEditor.Views"
+        Title="Consist" Width="1200" WindowStartupLocation="CenterOwner" SizeToContent="Height" CanResize="False"
+        RequestedThemeVariant="Light">
+    <Grid ColumnDefinitions="*,*,*" RowDefinitions="220,300,44">
+        <Border Background="LightGreen">
+            <Grid RowDefinitions="22,26,*" ColumnDefinitions="*,*,20">
+                <TextBlock Grid.ColumnSpan="2" Text="Paths (Double-Click to choose Path)" Margin="3 0"/>
+                <CheckBox Grid.Row="1" Content="normal paths" IsChecked="{Binding ShowNormalPaths}" Margin="3 0"/>
+                <CheckBox Grid.Row="1" Grid.Column="1" Content="siding paths" IsChecked="{Binding ShowSidingsPaths}"/>
+                <DataGrid x:Name="PathListView" Grid.Row="2" Grid.ColumnSpan="3" ItemsSource="{Binding TrainPathsSorted}" DoubleTapped="PathListView_MouseDoubleClick"
+                          SelectedItem="{Binding SelectedTrainPath}" Background="LightGreen" IsReadOnly="True" AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Filename" Width="180" Binding="{Binding FileName}"/>
+                        <DataGridTextColumn Header="Pathname" Width="190" Binding="{Binding Name}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+        <!--Second Column-->
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,26,26,*" ColumnDefinitions="100,*">
+            <TextBlock Text="Name" VerticalAlignment="Center" Margin="3 0"/>
+            <TextBox Grid.Column="1" Text="{Binding TrainName}"/>
+            <TextBlock Grid.Row="1" Text="Comment" VerticalAlignment="Center" Margin="3 0"/>
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Comment}"/>
+            <Border Grid.Row="2" Background="LightGreen">
+                <TextBlock Text="Path" VerticalAlignment="Center" Margin="3 0"/>
+            </Border>
+            <Border Grid.Row="2" Grid.Column="1" Background="LightGreen">
+                <TextBlock Text="{Binding ChosenTrainPath, Mode=TwoWay}" VerticalAlignment="Center"/>
+            </Border>
+            <Border Grid.Row="3" Background="LightSteelBlue">
+                <TextBlock Text="Consist" VerticalAlignment="Center" Margin="3 0"/>
+            </Border>
+            <Border Grid.Row="3" Grid.Column="1" Background="LightSteelBlue">
+                <CheckBox Content="multi" IsChecked="{Binding MultiConsist}"/>
+            </Border>
+            <Border Grid.Row="4" Background="LightSteelBlue">
+                <StackPanel IsVisible="{Binding MultiConsist}">
+                    <Button Width="32" Height="32" ToolTip.Tip="Move up" Command="{Binding MoveConsistUp}" Padding="2">
+                        <Image Width="24" Height="24" Source="/Images/Move_Up_24x24.png"/>
+                    </Button>
+                    <Button Width="32" Height="32" ToolTip.Tip="Remove" Command="{Binding RemoveConsist}" Padding="2">
+                        <Image Width="24" Height="24" Source="/Images/Remove_24x24.png"/>
+                    </Button>
+                    <Button Width="32" Height="32" ToolTip.Tip="Move Down" Command="{Binding MoveConsistsDown}" Padding="2">
+                        <Image Width="24" Height="24" Source="/Images/Move_Down_24x24.png"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+            <DataGrid Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Con}" SelectedIndex="{Binding SelectedConsistIndex}" Background="LightSteelBlue" AutoGenerateColumns="False">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="reverse" Binding="{Binding Reversed}" Width="85"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="200" IsReadOnly="True"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+        <!--Third Column-->
+        <Border Grid.Column="2" Background="LightSteelBlue">
+            <Grid RowDefinitions="22,26,*" ColumnDefinitions="*,*,20">
+                <TextBlock Grid.ColumnSpan="2" Text="Consists (Double Click to choose)" Margin="3 0"/>
+                <CheckBox Grid.Row="1" Content="Engines (+Wagons)" IsChecked="{Binding ShowEngines}" Margin="3 0"/>
+                <CheckBox Grid.Row="1" Grid.Column="1" Content="Wagons only" IsChecked="{Binding ShowWagons}"/>
+                <DataGrid x:Name="Consists_ListView" Grid.Row="2" Grid.ColumnSpan="3" ItemsSource="{Binding ConsistsSorted}" SelectedItem="{Binding SelectedConsist}"
+                          DoubleTapped="Consists_ListView_MouseDoubleClick" Background="LightSteelBlue" IsReadOnly="True" AutoGenerateColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Filename" Width="180" Binding="{Binding FileName}"/>
+                        <DataGridTextColumn Header="Consistname" Width="190" Binding="{Binding Name}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+        <Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="100,*,*" RowDefinitions="36,*">
+            <TextBlock Text="Start" VerticalAlignment="Center" Margin="3 0"/>
+            <Grid Grid.Column="1" ColumnDefinitions="*,*,*,*">
+                <TextBlock Text="Modus:" VerticalAlignment="Center"/>
+                <RadioButton Grid.Column="1" GroupName="start" IsChecked="{Binding ModusTime}" Content="Time" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="2" Text="{Binding StartTime}" IsVisible="{Binding ModusTime}" VerticalAlignment="Center"/>
+                <RadioButton Grid.Column="3" GroupName="start" Content="$static" IsChecked="{Binding ModusStatic}" VerticalAlignment="Center"/>
+            </Grid>
+            <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal">
+                <TextBlock Text="Command:" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding PossibleCommands}" SelectedItem="{Binding SelectedPossibleCommand}" Width="150" Margin="5 0" VerticalAlignment="Center"/>
+                <Button Width="32" Command="{Binding AddCommand}" ToolTip.Tip="Add Command" Padding="2" VerticalAlignment="Center">
+                    <Image Width="24" Height="24" Source="/Images/Add_24x24.png"/>
+                </Button>
+                <Button Width="32" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove Command" Padding="2" VerticalAlignment="Center">
+                    <Image Width="24" Height="24" Source="/Images/Remove_24x24.png"/>
+                </Button>
+            </StackPanel>
+            <local:CommandList Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"/>
+        </Grid>
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Width="70" Content="OK" Margin="50 0" x:Name="OK_Button" Click="OK_Button_Click" HorizontalContentAlignment="Center"/>
+            <Button Width="70" Content="Cancel" IsCancel="True" Margin="50 0" Click="Cancel_Button_Click" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

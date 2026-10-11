@@ -7,7 +7,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
 using Orts.TimetableEditor.Model;
 using System.Text.RegularExpressions;
 
@@ -556,9 +555,9 @@ namespace Orts.TimetableEditor.ViewModel
             return SelectedConsist != null;
         }
 
-        private void OnRemoveConsist()
+        private async void OnRemoveConsist()
         {
-            if (MessageBox.Show("Really?", "Remove Item", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (await Dialogs.AskYesNo("Really?", "Remove Item"))
             {
                 Con.RemoveAt(SelectedConsistIndex);
             }

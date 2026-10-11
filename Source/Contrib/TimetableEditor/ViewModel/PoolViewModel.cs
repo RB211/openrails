@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orts.TimetableEditor.Model;
 using System.IO;
-using System.Windows;
 using Orts.TimetableEditor.Views;
 
 namespace Orts.TimetableEditor.ViewModel
@@ -19,7 +18,7 @@ namespace Orts.TimetableEditor.ViewModel
         private ConsistsAndPaths _ConsAndPaths;
         private DataFile _selectedTrainPath;
         private string _chosenTrainPath;
-        private Visibility _ShowPathList;
+        private bool _ShowPathList;
         private string _RoutePath;
         private string _Filename;
         public ObservableCollection<PoolItem> PoolItems { get; set; }
@@ -40,7 +39,7 @@ namespace Orts.TimetableEditor.ViewModel
             InsertRow = new MyICommand(OnInsertRow, CanInsertRow);
             RemoveRow = new MyICommand(OnRemoveRow, CanRemoveRow);
             SaveCommand = new MyICommand(OnSaveCommand, CanSaveCommand);
-            ShowPathList = Visibility.Collapsed;
+            ShowPathList = false;
         }
 
         public bool TurntableMode
@@ -72,11 +71,11 @@ namespace Orts.TimetableEditor.ViewModel
                 {
                     if(SelectedItem.Name=="#access" ||  SelectedItem.Name=="#storage")
                     {
-                        ShowPathList = Visibility.Visible;
+                        ShowPathList = true;
                     }
                     else
                     {
-                        ShowPathList = Visibility.Collapsed;
+                        ShowPathList = false;
                     }
                 }
             } 
@@ -121,7 +120,7 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        public Visibility ShowPathList
+        public bool ShowPathList
         {
             get
             {
@@ -184,7 +183,7 @@ namespace Orts.TimetableEditor.ViewModel
 
         public void ReadPoolFile(string filename)
         {
-            RoutePath = Path.GetDirectoryName(filename)+"\\";
+            RoutePath = Path.GetDirectoryName(filename);
             //RoutePath = Path.GetFullPath(filename);
             Filename = Path.GetFileName(filename);
             string[] pool = File.ReadAllText(filename).Split('\n');
@@ -261,9 +260,9 @@ namespace Orts.TimetableEditor.ViewModel
             return true;
         }
 
-        private void OnRemoveRow()
+        private async void OnRemoveRow()
         {
-            if (MessageBox.Show("Do you really want to remove this row?", "Remove row", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (await Dialogs.AskYesNo("Do you really want to remove this row?", "Remove row"))
             {
                 PoolItems.Remove(SelectedItem);
             }
@@ -274,7 +273,7 @@ namespace Orts.TimetableEditor.ViewModel
             return SelectedItem != null;
         }
 
-        private void OnSaveCommand()
+        private async void OnSaveCommand()
         {
             if(Filename==null || Filename=="")
             {
@@ -285,19 +284,19 @@ namespace Orts.TimetableEditor.ViewModel
                 List<string> filter = new List<string>();
                 if (TurntableMode) filter.Add("*.turntable-or"); else filter.Add("*.pool-or");
                 osvm.ListFiles(RoutePath, filter);
-                if(osv.ShowDialog()==true)
+                if(await Dialogs.ShowDialog(osv) && !string.IsNullOrEmpty(osvm.Filename))
                 {
                     bool can = true;                    
-                    if (!TurntableMode && File.Exists(RoutePath + Path.GetFileNameWithoutExtension(osvm.Filename) + ".pool-or"))
+                    if (!TurntableMode && File.Exists(Path.Combine(RoutePath, Path.GetFileNameWithoutExtension(osvm.Filename) + ".pool-or")))
                     {
-                       if (MessageBox.Show("File already exists", "Overwrite File?", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                       if (!await Dialogs.AskYesNo("File already exists", "Overwrite File?"))
                        {
                            can = false;
                        }
                     }
-                    if (TurntableMode && File.Exists(RoutePath + Path.GetFileNameWithoutExtension(osvm.Filename) + ".turntable-or"))
+                    if (TurntableMode && File.Exists(Path.Combine(RoutePath, Path.GetFileNameWithoutExtension(osvm.Filename) + ".turntable-or")))
                     {
-                        if (MessageBox.Show("File already exists", "Overwrite File?", MessageBoxButton.YesNo) == MessageBoxResult.No)
+                        if (!await Dialogs.AskYesNo("File already exists", "Overwrite File?"))
                         {
                             can = false;
                         }
@@ -306,18 +305,18 @@ namespace Orts.TimetableEditor.ViewModel
                     {
                         if (TurntableMode)
                         {                            
-                            SavePoolFile(RoutePath + Path.GetFileNameWithoutExtension(osvm.Filename) + ".turntable-or");
+                            SavePoolFile(Path.Combine(RoutePath, Path.GetFileNameWithoutExtension(osvm.Filename) + ".turntable-or"));
                         }
                         else
                         {
-                            SavePoolFile(RoutePath + Path.GetFileNameWithoutExtension(osvm.Filename) + ".pool-or");
+                            SavePoolFile(Path.Combine(RoutePath, Path.GetFileNameWithoutExtension(osvm.Filename) + ".pool-or"));
                         }
                     }
                 }
             }
             else
             {
-                SavePoolFile(RoutePath+Filename);
+                SavePoolFile(Path.Combine(RoutePath, Filename));
             }
         }
 

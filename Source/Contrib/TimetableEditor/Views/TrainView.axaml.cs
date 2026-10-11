@@ -1,16 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Orts.TimetableEditor.Model;
 using Orts.TimetableEditor.ViewModel;
 
@@ -28,14 +18,20 @@ namespace Orts.TimetableEditor.Views
 
         private void OK_Button_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = true;
-            Close();
+            Close(true);
         }
 
-        private void Consists_ListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void Cancel_Button_Click(object sender, RoutedEventArgs e)
+        {
+            Close(false);
+        }
+
+        private void Consists_ListView_MouseDoubleClick(object sender, TappedEventArgs e)
         {
             TrainViewModel trainViewModel = this.DataContext as TrainViewModel;
-            if(trainViewModel.MultiConsist==false)
+            if (trainViewModel.SelectedConsist == null)
+                return;
+            if (trainViewModel.MultiConsist == false)
             {
                 trainViewModel.Con.Clear();
             }
@@ -45,10 +41,9 @@ namespace Orts.TimetableEditor.Views
                 conname = "<" + conname + ">";
             }
             trainViewModel.Con.Add(new Consist { Name = conname, Reversed = false });
-
         }
 
-        private void PathListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void PathListView_MouseDoubleClick(object sender, TappedEventArgs e)
         {
             TrainViewModel trainViewModel = this.DataContext as TrainViewModel;
             if (trainViewModel.SelectedTrainPath != null)

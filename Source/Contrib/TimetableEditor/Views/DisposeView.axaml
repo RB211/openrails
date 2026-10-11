@@ -1,0 +1,28 @@
+<Window x:Class="Orts.TimetableEditor.Views.DisposeView"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Orts.TimetableEditor.Views"
+        Title="DisposeView" Height="450" Width="800" CanResize="False" WindowStartupLocation="CenterOwner">
+    <Grid RowDefinitions="30,36,*" ColumnDefinitions="150,32,*">
+        <StackPanel Grid.ColumnSpan="3" Orientation="Horizontal">
+            <TextBlock Text="Dispose action:" Margin="3 0" VerticalAlignment="Center"/>
+            <RadioButton Content="$forms" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposeForms}"/>
+            <RadioButton Content="$triggers" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposeTriggers}"/>
+            <RadioButton Content="$static" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposeStatic}"/>
+            <RadioButton Content="$stable" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposeStable}"/>
+            <RadioButton Content="$pool" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposePool}"/>
+            <RadioButton Content="$attach" Margin="3 0" VerticalAlignment="Center" GroupName="dispose" IsChecked="{Binding DisposeAttach}"/>
+        </StackPanel>
+        <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal">
+            <TextBlock Text="Command:" VerticalAlignment="Center"/>
+            <ComboBox ItemsSource="{Binding PossibleCommands}" SelectedItem="{Binding SelectedPossibleCommand}" Width="150" Margin="5 0" VerticalAlignment="Center"/>
+            <Button Width="32" Command="{Binding AddCommand}" ToolTip.Tip="Add Command" Padding="2" VerticalAlignment="Center">
+                <Image Width="24" Height="24" Source="/Images/Add_24x24.png"/>
+            </Button>
+            <Button Width="32" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove Command" Padding="2" VerticalAlignment="Center">
+                <Image Width="24" Height="24" Source="/Images/Remove_24x24.png"/>
+            </Button>
+        </StackPanel>
+        <local:CommandList Grid.Row="2" Grid.ColumnSpan="3"/>
+    </Grid>
+</Window>

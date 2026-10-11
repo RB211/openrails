@@ -1,17 +1,9 @@
-﻿<Window x:Class="Orts.TimetableEditor.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<Window x:Class="Orts.TimetableEditor.MainWindow"
+        xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Orts.TimetableEditor"
         xmlns:Views="clr-namespace:Orts.TimetableEditor.Views"
-        mc:Ignorable="d"
         Title="Open Rails Timetable Editor" Height="450" Width="800" WindowState="Maximized">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Grid RowDefinitions="Auto,*">
         <Menu>
             <MenuItem Header="File">
                 <MenuItem Header="New Timetable" Click="Menu_NewTimetable"/>
@@ -24,7 +16,7 @@
                 <Separator/>
                 <MenuItem Header="Close Timetable" Click="Menu_CloseTimetable" x:Name="Menu_CloseTT" IsEnabled="False"/>
                 <Separator/>
-                <MenuItem Header="Zip Timetable" Click="Menu_Zip_Timetable" x:Name="Menu_ZipTimetable" IsEnabled="False" Visibility="Collapsed"/>
+                <MenuItem Header="Zip Timetable" Click="Menu_Zip_Timetable" x:Name="Menu_ZipTimetable" IsEnabled="False" IsVisible="False"/>
                 <Separator/>
                 <MenuItem Header="Close" Click="Close_Click"/>
             </MenuItem>
@@ -37,6 +29,6 @@
                 <MenuItem Header="Open" Click="Open_Pool_CLick"/>
             </MenuItem>
         </Menu>
-        <Views:MainView Grid.Row="1" x:Name="MainView"/>       
+        <Views:MainView Grid.Row="1" x:Name="MainView"/>
     </Grid>
 </Window>

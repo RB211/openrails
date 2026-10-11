@@ -1,0 +1,40 @@
+<UserControl x:Class="Orts.TimetableEditor.Views.Table"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid RowDefinitions="Auto,*">
+        <WrapPanel>
+            <Button Width="40" Height="40" Command="{Binding AddRow}" ToolTip.Tip="Add Row">
+                <Image Width="32" Height="32" Source="/Images/RowAdd.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding InsertRow}" ToolTip.Tip="Insert Row">
+                <Image Width="32" Height="32" Source="/Images/RowInsert.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding DeleteRow}" ToolTip.Tip="Delete Row">
+                <Image Width="32" Height="32" Source="/Images/RowDelete.png"/>
+            </Button>
+            <Button x:Name="AddColButton" Width="40" Height="40" Command="{Binding AddCol}" ToolTip.Tip="Add Column">
+                <Image Width="32" Height="32" Source="/Images/ColumnAdd.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding InsertCol}" ToolTip.Tip="Insert Column">
+                <Image Width="32" Height="32" Source="/Images/ColumnInsert.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding DeleteCol}" ToolTip.Tip="Delete Column">
+                <Image Width="32" Height="32" Source="/Images/ColumnDelete.png"/>
+            </Button>
+            <TextBlock Margin="10 0 0 0" Text="{Binding CurrentColumnIndexText}" Width="20" TextAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock Margin="0 0 10 0" Text="{Binding CurrentRowIndex}" Width="20" VerticalAlignment="Center"/>
+            <Button Width="40" Height="40" Command="{Binding EditStations}" Margin="3 0" ToolTip.Tip="Edit Stations">
+                <Image Width="32" Height="32" Source="/Images/Station.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding EditTrain}" Margin="3 0" ToolTip.Tip="Edit Train">
+                <Image Width="32" Height="32" Source="/Images/train.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding Dispose}" Margin="3 0" ToolTip.Tip="Dispose">
+                <Image Width="32" Height="32" Source="/Images/Dispose_32x32.png"/>
+            </Button>
+        </WrapPanel>
+        <DataGrid x:Name="dataGrid" Grid.Row="1" AutoGenerateColumns="False" CanUserSortColumns="False" CanUserReorderColumns="False"
+                  FrozenColumnCount="2" GridLinesVisibility="All" SelectionMode="Single"
+                  CurrentCellChanged="dataGrid_SelectedCellsChanged" KeyDown="dataGrid_KeyDown"/>
+    </Grid>
+</UserControl>

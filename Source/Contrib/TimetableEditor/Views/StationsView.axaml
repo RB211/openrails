@@ -1,0 +1,36 @@
+<Window x:Class="Orts.TimetableEditor.Views.StationsView"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="StationsView" CanResize="False" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner">
+    <Grid ColumnDefinitions="200,200,200" RowDefinitions="24,300,Auto,44" Margin="4">
+        <TextBlock Text="Stationfiles"/>
+        <TextBlock Text="Stations" Grid.Column="1"/>
+        <ListBox Grid.Row="1" ItemsSource="{Binding StationFiles}" SelectedItem="{Binding SelectedStationFile}"/>
+        <ListBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Stations}" SelectedItem="{Binding SelectedStation}"/>
+        <StackPanel Grid.Row="1" Grid.Column="2" IsVisible="{Binding ShowNewStationsButton}" Margin="4 0">
+            <TextBlock Text="Choose a stationfile or create a new one" TextWrapping="Wrap"/>
+            <Button Content="create New" Command="{Binding NewStationFile}" Margin="0 4"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Grid.Row="1" IsVisible="{Binding ShowAdjustStationsButtons}" Margin="4 0">
+            <Button Width="40" Height="40" Command="{Binding MoveStationUp}" Margin="0 40 0 0">
+                <Image Width="32" Height="32" Source="/Images/Move_Up_32x32.png"/>
+            </Button>
+            <Button Width="40" Height="40" Command="{Binding MoveStationDown}">
+                <Image Width="32" Height="32" Source="/Images/Move_Down_32x32.png"/>
+            </Button>
+            <WrapPanel Margin="0 40 0 0">
+                <TextBlock Text="Filename " VerticalAlignment="Center"/>
+                <TextBox Text="{Binding TTFileName}" Width="170"/>
+            </WrapPanel>
+            <Button Content="Save" Width="70" Margin="0 5 0 0" Command="{Binding SaveNewStationFile}" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+        <WrapPanel Grid.Row="2" Grid.ColumnSpan="3" HorizontalAlignment="Center" Margin="0 4">
+            <TextBlock Text="Timetable name " VerticalAlignment="Center"/>
+            <TextBox Text="{Binding TTName, Mode=TwoWay}" Width="150"/>
+        </WrapPanel>
+        <StackPanel Orientation="Horizontal" Grid.Row="3" Grid.ColumnSpan="3" HorizontalAlignment="Center">
+            <Button Width="70" Content="OK" Margin="40 0" Click="OK_Click" Command="{Binding StationsOK}" HorizontalContentAlignment="Center"/>
+            <Button Width="70" Content="Cancel" Margin="40 0" IsCancel="True" Click="Cancel_Click" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

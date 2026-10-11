@@ -1,0 +1,14 @@
+<Window x:Class="Orts.TimetableEditor.Views.OpenSaveView"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OpenSaveView" CanResize="False" SizeToContent="WidthAndHeight" WindowStartupLocation="CenterOwner">
+    <Grid ColumnDefinitions="70,250" RowDefinitions="250,Auto,Auto" Margin="4">
+        <ListBox Grid.ColumnSpan="2" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFileName}" DoubleTapped="Files_DoubleTapped"/>
+        <TextBlock Grid.Row="1" Text="Filename: " VerticalAlignment="Center"/>
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Filename}" Margin="0 4"/>
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button x:Name="OK_Button" Content="{Binding OKButtonText}" Width="80" Margin="30 10" Command="{Binding OKClick}" Click="OK_Button_Click" IsDefault="True" HorizontalContentAlignment="Center"/>
+            <Button x:Name="Cancel_Button" Content="Cancel" Width="80" Margin="30 10" IsCancel="True" Click="Cancel_Button_Click" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>
