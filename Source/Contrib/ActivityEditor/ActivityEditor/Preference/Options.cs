@@ -1,337 +1,431 @@
-﻿using System;
+//
+// This file is part of Open Rails.
+//
+// Open Rails is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Open Rails is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
+
+using System;
 using System.IO;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Windows.Forms;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Platform.Storage;
 using LibAE.Formats;
 using ActivityEditor.ActionProperties;
 using Orts.Formats.OR;
 
 namespace ActivityEditor.Preference
 {
-    public partial class Options : Form
+    public partial class Options : Window
     {
         List<string> routePaths;
+
+        CheckBox checkBox1, ShowSnap, ShowLabelPlat, showTiles, snapTrack, SnapInfo, showRuler, snapLine, trackInfo;
+        NumericUpDown snapCircle, PlSiZoomLevel;
+        TextBlock snapCircleLabel, PlSiLabel;
+        TextBox MSTSPath, AEPath, CommentAction;
+        ListBox ListRoutePaths, ListAvailable, ListUsed;
+        Button RemoveRoutePaths;
 
         public Options()
         {
             InitializeComponent();
             Program.aePreference.UpdateConfig();
-            this.checkBox1.Checked = Program.aePreference.ShowAllSignal;
-            this.ShowSnap.Checked = Program.aePreference.ShowSnapCircle;
-            this.ShowLabelPlat.Checked = Program.aePreference.ShowPlSiLabel;
+            this.checkBox1.IsChecked = Program.aePreference.ShowAllSignal;
+            this.ShowSnap.IsChecked = Program.aePreference.ShowSnapCircle;
+            this.ShowLabelPlat.IsChecked = Program.aePreference.ShowPlSiLabel;
             this.MSTSPath.Text = Program.aePreference.MSTSPath;
             this.AEPath.Text = Program.aePreference.AEPath;
-            ListRoutePaths.DataSource = Program.aePreference.RoutePaths;
+            ListRoutePaths.ItemsSource = Program.aePreference.RoutePaths.ToList();
             routePaths = new List<string> ();
-            this.showTiles.Checked = Program.aePreference.ShowTiles;
-            this.snapTrack.Checked = Program.aePreference.ShowSnapLine;
-            this.SnapInfo.Checked = Program.aePreference.ShowSnapInfo;
-            this.showRuler.Checked = Program.aePreference.ShowRuler;
-            this.snapLine.Checked = Program.aePreference.ShowSnapLine;
-            this.trackInfo.Checked = Program.aePreference.ShowTrackInfo;
-            this.ListAvailable.DataSource = Program.aePreference.AvailableActions;
-            this.ListUsed.DataSource = Program.aePreference.UsedActions;
-        }
-        
-        private void DrawOnTab(object sender, DrawItemEventArgs e)
-        {
-            Font font;
-            Brush back_brush;
-            Brush fore_brush;
-            Rectangle bounds = e.Bounds;
-
-            this.tabControl1.Controls[e.Index].BackColor = Color.Silver;
-            if (e.Index == this.tabControl1.SelectedIndex)
-            {
-                font = new Font(e.Font, e.Font.Style);
-                back_brush = new SolidBrush(Color.DimGray);
-                fore_brush = new SolidBrush(Color.White);
-                bounds = new Rectangle(bounds.X + (this.tabControl1.Padding.X / 2), 
-                    bounds.Y + this.tabControl1.Padding.Y, 
-                    bounds.Width - this.tabControl1.Padding.X, 
-                    bounds.Height - (this.tabControl1.Padding.Y * 2));
-            }
-            else
-            {
-                font = new Font(e.Font, e.Font.Style & ~FontStyle.Bold);
-                back_brush = new SolidBrush(this.tabControl1.TabPages[e.Index].BackColor);
-                fore_brush = new SolidBrush(this.tabControl1.TabPages[e.Index].ForeColor);
-            }
-            string tab_name = this.tabControl1.TabPages[e.Index].Text;
-            StringFormat sf = new StringFormat();
-            sf.Alignment = StringAlignment.Center;
-            sf.LineAlignment = StringAlignment.Center;
-            e.Graphics.FillRectangle(back_brush, bounds);
-            e.Graphics.DrawString(tab_name, font, fore_brush, bounds, sf);
-            /*
-            Brush background_brush = new SolidBrush(Color.DodgerBlue);
-            Rectangle LastTabRect = this.tabControl1.GetTabRect(this.tabControl1.TabPages.Count - 1);
-            Rectangle rect = new Rectangle();
-            rect.Location = new Point(LastTabRect.Right + this.Left, this.Top);
-            rect.Size = new Size(this.Right - rect.Left, LastTabRect.Height);
-            e.Graphics.FillRectangle(background_brush, rect);
-            background_brush.Dispose();
-            sf.Dispose();
-            back_brush.Dispose();
-            fore_brush.Dispose();
-            font.Dispose();
-             */
+            this.showTiles.IsChecked = Program.aePreference.ShowTiles;
+            this.snapTrack.IsChecked = Program.aePreference.ShowSnapLine;
+            this.SnapInfo.IsChecked = Program.aePreference.ShowSnapInfo;
+            this.showRuler.IsChecked = Program.aePreference.ShowRuler;
+            this.snapLine.IsChecked = Program.aePreference.ShowSnapLine;
+            this.trackInfo.IsChecked = Program.aePreference.ShowTrackInfo;
+            this.ListAvailable.ItemsSource = Program.aePreference.AvailableActions.ToList();
+            this.ListUsed.ItemsSource = Program.aePreference.UsedActions.ToList();
+            CheckedChanged(null, null);
+            PlSiShow(null, null);
+            HookEvents();
         }
 
-        private void browseMSTSPath_Click(object sender, EventArgs e)
+        static CheckBox Check(string text)
         {
-            if (MSTSfolderBrowse.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            return new CheckBox { Content = text };
+        }
+
+        void InitializeComponent()
+        {
+            Title = "Options";
+            Width = 560;
+            Height = 380;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            // Editor Options
+            checkBox1 = Check("Show all Signal");
+            ShowSnap = Check("Show Snap circle");
+            ShowLabelPlat = Check("Show Platform Label");
+            snapCircleLabel = new TextBlock { Text = "Size of snap circle :", VerticalAlignment = VerticalAlignment.Center };
+            snapCircle = new NumericUpDown { Minimum = 2, Maximum = 20, Value = 10, Increment = 1, Width = 120, FormatString = "0" };
+            PlSiLabel = new TextBlock { Text = "Zoom level :", VerticalAlignment = VerticalAlignment.Center };
+            PlSiZoomLevel = new NumericUpDown { Minimum = 0.25m, Maximum = 1.5m, Value = 1, Increment = 0.05m, Width = 120, FormatString = "0.00" };
+            var editorOptions = new StackPanel
             {
-                string path = MSTSfolderBrowse.SelectedPath;
+                Margin = new Thickness(8),
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = "Editor Preference", FontSize = 16 },
+                    checkBox1,
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { ShowSnap, snapCircleLabel, snapCircle } },
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { ShowLabelPlat, PlSiLabel, PlSiZoomLevel } },
+                },
+            };
+
+            // Path Options
+            MSTSPath = new TextBox { Width = 300 };
+            var browseMSTSPath = new Button { Content = "Browse" };
+            browseMSTSPath.Click += browseMSTSPath_Click;
+            ListRoutePaths = new ListBox { Height = 110 };
+            var AddRoutePaths = new Button { Content = "Add", Width = 75 };
+            AddRoutePaths.Click += AddRoutePaths_Click;
+            RemoveRoutePaths = new Button { Content = "Remove", Width = 75 };
+            RemoveRoutePaths.Click += RemoveRoutePaths_Click;
+            AEPath = new TextBox { Width = 300, IsReadOnly = true };
+            var pathOptions = new StackPanel
+            {
+                Margin = new Thickness(8),
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = "Please, configure your paths", FontSize = 16 },
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = "MSTS Path :", Width = 100, VerticalAlignment = VerticalAlignment.Center }, MSTSPath, browseMSTSPath } },
+                    new TextBlock { Text = "Route Paths" },
+                    new Grid
+                    {
+                        ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                        Children =
+                        {
+                            ListRoutePaths,
+                            WithColumn(new StackPanel { Spacing = 4, Margin = new Thickness(6, 0, 0, 0), Children = { AddRoutePaths, RemoveRoutePaths } }, 1),
+                        },
+                    },
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { new TextBlock { Text = "Activity Editor", Width = 100, VerticalAlignment = VerticalAlignment.Center }, AEPath } },
+                },
+            };
+
+            // Debug Options
+            showTiles = Check("Show Tiles");
+            trackInfo = Check("Show Track Info");
+            showRuler = Check("Show Ruler");
+            snapLine = Check("Show Snap Line");
+            SnapInfo = Check("Show Snap Info");
+            snapTrack = Check("Show Snap Track Info");
+            var debugOptions = new StackPanel
+            {
+                Margin = new Thickness(8),
+                Spacing = 6,
+                Children = { new TextBlock { Text = "Editor Preference", FontSize = 16 }, showTiles, trackInfo, showRuler, snapLine, SnapInfo, snapTrack },
+            };
+
+            // Actions Configuration
+            ListAvailable = new ListBox { Height = 160 };
+            ListAvailable.Tapped += ShowCommentAvailable;
+            ListUsed = new ListBox { Height = 160 };
+            ListUsed.Tapped += ShowCommentUsed;
+            ListUsed.DoubleTapped += EditProperties;
+            ListUsed.PointerReleased += MouseDownUsed;
+            var AddAction = new Button { Content = "Add >" };
+            AddAction.Click += AddToUsed;
+            var RemoveAction = new Button { Content = "< remove" };
+            RemoveAction.Click += RemoveFromUsed;
+            CommentAction = new TextBox { IsReadOnly = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Height = 50 };
+            var actionsOptions = new StackPanel
+            {
+                Margin = new Thickness(8),
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = "Configuration for Generic Auxiliary Actions", FontSize = 16 },
+                    new Grid
+                    {
+                        ColumnDefinitions = new ColumnDefinitions("*,Auto,*"),
+                        Children =
+                        {
+                            ListAvailable,
+                            WithColumn(new StackPanel { Spacing = 4, Margin = new Thickness(6, 0), VerticalAlignment = VerticalAlignment.Center, Children = { AddAction, RemoveAction } }, 1),
+                            WithColumn(ListUsed, 2),
+                        },
+                    },
+                    CommentAction,
+                },
+            };
+
+            var tabControl1 = new TabControl();
+            tabControl1.Items.Add(new TabItem { Header = "Editor Options", Content = editorOptions, FontSize = 15 });
+            tabControl1.Items.Add(new TabItem { Header = "Path Options", Content = pathOptions, FontSize = 15 });
+            tabControl1.Items.Add(new TabItem { Header = "Debug Options", Content = debugOptions, FontSize = 15 });
+            tabControl1.Items.Add(new TabItem { Header = "Actions Configuration", Content = actionsOptions, FontSize = 15 });
+
+            var OptionOK = new Button { Content = "OK", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(8) };
+            OptionOK.Click += optionOK_click;
+            DockPanel.SetDock(OptionOK, Dock.Bottom);
+            Content = new DockPanel { Children = { OptionOK, tabControl1 } };
+        }
+
+        void HookEvents()
+        {
+            checkBox1.IsCheckedChanged += checkBox1_CheckedChanged;
+            ShowSnap.IsCheckedChanged += CheckedChanged;
+            ShowLabelPlat.IsCheckedChanged += PlSiShow;
+            snapCircle.ValueChanged += snapCircle_ValueChanged;
+            PlSiZoomLevel.ValueChanged += PlSiValue;
+            showTiles.IsCheckedChanged += showTiles_CheckedChanged;
+            snapTrack.IsCheckedChanged += snapTrack_CheckedChanged;
+            SnapInfo.IsCheckedChanged += SnapInfo_CheckedChanged;
+            showRuler.IsCheckedChanged += showRuler_CheckedChanged;
+            snapLine.IsCheckedChanged += snapLine_CheckedChanged;
+            trackInfo.IsCheckedChanged += trackInfo_changed;
+        }
+
+        static Control WithColumn(Control control, int column)
+        {
+            Grid.SetColumn(control, column);
+            return control;
+        }
+
+        async Task<string> BrowseFolder(string title)
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title, AllowMultiple = false });
+            return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        }
+
+        void RefreshRoutePaths()
+        {
+            ListRoutePaths.ItemsSource = Program.aePreference.RoutePaths.ToList();
+            RemoveRoutePaths.IsEnabled = Program.aePreference.RoutePaths.Count > 0;
+        }
+
+        private async void browseMSTSPath_Click(object sender, RoutedEventArgs e)
+        {
+            string path = await BrowseFolder("Select the MSTS folder");
+            if (path != null)
+            {
                 MSTSPath.Text = path;
                 Program.aePreference.MSTSPath = path;
-                string completeFileName = Path.Combine(path, "routes");
+                string completeFileName = LibAE.PathCase.Combine(path, "routes");
                 if (Directory.Exists(completeFileName))
                 {
                     Program.aePreference.RoutePaths.Add(completeFileName);
-                    ListRoutePaths.DataSource = null;
-                    ListRoutePaths.DataSource = Program.aePreference.RoutePaths;
-                    RemoveRoutePaths.Enabled = true;
-
+                    RefreshRoutePaths();
                 }
             }
         }
 
-        private void AddRoutePaths_Click(object sender, EventArgs e)
+        private async void AddRoutePaths_Click(object sender, RoutedEventArgs e)
         {
-            if (MSTSfolderBrowse.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            string path = await BrowseFolder("Select a Routes folder");
+            if (path != null)
             {
-                string path = MSTSfolderBrowse.SelectedPath;
                 Program.aePreference.RoutePaths.Add(path);
-                ListRoutePaths.DataSource = null;
-                ListRoutePaths.DataSource = Program.aePreference.RoutePaths;
-                RemoveRoutePaths.Enabled = true;
+                RefreshRoutePaths();
             }
         }
 
-        private void RemoveRoutePaths_Click(object sender, EventArgs e)
+        private void RemoveRoutePaths_Click(object sender, RoutedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListRoutePaths.SelectedIndex;
+            int selected = ListRoutePaths.SelectedIndex;
             if (selected >= 0)
             {
                 Program.aePreference.RoutePaths.RemoveAt(selected);
-                ListRoutePaths.DataSource = null;
-                ListRoutePaths.DataSource = Program.aePreference.RoutePaths;
             }
-            if (routePaths.Count < 1)
-            {
-                RemoveRoutePaths.Enabled = false;
-                return;
-            }
+            RefreshRoutePaths();
         }
 
-        private void configureRoutePath ()
+        private void checkBox1_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            if (Program.aePreference.RoutePaths.Count <= 0)
-            {
-                this.ListRoutePaths.DataSource = null;
-                RemoveRoutePaths.Enabled = false;
-            }
-            else
-            {
-                this.ListRoutePaths.DataSource = Program.aePreference.RoutePaths;
-                RemoveRoutePaths.Enabled = true;
-            }
+            Program.aePreference.ShowAllSignal = checkBox1.IsChecked == true;
         }
 
-        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        private void CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowAllSignal = checkBox1.Checked;
+            bool show = ShowSnap.IsChecked == true;
+            this.snapCircle.IsEnabled = show;
+            this.snapCircleLabel.IsEnabled = show;
+            this.snapCircle.Value = Program.aePreference.getSnapCircle() > 0 ? Program.aePreference.getSnapCircle() : 2;
+            Program.aePreference.ShowSnapCircle = show;
         }
 
-        private void CheckedChanged(object sender, EventArgs e)
+        private void PlSiShow(object sender, RoutedEventArgs e)
         {
-            this.snapCircle.Enabled = ShowSnap.Checked;
-            this.snapCircleLabel.Enabled = ShowSnap.Checked;
-            this.snapCircle.Value = Program.aePreference.getSnapCircle()>0?Program.aePreference.getSnapCircle():2;
-            Program.aePreference.ShowSnapCircle = ShowSnap.Checked;
-        }
-
-        private void PlSiShow(object sender, EventArgs e)
-        {
-            this.PlSiZoomLevel.Enabled = ShowLabelPlat.Checked;
-            this.PlSiLabel.Enabled = ShowLabelPlat.Checked;
+            bool show = ShowLabelPlat.IsChecked == true;
+            this.PlSiZoomLevel.IsEnabled = show;
+            this.PlSiLabel.IsEnabled = show;
             this.PlSiZoomLevel.Value = (decimal)(Program.aePreference.getPlSiZoom() > 0 ? Program.aePreference.getPlSiZoom() : 1);
-            Program.aePreference.ShowPlSiLabel = ShowLabelPlat.Checked;
-            Program.aePreference.PlSiZoom = (float)this.PlSiZoomLevel.Value;
+            Program.aePreference.ShowPlSiLabel = show;
+            Program.aePreference.PlSiZoom = (float)(this.PlSiZoomLevel.Value ?? 1);
         }
 
-        private void snapCircle_ValueChanged(object sender, EventArgs e)
+        private void snapCircle_ValueChanged(object sender, NumericUpDownValueChangedEventArgs e)
         {
-            Program.aePreference.setSnapCircle((int)((NumericUpDown)sender).Value);
+            Program.aePreference.setSnapCircle((int)(snapCircle.Value ?? 2));
         }
 
-        private void PlSiValue(object sender, EventArgs e)
+        private void PlSiValue(object sender, NumericUpDownValueChangedEventArgs e)
         {
-            Program.aePreference.setPlSiZoom((float)((NumericUpDown)sender).Value);
-            this.PlSiZoomLevel.Value = (decimal)(Program.aePreference.getPlSiZoom() > 0 ? Program.aePreference.getPlSiZoom() : 1);
+            Program.aePreference.setPlSiZoom((float)(PlSiZoomLevel.Value ?? 1));
         }
 
-        private void showTiles_CheckedChanged(object sender, EventArgs e)
+        private void showTiles_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowTiles = showTiles.Checked;
+            Program.aePreference.ShowTiles = showTiles.IsChecked == true;
         }
 
-        private void snapTrack_CheckedChanged(object sender, EventArgs e)
+        private void snapTrack_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowSnapLine = snapTrack.Checked;
+            Program.aePreference.ShowSnapLine = snapTrack.IsChecked == true;
         }
 
-        private void SnapInfo_CheckedChanged(object sender, EventArgs e)
+        private void SnapInfo_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowSnapInfo = SnapInfo.Checked;
+            Program.aePreference.ShowSnapInfo = SnapInfo.IsChecked == true;
         }
 
-        private void showRuler_CheckedChanged(object sender, EventArgs e)
+        private void showRuler_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowRuler = showRuler.Checked;
+            Program.aePreference.ShowRuler = showRuler.IsChecked == true;
         }
-        private void optionOK_click(object sender, EventArgs e)
+
+        private void optionOK_click(object sender, RoutedEventArgs e)
         {
             Close();
-            Program.aePreference.ShowAllSignal = this.checkBox1.Checked ;
-            Program.aePreference.ShowSnapCircle = this.ShowSnap.Checked;
-            Program.aePreference.ShowPlSiLabel = this.ShowLabelPlat.Checked;
-            Program.aePreference.MSTSPath = this.MSTSPath.Text;
-            //Program.aePreference.AEPath = this.AEPath.Text;
-            Program.aePreference.ShowTiles = this.showTiles.Checked;
-            Program.aePreference.ShowSnapLine = this.snapTrack.Checked;
-            Program.aePreference.ShowSnapInfo = this.SnapInfo.Checked;
-            Program.aePreference.ShowRuler = this.showRuler.Checked;
-            Program.aePreference.ShowSnapLine = snapLine.Checked;
-            Program.aePreference.ShowTrackInfo = this.trackInfo.Checked;
+            Program.aePreference.ShowAllSignal = this.checkBox1.IsChecked == true;
+            Program.aePreference.ShowSnapCircle = this.ShowSnap.IsChecked == true;
+            Program.aePreference.ShowPlSiLabel = this.ShowLabelPlat.IsChecked == true;
+            Program.aePreference.MSTSPath = this.MSTSPath.Text ?? "";
+            Program.aePreference.ShowTiles = this.showTiles.IsChecked == true;
+            Program.aePreference.ShowSnapLine = this.snapTrack.IsChecked == true;
+            Program.aePreference.ShowSnapInfo = this.SnapInfo.IsChecked == true;
+            Program.aePreference.ShowRuler = this.showRuler.IsChecked == true;
+            Program.aePreference.ShowSnapLine = snapLine.IsChecked == true;
+            Program.aePreference.ShowTrackInfo = this.trackInfo.IsChecked == true;
             Program.aePreference.saveXml();
         }
 
-        private void snapLine_CheckedChanged(object sender, EventArgs e)
+        private void snapLine_CheckedChanged(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowSnapLine = snapLine.Checked;
+            Program.aePreference.ShowSnapLine = snapLine.IsChecked == true;
         }
 
-        private void trackInfo_changed(object sender, EventArgs e)
+        private void trackInfo_changed(object sender, RoutedEventArgs e)
         {
-            Program.aePreference.ShowTrackInfo = trackInfo.Checked;
+            Program.aePreference.ShowTrackInfo = trackInfo.IsChecked == true;
         }
 
-        private void AddToUsed(object sender, EventArgs e)
+        private void AddToUsed(object sender, RoutedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListAvailable.SelectedIndex;
+            int selected = ListAvailable.SelectedIndex;
             if (selected >= 0)
             {
                 Program.aePreference.AddGenAction(Program.aePreference.AvailableActions[selected]);
-                ListUsed.DataSource = null;
-                ListUsed.DataSource = Program.aePreference.UsedActions;
-
-            }
-            if (routePaths.Count < 1)
-            {
-                return;
+                ListUsed.ItemsSource = Program.aePreference.UsedActions.ToList();
             }
         }
 
-        private void RemoveFromUsed(object sender, EventArgs e)
+        private void RemoveFromUsed(object sender, RoutedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListUsed.SelectedIndex;
+            int selected = ListUsed.SelectedIndex;
             if (selected >= 0)
             {
                 Program.aePreference.RemoveGenAction(selected);
-                ListUsed.DataSource = null;
-                ListUsed.DataSource = Program.aePreference.UsedActions;
-
-            }
-            if (routePaths.Count < 1)
-            {
-                return;
+                ListUsed.ItemsSource = Program.aePreference.UsedActions.ToList();
             }
         }
 
-        public void EditProperties(object sender, EventArgs e)
+        public async void EditProperties(object sender, RoutedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListUsed.SelectedIndex;
+            int selected = ListUsed.SelectedIndex;
             if (selected >= 0)
             {
                 AuxActionRef action = Program.aePreference.GetAction(selected);
                 if (action != null)
                 {
-                    if (action.GetType() == typeof(AuxActionHorn))
-                        EditHornProperties(action);
-                    else if (action.GetType() == typeof(AuxControlStart))
-                        EditControlStartProperties(action);
+                    await EditActionProperties(action);
                 }
             }
         }
 
-        public void EditHornProperties(AuxActionRef action)
+        async Task EditActionProperties(AuxActionRef action)
         {
-            HornProperties hornProperties = new HornProperties(action);
-            hornProperties.ShowDialog();
-            ((AuxActionHorn)action).SaveProperties(hornProperties.Action);
-
+            if (action.GetType() == typeof(AuxActionHorn))
+                await EditHornProperties(action);
+            else if (action.GetType() == typeof(AuxControlStart))
+                await EditControlStartProperties(action);
         }
 
-        public void EditControlStartProperties(AuxActionRef action)
+        public async Task EditHornProperties(AuxActionRef action)
+        {
+            HornProperties hornProperties = new HornProperties(action);
+            await Dialogs.ShowDialog(hornProperties);
+            ((AuxActionHorn)action).SaveProperties(hornProperties.Action);
+        }
+
+        public async Task EditControlStartProperties(AuxActionRef action)
         {
             ControlStartProperties controlStartProperties = new ControlStartProperties(action);
-            controlStartProperties.ShowDialog();
+            await Dialogs.ShowDialog(controlStartProperties);
             ((AuxControlStart)action).SaveProperties(controlStartProperties.Action);
         }
 
-        public void ShowCommentUsed(object sender, EventArgs e)
+        public void ShowCommentUsed(object sender, RoutedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListUsed.SelectedIndex;
+            int selected = ListUsed.SelectedIndex;
+            if (selected >= 0 && selected < Program.aePreference.AvailableActions.Count)
+            {
+                CommentAction.Text = Program.aePreference.GetComment(Program.aePreference.AvailableActions[selected]);
+            }
+        }
+
+        public void ShowCommentAvailable(object sender, RoutedEventArgs e)
+        {
+            int selected = ListAvailable.SelectedIndex;
             if (selected >= 0)
             {
                 CommentAction.Text = Program.aePreference.GetComment(Program.aePreference.AvailableActions[selected]);
             }
         }
 
-        public void ShowCommentAvailable(object sender, EventArgs e)
+        private async void MouseDownUsed(object sender, PointerReleasedEventArgs e)
         {
-            int selected = -1;
-            //  Trouver le sélectionné
-            selected = ListAvailable.SelectedIndex;
-            if (selected >= 0)
-            {
-                CommentAction.Text = Program.aePreference.GetComment(Program.aePreference.AvailableActions[selected]);
-            }
-        }
-
-        private void MouseDownUsed(object sender, MouseEventArgs e)
-        {
-            ListUsed.SelectedIndex = ListUsed.IndexFromPoint(e.X, e.Y);
+            // Right click on a used action edits its properties.
+            if (e.InitialPressMouseButton != MouseButton.Right)
+                return;
             int index = ListUsed.SelectedIndex;
-
-            if (e.Button == System.Windows.Forms.MouseButtons.Right)
-            {
+            if (index < 0)
+                return;
+            if (index < Program.aePreference.AvailableActions.Count)
                 CommentAction.Text = Program.aePreference.GetComment(Program.aePreference.AvailableActions[index]);
-                AuxActionRef action = Program.aePreference.GetAction(index);
-                if (action != null)
-                {
-                    if (action.GetType() == typeof(AuxActionHorn))
-                        EditHornProperties(action);
-                    else if (action.GetType() == typeof(AuxControlStart))
-                        EditControlStartProperties(action);
-                }
+            AuxActionRef action = Program.aePreference.GetAction(index);
+            if (action != null)
+            {
+                await EditActionProperties(action);
             }
         }
 

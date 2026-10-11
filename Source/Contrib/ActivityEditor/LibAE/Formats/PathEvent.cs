@@ -22,13 +22,10 @@
 /// 
 
 using System;
-using System.Windows;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Reflection;
 using Microsoft.Xna.Framework;
 using MSTS;
@@ -88,21 +85,27 @@ namespace LibAE.Formats
         {
         }
 
-        public virtual Icon getIcon() { return null; }
+        /// <summary>
+        /// Name of the embedded icon resource (in this assembly) used to draw this event, or null.
+        /// </summary>
+        /// <remarks>Was a System.Drawing.Icon, which is not available on non-Windows platforms.</remarks>
+        public virtual string getIconName() { return null; }
+
+        /// <summary>Open the embedded icon resource named by <see cref="getIconName"/>.</summary>
+        public Stream getIconStream()
+        {
+            string name = getIconName();
+            return name == null ? null : typeof(PathEventItem).Assembly.GetManifestResourceStream(name);
+        }
     }
 
     public class ActStartItem : PathEventItem
     {
-        Icon StartIcon;
         public ActStartItem(TypeEditor interfaceType)
             : base(interfaceType)
         {
-            Stream st;
-            Assembly a = Assembly.GetExecutingAssembly();
 
             typeItem = (int)TypeEvent.ACTIVITY_START;
-            st = a.GetManifestResourceStream("LibAE.Icon.Start.ico");
-            StartIcon = new System.Drawing.Icon(st);
  
         }
 
@@ -123,23 +126,18 @@ namespace LibAE.Formats
             base.configCoord(coord);
         }
 
-        public override Icon getIcon() { return StartIcon; }
+        public override string getIconName() { return "LibAE.Icon.Start.ico"; }
 
     }
 
     public class ActStopItem : PathEventItem
     {
-        Icon StopIcon;
 
         public ActStopItem(TypeEditor interfaceType)
             : base(interfaceType)
         {
-            Stream st;
-            Assembly a = Assembly.GetExecutingAssembly();
 
             typeItem = (int)TypeEvent.ACTIVITY_STOP;
-           st = a.GetManifestResourceStream("LibAE.Icon.Stop.ico");
-            StopIcon = new System.Drawing.Icon(st);
 
         }
 
@@ -160,23 +158,18 @@ namespace LibAE.Formats
             base.configCoord(coord);
         }
 
-        public override Icon getIcon() { return StopIcon; }
+        public override string getIconName() { return "LibAE.Icon.Stop.ico"; }
 
     }
 
     public class ActWaitItem : PathEventItem
     {
-        Icon WaitIcon;
 
         public ActWaitItem(TypeEditor interfaceType)
             : base(interfaceType)
         {
-            Stream st;
-            Assembly a = Assembly.GetExecutingAssembly();
 
             typeItem = (int)TypeEvent.ACTIVITY_WAIT;
-            st = a.GetManifestResourceStream("LibAE.Icon.Wait.ico");
-            WaitIcon = new System.Drawing.Icon(st);
 
         }
 
@@ -197,7 +190,7 @@ namespace LibAE.Formats
             base.configCoord(coord);
         }
 
-        public override Icon getIcon() { return WaitIcon; }
+        public override string getIconName() { return "LibAE.Icon.Wait.ico"; }
 
     }
 

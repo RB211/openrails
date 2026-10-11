@@ -36,28 +36,52 @@ namespace Orts.Formats.OR
             RoutePath = Route;
             TRK = new RouteFile(MSTS.MSTSPath.GetTRKFileName(RoutePath));
             string routePath = Path.Combine(Route, TRK.Tr_RouteFile.FileName);
-            TDB = new TrackDatabaseFile(RoutePath + @"\" + TRK.Tr_RouteFile.FileName + ".tdb");
+            TDB = new TrackDatabaseFile(CombineIgnoreCase(RoutePath, TRK.Tr_RouteFile.FileName + ".tdb"));
 
-            string ORfilepath = System.IO.Path.Combine(RoutePath, "OpenRails");
+            string ORfilepath = CombineIgnoreCase(RoutePath, "OpenRails");
 
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            if (File.Exists(CombineIgnoreCase(ORfilepath, "sigcfg.dat")))
             {
-                SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
+                SIGCFG = new SignalConfigurationFile(CombineIgnoreCase(ORfilepath, "sigcfg.dat"), true);
             }
             else
             {
-                SIGCFG = new SignalConfigurationFile(RoutePath + @"\sigcfg.dat", false);
+                SIGCFG = new SignalConfigurationFile(CombineIgnoreCase(RoutePath, "sigcfg.dat"), false);
             }
 
-            if (Directory.Exists(RoutePath + @"\Openrails") && File.Exists(RoutePath + @"\Openrails\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\Openrails\TSECTION.DAT");
-            else if (Directory.Exists(RoutePath + @"\GLOBAL") && File.Exists(RoutePath + @"\GLOBAL\TSECTION.DAT"))
-                TSectionDat = new TrackSectionsFile(RoutePath + @"\GLOBAL\TSECTION.DAT");
+            if (File.Exists(CombineIgnoreCase(RoutePath, "Openrails", "TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(CombineIgnoreCase(RoutePath, "Openrails", "TSECTION.DAT"));
+            else if (File.Exists(CombineIgnoreCase(RoutePath, "GLOBAL", "TSECTION.DAT")))
+                TSectionDat = new TrackSectionsFile(CombineIgnoreCase(RoutePath, "GLOBAL", "TSECTION.DAT"));
             else
-                TSectionDat = new TrackSectionsFile(MstsPath + @"\GLOBAL\TSECTION.DAT");
-            if (File.Exists(RoutePath + @"\TSECTION.DAT"))
-                TSectionDat.AddRouteTSectionDatFile(RoutePath + @"\TSECTION.DAT");
+                TSectionDat = new TrackSectionsFile(CombineIgnoreCase(MstsPath, "GLOBAL", "TSECTION.DAT"));
+            if (File.Exists(CombineIgnoreCase(RoutePath, "TSECTION.DAT")))
+                TSectionDat.AddRouteTSectionDatFile(CombineIgnoreCase(RoutePath, "TSECTION.DAT"));
             Signals = new AESignals (this, SIGCFG);
+        }
+
+        /// <summary>
+        /// Path.Combine, matching each part case-insensitively against existing files and folders
+        /// (MSTS content has arbitrary casing, which matters on case-sensitive file systems).
+        /// </summary>
+        internal static string CombineIgnoreCase(string basePath, params string[] parts)
+        {
+            var options = new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive, IgnoreInaccessible = true };
+            var path = basePath;
+            foreach (var part in parts)
+            {
+                var candidate = Path.Combine(path, part);
+                if (!System.OperatingSystem.IsWindows() && !Path.Exists(candidate) && Directory.Exists(path))
+                {
+                    foreach (var match in Directory.EnumerateFileSystemEntries(path, part, options))
+                    {
+                        candidate = match;
+                        break;
+                    }
+                }
+                path = candidate;
+            }
+            return path;
         }
     }
 }

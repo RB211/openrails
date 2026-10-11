@@ -26,9 +26,8 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
+using System.Threading.Tasks;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using ActivityEditor.Route_Metadata;
 using LibAE;
 using LibAE.Formats;
@@ -106,25 +105,25 @@ namespace ActivityEditor.Engine
             aeRouteConfig.AddTagPanel(tagGBList.ToArray());
         }
 
-        public void Close(TypeEditor viewerMode)
+        public async Task Close(TypeEditor viewerMode)
         {
             aeRouteConfig.CloseRoute();
-            routeData.Visible = false;
+            routeData.IsVisible = false;
             if (viewerMode == TypeEditor.ACTIVITY)
             {
-                aeActivity.ClosegActivity();
-                AEConfigPanel.Visible = false;
+                await aeActivity.ClosegActivity();
+                AEConfigPanel.IsVisible = false;
             }
         }
 
-        public GlobalItem EditItem(GlobalItem item)
+        public async Task<GlobalItem> EditItem(GlobalItem item)
         {
             GlobalItem edited = null;
             if (item.IsEditable() && (typeof(StationAreaItem) == item.GetType()))
             {
                 ((StationAreaItem)item).setInterfaceConfigured();
                 StationInterface interface2 = new StationInterface(((StationAreaItem)item).getStationConnector());
-                interface2.ShowDialog();
+                await Dialogs.ShowDialog(interface2);
                 if (interface2.ToRemove)
                 {
                     return null;
@@ -135,14 +134,14 @@ namespace ActivityEditor.Engine
             else if (item.IsEditable() && (typeof(StationItem) == item.GetType()))
             {
                 StationDisplay interface2 = new StationDisplay((StationItem)item);
-                interface2.ShowDialog();
+                await Dialogs.ShowDialog(interface2);
                 edited = item;
             }
             else if (item.IsEditable() && (typeof(AEBufferItem) == item.GetType()))
             {
                 ((AEBufferItem)item).Configured = true;
                 BufferInterface interface2 = new BufferInterface(((AEBufferItem)item));
-                interface2.ShowDialog();
+                await Dialogs.ShowDialog(interface2);
                 if (interface2.ToRemove)
                 {
                     return null;
@@ -156,7 +155,7 @@ namespace ActivityEditor.Engine
                 destination.Add("All");
                 ((TrackSegment)item).Configured = true;
                 TrackSegmentInterface interface2 = new TrackSegmentInterface(((TrackSegment)item), destination);
-                interface2.ShowDialog();
+                await Dialogs.ShowDialog(interface2);
                 item.Edit();
                 edited = ((TrackSegment)item).parentStation;
             }
@@ -226,7 +225,6 @@ namespace ActivityEditor.Engine
             stationWidgetInfo = new List<StationWidgetInfo>();
             stationGBList = new List<GroupBox>();
             
-            Viewer.actParent.SuspendLayout();
             //System.Drawing.Point current = activityAe.GetPanelPosition();
             foreach (var item in getORWidget())
             {
@@ -251,8 +249,6 @@ namespace ActivityEditor.Engine
                     AddStationInfo(newStationWidget);
                 }
             }
-            Viewer.actParent.ResumeLayout(false);
-            Viewer.actParent.PerformLayout();
         }
 
         public void RemoveStation(int cntStr)
@@ -305,22 +301,19 @@ namespace ActivityEditor.Engine
         {
             if (viewerMode == TypeEditor.ACTIVITY)
             {
-                AEConfigPanel.Visible = true;
-                AEConfigPanel.ResumeLayout(false);
+                AEConfigPanel.IsVisible = true;
             }
-            routeData.Visible = true;
-            routeData.ResumeLayout(false);
+            routeData.IsVisible = true;
+            aeRouteConfig.ShowPanels(routeData);
         }
 
         public void UnsetFocus(TypeEditor viewerMode)
         {
             if (viewerMode == TypeEditor.ACTIVITY)
             {
-                AEConfigPanel.SuspendLayout();
-                AEConfigPanel.Visible = false;
+                AEConfigPanel.IsVisible = false;
             }
-            routeData.SuspendLayout();
-            routeData.Visible = false;
+            routeData.IsVisible = false;
         }
 
         public GlobalItem UpdateItem(GlobalItem item, MSTSCoord coord, bool controlKey, bool forceConnector)

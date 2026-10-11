@@ -88,14 +88,14 @@ namespace LibAE.Formats
                 string[] subdirectoryEntries = Directory.GetDirectories(routeParent);
                 foreach (string route in subdirectoryEntries)
                 {
-                    string[] files = Directory.GetFileSystemEntries(route, "*.trk");
+                    string[] files = PathCase.GetFileSystemEntries(route, "*.trk");
                     if (files.Count() == 1)
                     {
                         routePaths.Add(route);
                     }
                 }
-                string consistPath = Path.Combine(routeParent, "../TRAINS/CONSISTS");
-                subdirectoryEntries = Directory.GetFileSystemEntries(consistPath, "*.con");
+                string consistPath = PathCase.Combine(routeParent, "..", "TRAINS", "CONSISTS");
+                subdirectoryEntries = PathCase.GetFileSystemEntries(consistPath, "*.con");
                 foreach (string consist in subdirectoryEntries)
                 {
                     string fullPathConsist = Path.GetFullPath(consist);
@@ -163,7 +163,7 @@ namespace LibAE.Formats
         {
             if (FileName == null || FileName.Length <= 0)
                 return false;
-            string activityPath = Path.Combine(RoutePath, "activities");
+            string activityPath = PathCase.Combine(RoutePath, "activities");
             string completeFileName = Path.Combine(activityPath, FileName);
 
             JsonSerializer serializer = new JsonSerializer();

@@ -43,7 +43,7 @@ namespace Orts.Formats.OR
                 string[] subdirectoryEntries = Directory.GetDirectories(routeParent);
                 foreach (string route in subdirectoryEntries)
                 {
-                    string[] files = Directory.GetFileSystemEntries(route, "*.trk");
+                    string[] files = LibAE.PathCase.GetFileSystemEntries(route, "*.trk");
                     if (files.Count() == 1)
                     {
                         routePaths.Add(route);

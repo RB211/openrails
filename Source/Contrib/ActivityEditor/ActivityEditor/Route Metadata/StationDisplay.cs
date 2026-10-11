@@ -1,31 +1,48 @@
-﻿using System;
+//
+// This file is part of Open Rails.
+//
+// Open Rails is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Open Rails is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
+
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Windows.Forms;
-using System.Diagnostics;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using LibAE.Formats;
 using Orts.Formats.OR;
 
 namespace ActivityEditor.Route_Metadata
 {
-    public partial class StationDisplay : Form
+    public partial class StationDisplay : Window
     {
+        static readonly string ColumnWidths = "94,94,60,60,60,60,60,*";
+
         StationItem station;
+        TextBox StationName;
+        TextBlock label7;
+        Grid tablePaths;
+
         public StationDisplay(StationItem item)
         {
             int countPaths = 0;
             station = item;
             InitializeComponent();
-            SuspendLayout();
-            tablePaths.SuspendLayout();
             StationName.Text = station.nameStation;
             ClearTable();
-            
-            int cntPath = this.tablePaths.RowCount;
             foreach (var pointArea in item.stationArea)
             {
                 if (pointArea.IsInterface())
@@ -33,7 +50,6 @@ namespace ActivityEditor.Route_Metadata
                     countPaths += pointArea.getStationConnector().stationPaths.getPaths().Count;
                 }
             }
-
             if (countPaths > 0 && countPaths != item.StationPathsHelper.DefinedPath.Count)
             {
                 this.label7.Text = "Please Load Paths:";
@@ -42,112 +58,117 @@ namespace ActivityEditor.Route_Metadata
             {
                 label7.Text = "List of Paths seems OK:";
             }
-
             foreach (var originPoint in station.StationPathsHelper.DefinedPath)
             {
                 foreach (var destinPoint in originPoint.Value)
                 {
                     foreach (var possibility in destinPoint.Value)
                     {
-                        AddPathData(originPoint.Key, possibility.Value); 
+                        AddPathData(originPoint.Key, possibility.Value);
                     }
                 }
             }
-            tablePaths.ResumeLayout(false);
-            tablePaths.PerformLayout();
-            ResumeLayout(false);
-#if false
-		    foreach (var pointArea in item.stationArea)
+        }
+
+        void InitializeComponent()
+        {
+            Title = "Station Configuration";
+            Width = 949;
+            Height = 516;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            StationName = new TextBox { Width = 180 };
+            var quit = new Button { Content = "Quit", Width = 89 };
+            quit.Click += QuitStationConfig;
+            var loadPaths = new Button { Content = "Load Paths", Width = 85 };
+            loadPaths.Click += LoadPaths;
+            label7 = new TextBlock { Text = "label7", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0) };
+
+            var top = new StackPanel
             {
-                if (pointArea.IsInterface() && pointArea.getStationConnector().stationPaths.getPaths().Count > 0)
-                {
-                    AddPathData(pointArea.stationConnector.getLabel(), pointArea.stationConnector.stationPaths);
-                }
-            }
-            foreach (AEBufferItem buffer in item.insideBuffers)
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                Margin = new Thickness(8),
+                Children = { new TextBlock { Text = "Station :", VerticalAlignment = VerticalAlignment.Center }, StationName, label7, loadPaths, quit },
+            };
+            DockPanel.SetDock(top, Dock.Top);
+
+            var header = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths), Background = Brushes.Gainsboro, Margin = new Thickness(8, 0) };
+            string[] titles = { "From", " To ", "Max. Platform Length", "Max. Siding Length", "Number of Platform", "Number of Siding", "Max. Passing Length" };
+            for (int i = 0; i < titles.Length; i++)
             {
-                AddPathData(buffer.NameBuffer, buffer.stationPaths);
+                var text = new TextBlock { Text = titles[i], TextWrapping = TextWrapping.Wrap, Margin = new Thickness(3), FontWeight = FontWeight.SemiBold };
+                Grid.SetColumn(text, i);
+                header.Children.Add(text);
             }
-  
-#endif        
+            DockPanel.SetDock(header, Dock.Top);
+
+            tablePaths = new Grid { ColumnDefinitions = new ColumnDefinitions(ColumnWidths), Margin = new Thickness(8, 0) };
+            var root = new DockPanel();
+            root.Children.Add(top);
+            root.Children.Add(header);
+            root.Children.Add(new ScrollViewer { Content = tablePaths });
+            Content = root;
         }
 
         public void ClearTable()
         {
-            for (int cnt = tablePaths.RowCount - 1; cnt >= 0; cnt--)
-            {
-                tablePaths.RowStyles.RemoveAt(cnt);
-            }
-            tablePaths.RowStyles.Clear();  //first clear rowStyles
-            tablePaths.RowCount = 0;
+            tablePaths.Children.Clear();
+            tablePaths.RowDefinitions.Clear();
         }
 
-        private void QuitStationConfig(object sender, EventArgs e)
+        private void QuitStationConfig(object sender, RoutedEventArgs e)
         {
             Close();
         }
 
+        void AddCell(string text, int column, int row)
+        {
+            var label = new TextBlock { Text = text, Margin = new Thickness(3, 1) };
+            Grid.SetColumn(label, column);
+            Grid.SetRow(label, row);
+            tablePaths.Children.Add(label);
+        }
+
         public void AddPathData(string label, StationPath path)
         {
-            Stopwatch stopWatch = new Stopwatch();
-            TimeSpan ts;
-
             double passingYard = 0;
-            int cntRows = tablePaths.RowCount;
             if (path == null)
                 return;
-
-            Label CinBoth = new Label() { Text = "--", Anchor = AnchorStyles.Left, AutoSize = true };
+            string cinBoth;
             if (path.MainPath)
-                CinBoth.Text = "M - " + label;
+                cinBoth = "M - " + label;
             else
-                CinBoth.Text = label;
-
+                cinBoth = label;
             int nbrGlobalItem = path.ComponentItem.Count - 1;
-            Label CoutBoth = new Label() { Text = "--", Anchor = AnchorStyles.Left, AutoSize = true };
+            string coutBoth;
             GlobalItem lastItem = (GlobalItem)(path.ComponentItem[nbrGlobalItem]);
             if (lastItem.GetType() == typeof(AEBufferItem) && lastItem.associateNode.TrEndNode)
             {
-                CoutBoth.Text = ((AEBufferItem)lastItem).NameBuffer;
+                coutBoth = ((AEBufferItem)lastItem).NameBuffer;
             }
             else if (lastItem.GetType() == typeof(TrackSegment) && lastItem.associateNode.TrJunctionNode == null)
             {
-                CoutBoth.Text = ((TrackSegment)(lastItem)).HasConnector.label;
+                coutBoth = ((TrackSegment)(lastItem)).HasConnector.label;
                 if ((path.ComponentItem[0]).GetType() == typeof(TrackSegment))
                     passingYard = Math.Round(path.PassingYard, 1);
             }
             else
-                CoutBoth.Text = "###";
-            //TextBox t1 = new TextBox();
+                coutBoth = "###";
 
-            //l1.Text = "field : ";
-            stopWatch.Start();
-            tablePaths.RowCount++;
-            this.tablePaths.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // 30 is the rows space
-            this.tablePaths.Controls.Add(CinBoth, 0, cntRows);  // add label in column0
-            this.tablePaths.Controls.Add(CoutBoth, 1, cntRows);  // add textbox in column1
-            double yard = Math.Round(path.Platform, 1);
-            Label platformLength = new Label() { Text = yard.ToString(), Anchor = AnchorStyles.Left, AutoSize = true };
-            this.tablePaths.Controls.Add(platformLength, 2, cntRows);
-            yard = Math.Round (path.Siding,1);
-            Label sidingLength = new Label(){ Text = yard.ToString(), Anchor = AnchorStyles.Left, AutoSize = true };
-            this.tablePaths.Controls.Add(sidingLength, 3, cntRows);
-
-            Label nbrPlatform = new Label() { Text = path.NbrPlatform.ToString(), Anchor = AnchorStyles.Left, AutoSize = true };
-            this.tablePaths.Controls.Add(nbrPlatform, 4, cntRows);
-            Label nbrSiding = new Label() { Text = path.NbrSiding.ToString(), Anchor = AnchorStyles.Left, AutoSize = true };
-            this.tablePaths.Controls.Add(nbrSiding, 5, cntRows);
-            Label passingYardLength = new Label(){ Text = passingYard.ToString(), Anchor = AnchorStyles.Left, AutoSize = true };
-            this.tablePaths.Controls.Add(passingYardLength, 6, cntRows);
-            CinBoth = new Label() { Text = "--", Anchor = AnchorStyles.Left, AutoSize = true };
-            cntRows++;
-            ts = stopWatch.Elapsed;
+            int row = tablePaths.RowDefinitions.Count;
+            tablePaths.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            AddCell(cinBoth, 0, row);
+            AddCell(coutBoth, 1, row);
+            AddCell(Math.Round(path.Platform, 1).ToString(), 2, row);
+            AddCell(Math.Round(path.Siding, 1).ToString(), 3, row);
+            AddCell(path.NbrPlatform.ToString(), 4, row);
+            AddCell(path.NbrSiding.ToString(), 5, row);
+            AddCell(passingYard.ToString(), 6, row);
         }
 
-        private void LoadPaths(object sender, EventArgs e)
+        private void LoadPaths(object sender, RoutedEventArgs e)
         {
-            SuspendLayout();
-            tablePaths.SuspendLayout();
             station.StationPathsHelper.Reload();
             foreach (var originPoint in station.StationPathsHelper.DefinedPath)
             {
@@ -160,9 +181,6 @@ namespace ActivityEditor.Route_Metadata
                 }
             }
             this.label7.Text = "Loaded:";
-            tablePaths.ResumeLayout(false);
-            tablePaths.PerformLayout();
-            ResumeLayout(false);
         }
     }
 }

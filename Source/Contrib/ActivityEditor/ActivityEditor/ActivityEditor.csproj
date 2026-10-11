@@ -1,77 +1,42 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <OutputType>WinExe</OutputType>
     <AssemblyName>Contrib.ActivityEditor</AssemblyName>
+    <RootNamespace>ActivityEditor</RootNamespace>
     <ApplicationIcon>..\..\..\ORTS.ico</ApplicationIcon>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <IsPublishable>False</IsPublishable>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyTitle>Open Rails Activity Editor (Contributed)</AssemblyTitle>
     <Description>Open Rails Transport Simulator</Description>
     <Company>Open Rails</Company>
     <Product>Open Rails (disabled)</Product>
     <Copyright>Copyright © 2009 - 2022</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
-    <DefineConstants>TRACE;WINDOWS;ACTIVITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;ACTIVITY_EDITOR</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Update="Wizard\ActivityDescr.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Wizard\SelectRoute.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Wizard\SinglePage.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Wizard\TrainInfo.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\tag.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\signal.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\signalOther.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\signalRepeat.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\signalShunt.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\speedLimit.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
+    <!-- Icons drawn on the route view, loaded with GetManifestResourceStream("ActivityEditor.icon.*"). -->
+    <EmbeddedResource Include="icon\tag.ico" />
+    <EmbeddedResource Include="icon\signal.ico" />
+    <EmbeddedResource Include="icon\signalOther.ico" />
+    <EmbeddedResource Include="icon\signalRepeat.ico" />
+    <EmbeddedResource Include="icon\signalShunt.ico" />
+    <EmbeddedResource Include="icon\speedLimit.ico" />
     <EmbeddedResource Include="icon\SignalBox.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="icon\StationConnector.ico">
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
+    <EmbeddedResource Include="icon\StationConnector.ico" />
     <EmbeddedResource Include="icon\ruler.ico" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="icon\Ruler.png" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="icon\Start.ico" />
-  </ItemGroup>
-  <ItemGroup>
     <EmbeddedResource Include="icon\Stop.ico" />
     <EmbeddedResource Include="icon\Wait.ico" />
+    <!-- Toolbar images and other UI resources (formerly Properties/Resources.resx). -->
+    <AvaloniaResource Include="Resources\*.png" />
+    <AvaloniaResource Include="icon\*.png" />
+    <AvaloniaResource Include="icon\SignalBox.ico" />
+    <AvaloniaResource Include="icon\tag.gif" />
+    <AvaloniaResource Include="AboutActEdit.jpg" />
+    <AvaloniaResource Include="..\..\..\ORTS.png" Link="ORTS.png" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Orts.Formats.Msts\Orts.Formats.Msts.csproj" />
@@ -83,5 +48,8 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
   </ItemGroup>
 </Project>
