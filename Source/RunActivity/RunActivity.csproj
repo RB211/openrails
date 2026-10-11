@@ -598,11 +598,10 @@
     <ProjectReference Include="..\Orts.Simulation\Orts.Simulation.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- TEMP(linux-port): WinForms tool windows, being ported to Avalonia -->
-    <Compile Remove="Viewer3D/Map/MapForm*.cs;Viewer3D/Map/MapDataProvider.cs;Viewer3D/Map/MapThemeProvider.cs;Viewer3D/Debugging/**" />
-    <EmbeddedResource Remove="Viewer3D/Map/*.resx;Viewer3D/Debugging/**" />
-  </ItemGroup>
-  <ItemGroup>
+    <!-- Avalonia: map window and sound debug window (on their own UI thread, see Viewer3D/Debugging/UiThread.cs) -->
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <PackageReference Include="EmbedIO" Version="3.5.2" />
     <PackageReference Include="MonoGame.Framework.Native" Version="$(MonoGameVersion)" />
     <PackageReference Include="MonoGame.Runtime.Linux.$(OrtsGraphicsBackend)" Version="$(MonoGameVersion)" Condition="$(RuntimeIdentifier.StartsWith('linux'))" />

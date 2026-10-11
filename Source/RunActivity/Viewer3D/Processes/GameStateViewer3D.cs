@@ -50,7 +50,8 @@ namespace Orts.Viewer3D.Processes
                 Game.IsFixedTimeStep = false;
                 Game.InactiveSleepTime = TimeSpan.Zero;
 
-                // We must create these forms on the main thread (Render) or they won't pump events correctly.
+                // These create their windows on the Avalonia UI thread; the windows are shown/hidden through
+                // Viewer.MapViewerEnabled and Viewer.SoundDebugFormEnabled.
                 Program.MapForm = new MapViewer(Viewer.Simulator, Viewer);
                 Program.MapForm.Hide();
 
@@ -131,7 +132,7 @@ namespace Orts.Viewer3D.Processes
                 MPManager.Client.Stop();
             if (Program.Simulator != null)
                 Program.Simulator.Stop();
-            // MapForm and SoundDebugForm run in the Renderer thread and need to be disposed there
+            // MapForm and SoundDebugForm are disposed by RenderProcess.Stop
             base.Dispose();
         }
 
