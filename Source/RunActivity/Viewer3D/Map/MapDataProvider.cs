@@ -47,15 +47,15 @@ namespace Orts.Viewer3D.Map
 
             if (isMultiPlayer)
             {
-                F.playersPanel.Visible = true;
+                F.playersPanel.IsVisible = true;
             }
 
             if (isMultiPlayer && MPManager.IsServer())
             {
-                F.playerRolePanel.Visible = true;
-                F.messagesPanel.Visible = true;
-                F.multiplayerSettingsPanel.Visible = true;
-                //F.playersPanel.Visible = true;
+                F.playerRolePanel.IsVisible = true;
+                F.messagesPanel.IsVisible = true;
+                F.multiplayerSettingsPanel.IsVisible = true;
+                //F.playersPanel.IsVisible = true;
             }
         }
 
@@ -229,14 +229,14 @@ namespace Orts.Viewer3D.Map
         // Arrays are used instead of lists to avoid delays for memory management.
         public void CleanTextCells()
         {
-            if (F.alignedTextY == null || F.alignedTextY.Length != F.mapCanvas.Height / MapViewer.spacing) // First time to put text, or the text height has changed
+            if (F.alignedTextY == null || F.alignedTextY.Length != F.CanvasHeight / MapViewer.spacing) // First time to put text, or the text height has changed
             {
-                F.alignedTextY = new Vector2[F.mapCanvas.Height / MapViewer.spacing][];
-                F.alignedTextNum = new int[F.mapCanvas.Height / MapViewer.spacing];
-                for (var i = 0; i < F.mapCanvas.Height / MapViewer.spacing; i++)
+                F.alignedTextY = new Vector2[F.CanvasHeight / MapViewer.spacing][];
+                F.alignedTextNum = new int[F.CanvasHeight / MapViewer.spacing];
+                for (var i = 0; i < F.CanvasHeight / MapViewer.spacing; i++)
                     F.alignedTextY[i] = new Vector2[5]; //each line has at most 5 slots
             }
-            for (var i = 0; i < F.mapCanvas.Height / MapViewer.spacing; i++)
+            for (var i = 0; i < F.CanvasHeight / MapViewer.spacing; i++)
                 F.alignedTextNum[i] = 0;
         }
 
@@ -247,7 +247,7 @@ namespace Orts.Viewer3D.Map
             const float noFreeSlotFound = -1f;
 
             var desiredPositionY = (int)(wantY / MapViewer.spacing);  // The positionY of the ideal row for the text.
-            var endX = startX + (name.Length * F.trainFont.Size);
+            var endX = startX + (name.Length * MapViewer.LabelFontSizePt);
 
             if ((endX < 0) || // Out of drawing area
                     (F.alignedTextY == null))

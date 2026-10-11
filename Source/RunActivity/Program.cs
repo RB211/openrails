@@ -67,9 +67,15 @@ namespace Orts
                 NativeMethods.SetDllDirectory(path);
             }
 
+            // The map and sound debug windows run on their own Avalonia UI thread, which must be
+            // started before the game window is created.
+            UiThread.Start();
+
             var game = new Game(settings);
             game.PushState(new GameStateRunActivity(args));
             game.Run();
+
+            UiThread.Stop();
         }
     }
 }

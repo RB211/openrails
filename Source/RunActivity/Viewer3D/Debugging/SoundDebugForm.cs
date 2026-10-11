@@ -1,84 +1,280 @@
-﻿// COPYRIGHT 2013 by the Open Rails project.
-// 
+// COPYRIGHT 2013 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
-// This file is the responsibility of the 3D & Environment Team. 
+// This file is the responsibility of the 3D & Environment Team.
+
+// The sound debug window. The window is an Avalonia window living on the Avalonia UI thread (see UiThread.cs);
+// this class is created on the render thread and is the object the rest of the game talks to.
+// Like the WinForms version, it reads the sound sources directly (read-only).
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using System.Diagnostics;
 using System.IO;
-using System.Windows.Forms;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Threading;
 using Orts.Formats.Msts;
 using Orts.Simulation.RollingStocks;
 using ORTS.Common;
+using AvWindow = Avalonia.Controls.Window;
 
 namespace Orts.Viewer3D.Debugging
 {
-    public partial class SoundDebugForm : Form
+    public class SoundDebugForm : IDisposable
     {
-        Viewer Viewer;
+        readonly Viewer Viewer;
 
-        private Timer UITimer;
+        private DispatcherTimer UITimer;
         private double lastUpdateTime = 0;
         private int UpdateCounter = -1;
 
         private SoundSource SelectedSoundSource;
 
+        AvWindow Window;
+        bool AllowClose;
+        bool Disposed;
+        bool UpdateErrorReported;
+
+        TreeView activeSoundTree;
+        TreeView inactiveSoundTree;
+        SoundTreeNode activeSoundList;
+        SoundTreeNode inactiveSoundList;
+
+        SelectableTextBlock speed, wheelRPM, tractiveEffort, tractivePower, variable1, variable2, variable2Booster, variable3,
+            engineRPM, enginePower, engineTorque, backPressure, brakeCyl, curveForce, angleOfAttack, carFriction, carTunnelDistance,
+            distance, distanceSquared, smsVolume, smsFrequency, waves, alSources;
+        CheckBox sound3D, concreteSleepers, carInTunnel;
+
         public SoundDebugForm(Viewer viewer)
         {
-            InitializeComponent();
-
-            // Windows 2000 and XP should use 8.25pt Tahoma, while Windows
-            // Vista and later should use 9pt "Segoe UI". We'll use the
-            // Message Box font to allow for user-customizations, though.
-            Font = SystemFonts.MessageBoxFont;
-
             Viewer = viewer;
+            UiThread.Post(CreateWindow);
+        }
 
-            //foreach (string eventName in Enum.GetNames(typeof(Event)))
-            //    discreteTriggersList.Items.Add(eventName);
-            //discreteTriggersList.SelectedIndex = 0;
+        /// <summary>
+        /// Kept for compatibility with the WinForms version; visibility is controlled by <see cref="Viewer.SoundDebugFormEnabled"/>.
+        /// </summary>
+        public void Hide()
+        {
+        }
+
+        /// <summary>
+        /// Closes the window. Called on the render thread when the game ends; never blocks.
+        /// </summary>
+        public void Dispose()
+        {
+            if (Disposed) return;
+            Disposed = true;
+            UiThread.Post(() =>
+            {
+                UITimer?.Stop();
+                if (Window == null) return;
+                AllowClose = true;
+                Window.Close();
+            });
+        }
+
+        static string T(string text) => Viewer.Catalog.GetString(text);
+
+        #region Window construction
+        void CreateWindow()
+        {
+            if (Disposed) return;
+
+            Window = new AvWindow
+            {
+                Title = T("Sound Debug"),
+                Width = 900,
+                Height = 700,
+                ShowActivated = false,
+                FontSize = 12,
+            };
+
+            activeSoundTree = new TreeView();
+            inactiveSoundTree = new TreeView();
+            activeSoundList = new SoundTreeNode(activeSoundTree);
+            inactiveSoundList = new SoundTreeNode(inactiveSoundTree);
+            // Like the WinForms version: no keyboard navigation in the (constantly changing) trees
+            activeSoundTree.AddHandler(InputElement.KeyDownEvent, (s, e) => e.Handled = true, RoutingStrategies.Tunnel);
+            inactiveSoundTree.AddHandler(InputElement.KeyDownEvent, (s, e) => e.Handled = true, RoutingStrategies.Tunnel);
+            // Only one node can be selected over both trees
+            activeSoundTree.SelectionChanged += (s, e) => { if (activeSoundTree.SelectedItem != null) inactiveSoundTree.SelectedItem = null; };
+            inactiveSoundTree.SelectionChanged += (s, e) => { if (inactiveSoundTree.SelectedItem != null) activeSoundTree.SelectedItem = null; };
+
+            var variables = new Grid { ColumnDefinitions = new ColumnDefinitions("150,*") };
+            int row = 0;
+            SelectableTextBlock AddVariable(string label)
+            {
+                variables.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+                var name = new TextBlock { Text = T(label), Margin = new Thickness(0, 2) };
+                var value = new SelectableTextBlock { Text = "-", Margin = new Thickness(0, 2) };
+                Grid.SetRow(name, row);
+                Grid.SetRow(value, row);
+                Grid.SetColumn(value, 1);
+                variables.Children.Add(name);
+                variables.Children.Add(value);
+                row++;
+                return value;
+            }
+            speed = AddVariable("Speed (m/s)");
+            wheelRPM = AddVariable("Wheel RPM");
+            tractiveEffort = AddVariable("Tractive Effort (N)");
+            tractivePower = AddVariable("Tractive Power (W)");
+            variable1 = AddVariable("Variable 1");
+            variable2 = AddVariable("Variable 2");
+            variable2Booster = AddVariable("Booster Variable 2");
+            variable3 = AddVariable("Variable 3");
+            engineRPM = AddVariable("Engine RPM");
+            enginePower = AddVariable("Engine Power (W)");
+            engineTorque = AddVariable("Engine Torque (N-m)");
+            backPressure = AddVariable("Back Pressure (psi)");
+            brakeCyl = AddVariable("Brake Cylinder (psi)");
+            curveForce = AddVariable("Curve Force (N)");
+            angleOfAttack = AddVariable("Angle of Attack (mRad)");
+            carFriction = AddVariable("Car Friction Coefficient");
+            carTunnelDistance = AddVariable("Car Tunnel Distance (m)");
+            distance = AddVariable("Distance (m)");
+            distanceSquared = AddVariable("Distance Squared (m²)");
+            smsVolume = AddVariable("Volume");
+            smsFrequency = AddVariable("Frequency (Hz)");
+
+            CheckBox Indicator(string text) => new CheckBox { Content = T(text), IsHitTestVisible = false, Focusable = false, MinHeight = 0, Margin = new Thickness(0, 0, 12, 0) };
+            sound3D = Indicator("3D");
+            concreteSleepers = Indicator("Concrete Sleepers");
+            carInTunnel = Indicator("Car In Tunnel");
+            var indicators = new WrapPanel { Children = { sound3D, concreteSleepers, carInTunnel }, Margin = new Thickness(0, 4, 0, 0) };
+            DockPanel.SetDock(indicators, Dock.Bottom);
+
+            var cache = new Grid { ColumnDefinitions = new ColumnDefinitions("150,*"), RowDefinitions = new RowDefinitions("Auto,Auto") };
+            var wavesLabel = new TextBlock { Text = T("Cached Wave Files"), Margin = new Thickness(0, 2) };
+            waves = new SelectableTextBlock { Text = "-", Margin = new Thickness(0, 2) };
+            var alSourcesLabel = new TextBlock { Text = T("AL Sound Sources"), Margin = new Thickness(0, 2) };
+            alSources = new SelectableTextBlock { Text = "-", Margin = new Thickness(0, 2) };
+            Grid.SetColumn(waves, 1);
+            Grid.SetRow(alSourcesLabel, 1);
+            Grid.SetRow(alSources, 1);
+            Grid.SetColumn(alSources, 1);
+            cache.Children.Add(wavesLabel);
+            cache.Children.Add(waves);
+            cache.Children.Add(alSourcesLabel);
+            cache.Children.Add(alSources);
+
+            var left = new Grid { RowDefinitions = new RowDefinitions("*,4,Auto") };
+            var selectedSound = GroupBox(T("Selected Sound Source Variables"), new DockPanel { Children = { indicators, new ScrollViewer { Content = variables } } });
+            var soundCache = GroupBox(T("Sound Cache"), cache);
+            Grid.SetRow(soundCache, 2);
+            left.Children.Add(selectedSound);
+            left.Children.Add(new GridSplitter { ResizeDirection = GridResizeDirection.Rows, Background = Brushes.Transparent });
+            Grid.SetRow(left.Children[1], 1);
+            left.Children.Add(soundCache);
+
+            var right = new Grid { RowDefinitions = new RowDefinitions("*,4,*") };
+            var activeSounds = GroupBox(T("Active Sound Sources"), activeSoundTree);
+            var inactiveSounds = GroupBox(T("Inactive Sound Sources"), inactiveSoundTree);
+            var rightSplitter = new GridSplitter { ResizeDirection = GridResizeDirection.Rows, Background = Brushes.Transparent };
+            Grid.SetRow(rightSplitter, 1);
+            Grid.SetRow(inactiveSounds, 2);
+            right.Children.Add(activeSounds);
+            right.Children.Add(rightSplitter);
+            right.Children.Add(inactiveSounds);
+
+            var root = new Grid { ColumnDefinitions = new ColumnDefinitions("380,4,*"), Margin = new Thickness(3) };
+            var splitter = new GridSplitter { ResizeDirection = GridResizeDirection.Columns, Background = Brushes.Transparent };
+            Grid.SetColumn(splitter, 1);
+            Grid.SetColumn(right, 2);
+            root.Children.Add(left);
+            root.Children.Add(splitter);
+            root.Children.Add(right);
+            Window.Content = root;
+
+            Window.Closing += (s, e) =>
+            {
+                if (AllowClose) return;
+                e.Cancel = true;
+                Viewer.SoundDebugFormEnabled = false;
+                Window.Hide();
+            };
+            UiThread.Track(Window);
 
             // initialise the timer used to handle user input
-            UITimer = new Timer();
-            UITimer.Interval = 100;
-            UITimer.Tick += new EventHandler(UITimer_Tick);
+            UITimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            UITimer.Tick += UITimer_Tick;
             UITimer.Start();
         }
 
+        static Control GroupBox(string header, Control content)
+        {
+            var title = new TextBlock { Text = header, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+            DockPanel.SetDock(title, Dock.Top);
+            return new Border
+            {
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(6),
+                Margin = new Thickness(3),
+                Child = new DockPanel { Children = { title, content } },
+            };
+        }
+        #endregion
+
         void UITimer_Tick(object sender, EventArgs e)
         {
-            Visible = Viewer.SoundDebugFormEnabled;
+            if (Disposed) return;
+
+            var visible = Viewer.SoundDebugFormEnabled;
+            if (visible && !Window.IsVisible)
+                Window.Show();
+            else if (!visible && Window.IsVisible)
+                Window.Hide();
+
             if (Program.Viewer.RealTime - lastUpdateTime < 0.1f)
                 return;
-            else if (!Visible)
+            else if (!visible)
             {
                 // Reset the tree when closing the window
-                if (activeSoundList.Nodes.Count > 0)
-                    activeSoundList.Nodes.Clear();
-                if (inactiveSoundList.Nodes.Count > 0)
-                    inactiveSoundList.Nodes.Clear();
+                if (activeSoundList.Count > 0)
+                    activeSoundList.Clear();
+                if (inactiveSoundList.Count > 0)
+                    inactiveSoundList.Clear();
                 UpdateCounter = -1;
 
                 return;
             }
             lastUpdateTime = Program.Viewer.RealTime;
 
-            UpdateContent();
+            try
+            {
+                UpdateContent();
+            }
+            catch (Exception error)
+            {
+                // The sound sources are changed concurrently by the game; skip this update.
+                if (!UpdateErrorReported)
+                {
+                    UpdateErrorReported = true;
+                    Trace.TraceInformation("Sound debug window: skipped an update: {0}", error.Message);
+                }
+            }
         }
 
         /// <summary>
@@ -87,14 +283,12 @@ namespace Orts.Viewer3D.Debugging
         void UpdateContent()
         {
             var soundSources = Viewer.SoundProcess.GetSoundSources();
-            activeSoundList.BeginUpdate();
-            inactiveSoundList.BeginUpdate();
 
             int sourceIndex = 0;
 
             foreach (List<SoundSourceBase> src in soundSources.Values)
             {
-                foreach (SoundSourceBase ssb in src)
+                foreach (SoundSourceBase ssb in src.ToArray())
                 {
                     List<SoundSource> sources = new List<SoundSource>();
 
@@ -116,7 +310,7 @@ namespace Orts.Viewer3D.Debugging
                         if (UpdateCounter > -1 && (sourceIndex + UpdateCounter) % 20 != 0 && source != SelectedSoundSource)
                             continue;
 
-                        TreeNode node, subNode;
+                        SoundTreeNode node, subNode;
                         string nodeString, subNodeString = "";
                         string nodeKey, subNodeKey = "";
 
@@ -137,25 +331,16 @@ namespace Orts.Viewer3D.Debugging
                             nodeKey = nodeString + source.GetHashCode().ToString();
                         }
 
-                        if (source.SoundStreams.Count > 0)
+                        var soundStreams = source.SoundStreams.ToArray();
+                        if (soundStreams.Length > 0)
                         {
-                            int activeIndex = activeSoundList.Nodes.IndexOfKey(nodeKey);
-                            int inactiveIndex = inactiveSoundList.Nodes.IndexOfKey(nodeKey);
+                            var activeNode = activeSoundList.Find(nodeKey);
+                            var inactiveNode = inactiveSoundList.Find(nodeKey);
 
                             if (source.Active)
-                            {
-                                if (activeIndex == -1)
-                                    node = activeSoundList.Nodes.Add(nodeKey, nodeString);
-                                else
-                                    node = activeSoundList.Nodes[activeIndex];
-                            }
+                                node = activeNode ?? activeSoundList.Add(nodeKey, nodeString);
                             else
-                            {
-                                if (inactiveIndex == -1)
-                                    node = inactiveSoundList.Nodes.Add(nodeKey, nodeString);
-                                else
-                                    node = inactiveSoundList.Nodes[inactiveIndex];
-                            }
+                                node = inactiveNode ?? inactiveSoundList.Add(nodeKey, nodeString);
 
                             // Car sounds: Add sub-nodes to the main car node, but only if the main node is expanded
                             if (!String.IsNullOrEmpty(subNodeString) && !String.IsNullOrEmpty(subNodeKey))
@@ -163,42 +348,38 @@ namespace Orts.Viewer3D.Debugging
                                 // Remove this source from the opposite sub-node list
                                 if (source.Active)
                                 {
-                                    if (inactiveIndex != -1)
+                                    if (inactiveNode != null)
                                     {
-                                        inactiveSoundList.Nodes[inactiveIndex].Nodes.RemoveByKey(subNodeKey);
+                                        inactiveNode.Remove(subNodeKey);
 
                                         // Remove the main node if it has no inactive sources remaining
-                                        if (inactiveSoundList.Nodes[inactiveIndex].Nodes.Count == 0)
-                                            inactiveSoundList.Nodes.RemoveAt(inactiveIndex);
+                                        if (inactiveNode.Count == 0)
+                                            inactiveSoundList.Remove(nodeKey);
                                     }
                                 }
                                 else
                                 {
-                                    if (activeIndex != -1)
+                                    if (activeNode != null)
                                     {
-                                        activeSoundList.Nodes[activeIndex].Nodes.RemoveByKey(subNodeKey);
+                                        activeNode.Remove(subNodeKey);
 
                                         // Remove the main node if it has no active sources remaining
-                                        if (activeSoundList.Nodes[activeIndex].Nodes.Count == 0)
-                                            activeSoundList.Nodes.RemoveAt(activeIndex);
+                                        if (activeNode.Count == 0)
+                                            activeSoundList.Remove(nodeKey);
                                     }
                                 }
 
                                 // Skip processing sub-nodes unless main node is expanded
-                                if (!node.IsExpanded && node.Nodes.Count > 1)
+                                if (!node.IsExpanded && node.Count > 1)
                                     continue;
 
                                 node.Tag = source.Car;
 
-                                int subIndex = node.Nodes.IndexOfKey(subNodeKey);
-                                if (subIndex == -1)
+                                subNode = node.Find(subNodeKey);
+                                if (subNode == null)
                                 {
-                                    subNode = node.Nodes.Add(subNodeKey, subNodeString);
+                                    subNode = node.Add(subNodeKey, subNodeString);
                                     subNode.Tag = source;
-                                }
-                                else
-                                {
-                                    subNode = node.Nodes[subIndex];
                                 }
 
                                 // Do all future processing on the sub node
@@ -211,46 +392,43 @@ namespace Orts.Viewer3D.Debugging
                                 // Remove this source from the opposite node list
                                 if (source.Active)
                                 {
-                                    if (inactiveIndex != -1)
-                                        inactiveSoundList.Nodes.RemoveAt(inactiveIndex);
+                                    if (inactiveNode != null)
+                                        inactiveSoundList.Remove(nodeKey);
                                 }
                                 else
                                 {
-                                    if (activeIndex != -1)
-                                        activeSoundList.Nodes.RemoveAt(activeIndex);
+                                    if (activeNode != null)
+                                        activeSoundList.Remove(nodeKey);
                                 }
                             }
 
                             int activeSS = 0;
                             int streamIndex = 0;
-                            foreach (SoundStream soundStream in source.SoundStreams)
+                            foreach (SoundStream soundStream in soundStreams)
                             {
                                 string[] playingData = soundStream.ALSoundSource.GetPlayingData();
                                 if (playingData[0] != "-1")
                                     activeSS++;
-                                if (node.IsExpanded || node.Nodes.Count < source.SoundStreams.Count)
+                                if (node.IsExpanded || node.Count < soundStreams.Length)
                                 {
                                     // Only update sound stream nodes one time unless main node is expanded
                                     string streamString = String.Format("{0}: {1} (cue: {2}) {3}", playingData);
                                     string streamKey = streamIndex.ToString() + soundStream.GetHashCode().ToString();
 
-                                    TreeNode streamNode;
-
-                                    int streamNodeIndex = node.Nodes.IndexOfKey(streamKey);
-                                    if (streamNodeIndex == -1)
+                                    var streamNode = node.Find(streamKey);
+                                    if (streamNode == null)
                                     {
-                                        streamNode = node.Nodes.Add(streamKey, streamString);
+                                        streamNode = node.Add(streamKey, streamString);
                                         streamNode.Tag = soundStream;
                                     }
                                     else
                                     {
-                                        streamNode = node.Nodes[streamNodeIndex];
                                         streamNode.Text = streamString;
                                     }
                                 }
                                 streamIndex++;
                             }
-                            node.Text = string.Format("{0}({1}{2}{3})", node.Text.Split('(')[0], activeSS, @"@", source.SoundStreams.Count);
+                            node.Text = string.Format("{0}({1}{2}{3})", node.Text.Split('(')[0], activeSS, @"@", soundStreams.Length);
                         }
                     }
                 }
@@ -259,21 +437,19 @@ namespace Orts.Viewer3D.Debugging
             // Fill selected node's data
             MSTSWagon selectedCar = null;
             SoundStream selectedStream = null;
-            TreeNode selectedNode = activeSoundList.SelectedNode;
-            if (selectedNode == null)
-                selectedNode = inactiveSoundList.SelectedNode;
+            var selectedTag = (activeSoundTree.SelectedItem as TreeViewItem)?.Tag ?? (inactiveSoundTree.SelectedItem as TreeViewItem)?.Tag;
 
-            if (selectedNode?.Tag is SoundSource)
+            if (selectedTag is SoundSource selectedSource)
             {
-                SelectedSoundSource = (SoundSource)selectedNode.Tag;
+                SelectedSoundSource = selectedSource;
                 selectedCar = SelectedSoundSource.Car;
             }
-            else if (selectedNode?.Tag is MSTSWagon car)
+            else if (selectedTag is MSTSWagon car)
             {
                 SelectedSoundSource = null;
                 selectedCar = car;
             }
-            else if (selectedNode?.Tag is SoundStream stream)
+            else if (selectedTag is SoundStream stream)
             {
                 selectedStream = stream;
                 SelectedSoundSource = selectedStream.SoundSource;
@@ -301,7 +477,7 @@ namespace Orts.Viewer3D.Debugging
                 distanceSquared.Text = squareDistance.ToString("0");
 
                 OpenAL.alGetSourcei(selectedStream.ALSoundSource.SoundSourceID, OpenAL.AL_SOURCE_RELATIVE, out int relative);
-                sound3D.Checked = relative == OpenAL.AL_FALSE;
+                sound3D.IsChecked = relative == OpenAL.AL_FALSE;
 
                 OpenAL.alGetSourcef(selectedStream.ALSoundSource.SoundSourceID, OpenAL.AL_GAIN, out float gain);
                 smsVolume.Text = gain.ToString("0.000");
@@ -313,7 +489,7 @@ namespace Orts.Viewer3D.Debugging
             {
                 smsVolume.Text = "-";
                 smsFrequency.Text = "-";
-                sound3D.Checked = false;
+                sound3D.IsChecked = false;
 
                 if (SelectedSoundSource != null && SelectedSoundSource.WorldLocation != WorldLocation.None)
                 {
@@ -337,7 +513,8 @@ namespace Orts.Viewer3D.Debugging
                 tractiveEffort.Text = (selectedCar.LocomotiveAxles.DriveForceN * Math.Sign(selectedCar.WheelSpeedMpS)).ToString("0"); // ensure positive for traction, negative for dynamics
                 tractivePower.Text = (selectedCar.LocomotiveAxles.DrivePowerW).ToString("0");
 
-                float[] Variable1 = selectedCar.Variable1;
+                // Copy, so that the scaling below does not change the car's sound variables
+                float[] Variable1 = (float[])selectedCar.Variable1.Clone();
                 float Variable2 = selectedCar.Variable2;
                 float Variable2Booster = selectedCar.Variable2_Booster;
                 float Variable3 = selectedCar.Variable3;
@@ -388,8 +565,8 @@ namespace Orts.Viewer3D.Debugging
 
                 carTunnelDistance.Text = selectedCar.CarTunnelDistanceM.ToString("0.0");
 
-                concreteSleepers.Checked = SharedSMSFileManager.ConcreteSleepers == 1.0f;
-                carInTunnel.Checked = selectedCar.TrackSoundInTunnelTriggered == 1.0f;
+                concreteSleepers.IsChecked = SharedSMSFileManager.ConcreteSleepers == 1.0f;
+                carInTunnel.IsChecked = selectedCar.TrackSoundInTunnelTriggered == 1.0f;
             }
             else
             {
@@ -417,43 +594,71 @@ namespace Orts.Viewer3D.Debugging
 
                 carTunnelDistance.Text = "-";
 
-                concreteSleepers.Checked = false;
-                carInTunnel.Checked = false;
+                concreteSleepers.IsChecked = false;
+                carInTunnel.IsChecked = false;
             }
 
             waves.Text = SoundItem.AllPieces.Count.ToString();
             alSources.Text = ALSoundSource.ActiveCount.ToString();
 
-            activeSoundList.EndUpdate();
-            inactiveSoundList.EndUpdate();
-
             UpdateCounter = (UpdateCounter + 1) % 20;
         }
 
-        private void SoundDebugForm_FormClosing(object sender, FormClosingEventArgs e)
+        /// <summary>
+        /// A node of a sound tree, with its children accessible by key (like the WinForms TreeNodeCollection).
+        /// </summary>
+        class SoundTreeNode
         {
-            e.Cancel = true;
-            Viewer.SoundDebugFormEnabled = false;
-        }
+            readonly ItemsControl Container; // The TreeView for the root, else the TreeViewItem
+            readonly Dictionary<string, SoundTreeNode> Children = new Dictionary<string, SoundTreeNode>();
 
-        private void activeSoundList_KeyDown(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-        }
+            public SoundTreeNode(ItemsControl container)
+            {
+                Container = container;
+            }
 
-        private void activeSoundList_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            e.Handled = true;
-        }
+            TreeViewItem Item => Container as TreeViewItem;
 
-        private void inactiveSoundList_KeyDown(object sender, KeyEventArgs e)
-        {
-            e.Handled = true;
-        }
+            public object Tag
+            {
+                get => Item?.Tag;
+                set { if (Item != null) Item.Tag = value; }
+            }
 
-        private void inactiveSoundList_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            e.Handled = true;
+            public string Text
+            {
+                get => Item?.Header as string ?? "";
+                set { if (Item != null && (Item.Header as string) != value) Item.Header = value; }
+            }
+
+            public bool IsExpanded => Item?.IsExpanded ?? true;
+
+            public int Count => Children.Count;
+
+            public SoundTreeNode Find(string key) => Children.TryGetValue(key, out var node) ? node : null;
+
+            public SoundTreeNode Add(string key, string text)
+            {
+                var node = new SoundTreeNode(new TreeViewItem { Header = text });
+                Children[key] = node;
+                Container.Items.Add(node.Container);
+                return node;
+            }
+
+            public void Remove(string key)
+            {
+                if (Children.TryGetValue(key, out var node))
+                {
+                    Children.Remove(key);
+                    Container.Items.Remove(node.Container);
+                }
+            }
+
+            public void Clear()
+            {
+                Children.Clear();
+                Container.Items.Clear();
+            }
         }
     }
 }

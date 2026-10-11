@@ -816,6 +816,8 @@ namespace Orts.Viewer3D
 
             HandleUserInput(elapsedTime);
             UserInput.Handled();
+            // Apply the switch, signal and multiplayer actions requested in the map window
+            Program.MapForm?.RunPendingGameActions();
             // We need to do it also here, because passing from manual to auto a ReverseFormation may be needed
             if (Camera is TrackingCamera && Camera.AttachedCar != null && Camera.AttachedCar.Train != null && Camera.AttachedCar.Train.FormationReversed)
             {
