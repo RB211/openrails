@@ -1,0 +1,42 @@
+<Window x:Class="Orts.TimetableEditor.Views.PoolView"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PoolView" Height="450" Width="800" WindowStartupLocation="CenterOwner">
+    <Grid RowDefinitions="44,*,40" ColumnDefinitions="*,*">
+        <DockPanel>
+            <Button DockPanel.Dock="Left" Width="40" Command="{Binding AddPool}" ToolTip.Tip="Add Pool">
+                <Image Width="32" Height="32" Source="/Images/Add_24x24.png"/>
+            </Button>
+            <Button DockPanel.Dock="Left" Width="40" Command="{Binding AddRow}" ToolTip.Tip="Add Row">
+                <Image Width="32" Height="32" Source="/Images/RowAdd.png"/>
+            </Button>
+            <Button DockPanel.Dock="Left" Width="40" Command="{Binding InsertRow}" ToolTip.Tip="Insert Row">
+                <Image Width="32" Height="32" Source="/Images/RowInsert.png"/>
+            </Button>
+            <Button DockPanel.Dock="Left" Width="40" Command="{Binding RemoveRow}" ToolTip.Tip="Delete Row">
+                <Image Width="32" Height="32" Source="/Images/RowDelete.png"/>
+            </Button>
+            <Button DockPanel.Dock="Right" Width="40" Command="{Binding SaveCommand}" ToolTip.Tip="Save" HorizontalAlignment="Right">
+                <Image Width="32" Height="32" Source="/Images/Save_32x32.png"/>
+            </Button>
+        </DockPanel>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding PoolItems}" AutoGenerateColumns="False" SelectedItem="{Binding SelectedItem}"
+                  GridLinesVisibility="All" BorderThickness="1" BorderBrush="Gray">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Qalifier" Width="150" Binding="{Binding Name}"/>
+                <DataGridTextColumn Header="Value" Width="200" Binding="{Binding Value}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <DataGrid x:Name="PathListView" Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ConsistsAndPaths.Paths}" DoubleTapped="PathListView_MouseDoubleClick"
+                  SelectedItem="{Binding SelectedTrainPath}" IsVisible="{Binding ShowPathList}" IsReadOnly="True" AutoGenerateColumns="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Filename" Width="180" Binding="{Binding FileName}"/>
+                <DataGridTextColumn Header="Pathname" Width="190" Binding="{Binding Name}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Content="OK" Width="70" Margin="30 0" Click="OK_Click" HorizontalContentAlignment="Center"/>
+            <Button Content="Cancel" Width="70" Margin="30 0" IsCancel="True" Click="Cancel_Click" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

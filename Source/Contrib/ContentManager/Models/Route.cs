@@ -45,7 +45,7 @@ namespace ORTS.ContentManager.Models
         {
             if (!Directory.Exists(folderPath))
                 throw new DirectoryNotFoundException(folderPath);
-            var fileNames = Directory.GetFiles(folderPath, "*.trk");
+            var fileNames = PathCase.GetFiles(folderPath, "*.trk");
             if (fileNames.Length == 0)
                 throw new FileNotFoundException("TRK file not found in '" + folderPath + "'.", System.IO.Path.Combine(folderPath, "*.trk"));
             return fileNames[0];

@@ -24,7 +24,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text;
 using Path = ORTS.ContentManager.Models.Path;
 using ORTS.Common;
@@ -48,8 +49,9 @@ namespace ORTS.ContentManager
 
             try {
                 var stream = new MemoryStream();
-                var serializer = new BinaryFormatter();
-                serializer.Serialize(stream, content);
+                // BinaryFormatter is not available on .NET 9+; JSON is used to check that Content items remain serializable.
+                var serializerOptions = new JsonSerializerOptions { ReferenceHandler = ReferenceHandler.IgnoreCycles };
+                JsonSerializer.Serialize(stream, content, content.GetType(), serializerOptions);
 #if DEBUG_CONTENT_SERIALIZATION
                 var serializedText = new StringBuilder((int)stream.Length);
                 stream.Position = 0;
@@ -83,7 +85,7 @@ namespace ORTS.ContentManager
 
                     if (content is ContentMSTSRoute)
                     {
-                        var file = new RouteFile(System.IO.Path.Combine(content.PathName, content.Name + ".trk"));
+                        var file = new RouteFile(PathCase.Combine(content.PathName, content.Name + ".trk"));
                         details.AppendFormat("Route ID:\t{1}{0}", Environment.NewLine, file.Tr_RouteFile.RouteID);
                         details.AppendFormat("Route Key:\t{1}{0}", Environment.NewLine, file.Tr_RouteFile.FileName);
                     }

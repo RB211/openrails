@@ -1,5 +1,4 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,11 +7,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
 using Orts.TimetableEditor.Views;
 using Orts.TimetableEditor.Model;
-using System.Windows.Documents;
 
 namespace Orts.TimetableEditor.ViewModel
 {
@@ -38,8 +34,8 @@ namespace Orts.TimetableEditor.ViewModel
         private int currentRowIndex;
         private int currentColumnIndex;
         private string currentColumnIndexText;
-        private Visibility showNewStationsButton;
-        private Visibility showAdjustStationsButtons;
+        private bool showNewStationsButton;
+        private bool showAdjustStationsButtons;
         private ConsistsAndPaths consandpaths;
         public MyICommand NewStationFile { get; set; }
         public MyICommand MoveStationUp { get; set; }
@@ -104,7 +100,7 @@ namespace Orts.TimetableEditor.ViewModel
             {
                 currentRow = value;
                 OnPropertyChanged(nameof(CurrentRow));
-                MessageBox.Show(Timetable.Rows.IndexOf(CurrentRow).ToString());
+                _ = Dialogs.Show(Timetable.Rows.IndexOf(CurrentRow).ToString());
             }
         }
 
@@ -137,7 +133,7 @@ namespace Orts.TimetableEditor.ViewModel
             {
                 selectedCell = value;
                 OnPropertyChanged(nameof(SelectedCell));
-                MessageBox.Show(SelectedCell);
+                _ = Dialogs.Show(SelectedCell);
             }
         }
 
@@ -197,7 +193,7 @@ namespace Orts.TimetableEditor.ViewModel
         {
             get
             {
-                return TdbFileName;
+                return tdbfilename;
             }
             set
             {
@@ -280,7 +276,7 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        public Visibility ShowNewStationsButton
+        public bool ShowNewStationsButton
         {
             get
             {
@@ -295,7 +291,7 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        public Visibility ShowAdjustStationsButtons
+        public bool ShowAdjustStationsButtons
         {
             get
             {
@@ -310,21 +306,19 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        public void newTimetable(string tdbfilename, string routepath)
+        /// <summary>
+        /// Set up a new timetable, asking the user for the stations; returns false if that was cancelled.
+        /// </summary>
+        public async Task<bool> newTimetable(string tdbfilename, string routepath)
         {
             RoutePath = routepath;
-            activityPath = routePath + "\\" + "Activities\\OpenRails";
+            activityPath = PathCase.Combine(routePath, "Activities", "OpenRails");
             if (Directory.Exists(activityPath) == false)
             {
                 Directory.CreateDirectory(activityPath);
             }
-            string pt = RoutePath;
-            pathsPath = pt + "\\" + "Paths";
-            pt = pt + ".tst";
-            pt = Path.GetDirectoryName(pt);
-            pt = pt + ".tst";
-            pt = Path.GetDirectoryName(pt);
-            consistPath = pt;
+            pathsPath = PathCase.Combine(RoutePath, "Paths");
+            consistPath = Path.GetDirectoryName(Path.GetDirectoryName(RoutePath));
             TdbFileName = tdbfilename;
             StationsView stationsView = new StationsView();
             stationsView.DataContext = this;
@@ -332,22 +326,23 @@ namespace Orts.TimetableEditor.ViewModel
             bool hasFiles = loadStationFiles();
             if (hasFiles == true)
             {
-                ShowNewStationsButton = Visibility.Visible;
-                ShowAdjustStationsButtons = Visibility.Collapsed;
+                ShowNewStationsButton = true;
+                ShowAdjustStationsButtons = false;
             }
             else
             {
-                ShowNewStationsButton = Visibility.Collapsed;
-                ShowAdjustStationsButtons = Visibility.Visible;
+                ShowNewStationsButton = false;
+                ShowAdjustStationsButtons = true;
                 extractStations(TdbFileName);
             }
-            stationsView.ShowDialog();
+            bool ok = await Dialogs.ShowDialog(stationsView);
+            return ok && Timetable.Columns.Count > 0;
         }
 
         public void LoadTimetable(string tdbfilename, string routepath, string timetablefile)
         {            
             RoutePath=routepath;
-            activityPath = routePath + "\\" + "Activities\\OpenRails";
+            activityPath = PathCase.Combine(routePath, "Activities", "OpenRails");
             delimiter=';';
             using (var reader = new StreamReader(timetablefile))
             {
@@ -380,7 +375,7 @@ namespace Orts.TimetableEditor.ViewModel
                     string line = (Timetable.Rows.Count + 1).ToString() + delimiter + reader.ReadLine();
                     string[] row = line.Split(delimiter);
                     DataRow dr = Timetable.NewRow();
-                    for (int i = 0; i < headers.Length; i++)
+                    for (int i = 0; i < Math.Min(row.Length, Timetable.Columns.Count); i++)
                     {
                         dr[i] = row[i];
                     }
@@ -459,7 +454,7 @@ namespace Orts.TimetableEditor.ViewModel
         private void loadStationFile(string file)
         {
             Stations.Clear();
-            using (StreamReader sr = new StreamReader(activityPath + "\\" + file))
+            using (StreamReader sr = new StreamReader(Path.Combine(activityPath, file)))
             {
                 string line;
                 while ((line = sr.ReadLine()) != null)
@@ -665,8 +660,8 @@ namespace Orts.TimetableEditor.ViewModel
         private void OnCreateNewStationFile()
         {
             extractStations(tdbfilename);
-            ShowNewStationsButton = Visibility.Collapsed;
-            ShowAdjustStationsButtons = Visibility.Visible;
+            ShowNewStationsButton = false;
+            ShowAdjustStationsButtons = true;
             SelectedStationFile = null;
         }
         private bool CanCreateNewStationFile()
@@ -712,7 +707,7 @@ namespace Orts.TimetableEditor.ViewModel
             return res;
         }
 
-        private void OnSaveNewStationFile()
+        private async void OnSaveNewStationFile()
         {
             string fname = Path.GetFileNameWithoutExtension(TTFileName);
             bool found = false;
@@ -725,22 +720,22 @@ namespace Orts.TimetableEditor.ViewModel
             }
             if (found == true)
             {
-                if (MessageBox.Show("Overwrite File", "File already exists", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                if (await Dialogs.AskYesNo("Overwrite File", "File already exists"))
                 {
                     found = false;
                 }
             }
             if (found == false)
             {
-                using (StreamWriter sw = new StreamWriter(activityPath + "\\" + fname + ".stations"))
+                using (StreamWriter sw = new StreamWriter(Path.Combine(activityPath, fname + ".stations")))
                 {
                     foreach (string station in Stations)
                     {
                         sw.WriteLine(station);
                     }
                 }
-                ShowAdjustStationsButtons = Visibility.Collapsed;
-                ShowNewStationsButton = Visibility.Visible;
+                ShowAdjustStationsButtons = false;
+                ShowNewStationsButton = true;
             }
             loadStationFiles();
             SelectedStationFile = StationFiles[StationFiles.IndexOf(fname + ".stations")];
@@ -837,9 +832,9 @@ namespace Orts.TimetableEditor.ViewModel
             }
             return res;
         }
-        private void OnDeleteRow()
+        private async void OnDeleteRow()
         {
-            if (MessageBox.Show("Delete current Row?", "Delete Row", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (await Dialogs.AskYesNo("Delete current Row?", "Delete Row"))
             {
                 Timetable.Rows[CurrentRowIndex].Delete();
                 renumberRows();
@@ -882,9 +877,9 @@ namespace Orts.TimetableEditor.ViewModel
         {
             return true;
         }
-        private void OnDeleteCol()
+        private async void OnDeleteCol()
         {
-            if (MessageBox.Show("Delete current column?", "Delete Column", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (await Dialogs.AskYesNo("Delete current column?", "Delete Column"))
             {
                 DataTable old;
                 Timetable.Columns.Remove(Timetable.Columns[CurrentColumnIndex]);
@@ -900,7 +895,7 @@ namespace Orts.TimetableEditor.ViewModel
             return true;
         }
 
-        private void OnEditStations()
+        private async void OnEditStations()
         {
             StationParamsViewModel stParams = new StationParamsViewModel();
             foreach(DataRow row in Timetable.Rows)
@@ -914,8 +909,7 @@ namespace Orts.TimetableEditor.ViewModel
             }
             StationParametersView st = new StationParametersView();
             st.DataContext = stParams;
-            st.ShowDialog();
-            if(st.DialogResult==true)
+            if(await Dialogs.ShowDialog(st))
             {
                 foreach(Station station in stParams.Stations)
                 {
@@ -945,21 +939,11 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        private void OnEditTrain()
+        private async void OnEditTrain()
         {
             if(ConsAndPaths.Consists.Count==0 || ConsAndPaths.Paths.Count==0)
             {
-                waiting waitingscreen = new waiting();
-                waitingscreen.Show();
-                if(ConsAndPaths.Consists.Count==0)
-                {
-                    ConsAndPaths.loadConsists();
-                }                
-                if(ConsAndPaths.Paths.Count==0)
-                {
-                    ConsAndPaths.loadPaths();
-                }
-                waitingscreen.Close();
+                await Dialogs.RunWithWaitingWindow(() => ConsAndPaths.LoadMissing());
             }
             TrainViewModel model = new TrainViewModel();           
             model.ConsistsAndPaths = ConsAndPaths;
@@ -999,8 +983,7 @@ namespace Orts.TimetableEditor.ViewModel
                 }
             }
             trains.DataContext = model;
-            trains.ShowDialog();
-            if(trains.DialogResult==true)
+            if(await Dialogs.ShowDialog(trains))
             {
                 bool firstcomment = true;
                 for(int r=0; r<Timetable.Rows.Count;r++)
@@ -1055,17 +1038,27 @@ namespace Orts.TimetableEditor.ViewModel
 
         private void OnPaste()
         {
-            string[] lines = Clipboard.GetText().Split('\n');
-            int rows = lines.Length-1;
+            // Pasting is handled by the Table view (Ctrl+V), which reads the clipboard and calls PasteText.
+        }
+
+        public async Task PasteText(string text)
+        {
+            string[] lines = text.Replace("\r", "").Split('\n');
+            // Spreadsheet data on the clipboard ends with a line break; ignore the empty last line.
+            if (lines.Length > 1 && lines[lines.Length - 1] == "")
+            {
+                lines = lines.Take(lines.Length - 1).ToArray();
+            }
+            int rows = lines.Length;
             int columns = 0;
-            for(int i=0; i<lines.Count()-1;i++)
+            for(int i=0; i<lines.Count();i++)
             {
                 string[] cols = lines[i].Split('\t');
-                columns = cols.Length;
+                columns = Math.Max(columns, cols.Length);
             }
             if (CurrentColumnIndex + columns > Timetable.Columns.Count || CurrentRowIndex + rows > Timetable.Rows.Count)
             {
-                MessageBox.Show("Not enough room for data. Paste canceled");
+                await Dialogs.Show("Not enough room for data. Paste canceled");
             }
             else
             {
@@ -1086,21 +1079,11 @@ namespace Orts.TimetableEditor.ViewModel
             return true;
         }
 
-        private void OnDispose()
+        private async void OnDispose()
         {
             if (ConsAndPaths.Consists.Count == 0 || ConsAndPaths.Paths.Count == 0)
             {
-                waiting waitingscreen = new waiting();
-                waitingscreen.Show();
-                if (ConsAndPaths.Consists.Count == 0)
-                {
-                    ConsAndPaths.loadConsists();
-                }
-                if (ConsAndPaths.Paths.Count == 0)
-                {
-                    ConsAndPaths.loadPaths();
-                }
-                waitingscreen.Close();
+                await Dialogs.RunWithWaitingWindow(() => ConsAndPaths.LoadMissing());
             }
             DisposeViewModel dispvm = new DisposeViewModel();            
             dispvm.ConsistsAndPaths = ConsAndPaths;
@@ -1125,7 +1108,7 @@ namespace Orts.TimetableEditor.ViewModel
                     dispvm.ParseDispose(Timetable.Rows[r][CurrentColumnIndex].ToString());
                 }
             }
-            disp.ShowDialog();
+            await Dialogs.ShowDialog(disp);
         }
 
         private bool CanDispose()

@@ -25,7 +25,9 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
+using System.Threading.Tasks;
+using ActivityEditor;
+using Avalonia.Platform.Storage;
 using AEWizard;
 using LibAE;
 using LibAE.Formats;
@@ -45,7 +47,6 @@ namespace ActivityEditor.Engine
         public bool saveEnabled = false;
         public bool saveAsEnabled = false;
         public bool loadEnabled = true;    //  Maybe to change as preference ComponentItem setted
-        public System.Windows.Forms.SaveFileDialog SaveActivity;
 
 
         public AEActivity()
@@ -57,9 +58,9 @@ namespace ActivityEditor.Engine
             return activityInfo.ActivityName;
         }
 
-        public void LoadPanels(System.Windows.Forms.GroupBox activityBox)
+        public void LoadPanels(GroupBox activityBox)
         {
-            activityBox.Visible = true;
+            activityBox.IsVisible = true;
         }
 
         public void LoadActivity(ActivityInfo activity)
@@ -107,39 +108,35 @@ namespace ActivityEditor.Engine
             stationPanelVisibility = info;
         }
 
-        public void ClosegActivity()
+        public async Task ClosegActivity()
         {
-            DialogResult result = MessageBox.Show("Do you want to save?", "Save activity ?",
-                                    MessageBoxButtons.OKCancel);
-            switch (result)
+            if (await Dialogs.AskOkCancel("Do you want to save?", "Save activity ?"))
             {
-                case DialogResult.OK:
+                if (activityInfo.FileName == null || activityInfo.FileName.Length > 0)
+                    if (!await SaveAs(activityInfo))
                     {
-                        if (activityInfo.FileName == null || activityInfo.FileName.Length > 0)
-                            if (!SaveAs(activityInfo))
-                            {
-                                activityInfo.saveActivity();
-                            }
-                        break;
-                    }
-                case DialogResult.Cancel:
-                    {
-                        break;
+                        activityInfo.saveActivity();
                     }
             }
         }
 
-        public bool SaveAs(ActivityInfo activity)
+        public async Task<bool> SaveAs(ActivityInfo activity)
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ActEditor));
-            this.SaveActivity = new System.Windows.Forms.SaveFileDialog();
-            this.SaveActivity.InitialDirectory = activity.RoutePath;
-            this.SaveActivity.DefaultExt = "act.json";
-            resources.ApplyResources(this.SaveActivity, "SaveActivity");
-
-            if (this.SaveActivity.ShowDialog() == DialogResult.OK)
+            var storage = Program.actEditor.StorageProvider;
+            IStorageFolder startFolder = null;
+            if (!string.IsNullOrEmpty(activity.RoutePath) && System.IO.Directory.Exists(activity.RoutePath))
+                startFolder = await storage.TryGetFolderFromPathAsync(activity.RoutePath);
+            var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                activity.saveActivity(this.SaveActivity.FileName);
+                Title = "Save Activity",
+                SuggestedStartLocation = startFolder,
+                DefaultExtension = "act.json",
+                FileTypeChoices = new[] { new FilePickerFileType("Activity file") { Patterns = new[] { "*.act.json" } } },
+            });
+            var fileName = file?.TryGetLocalPath();
+            if (fileName != null)
+            {
+                activity.saveActivity(fileName);
                 return true;
             }
             return false;

@@ -57,7 +57,7 @@ namespace ORTS.ContentManager.Models
                 var WagCount = 0;
                 var Separator = ""; // when set, indicates that subsequent engines are in a separate block
 
-                var basePath = System.IO.Path.Combine(System.IO.Path.Combine(content.Parent.PathName, "Trains"), "Trainset");
+                var basePath = PathCase.Combine(content.Parent.PathName, "Trains", "Trainset");
 
                 var CarList = new List<Car>();
                 foreach (Wagon wag in file.Train.TrainCfg.WagonList)
@@ -66,7 +66,7 @@ namespace ORTS.ContentManager.Models
                     try
                     {
                         var fileType = wag.IsEngine ? ".eng" : ".wag";
-                        var filePath = System.IO.Path.Combine(System.IO.Path.Combine(basePath, wag.Folder), wag.Name + fileType);
+                        var filePath = PathCase.Combine(basePath, wag.Folder, wag.Name + fileType);
                         var wagonFile = new WagonFile(filePath);
                         var engFile = wag.IsEngine ? new EngineFile(filePath) : null;
 

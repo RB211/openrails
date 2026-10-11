@@ -26,9 +26,10 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
+using ActivityEditor;
+using Avalonia.Controls;
+using Avalonia.Layout;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using LibAE;
 using LibAE.Formats;
 using Orts.Formats.Msts;
@@ -40,14 +41,11 @@ namespace ActivityEditor.Engine
 {
     public class AERouteConfig
     {
-        public System.Windows.Forms.TableLayoutPanel MainPanel;
-        public System.Windows.Forms.Label label;
+        public Grid MainPanel;
 
         public ORRouteConfig orRouteConfig { get { return Viewer.Simulator.orRouteConfig; } protected set { } }
-        public System.Windows.Forms.TableLayoutPanel RoutePanel;
-
-        public System.Windows.Forms.FlowLayoutPanel TagPanel;
-        public System.Windows.Forms.FlowLayoutPanel StationPanel;
+        public StackPanel TagPanel;
+        public StackPanel StationPanel;
         //  MSTS data
         public TrackNode[] nodes { get { return simulator.nodes; } set { } }
         AEConfig Parent;
@@ -68,109 +66,59 @@ namespace ActivityEditor.Engine
 
         public void LoadPanels(string ident, GroupBox routeData)
         {
-            // 
-            // groupBox2
-            // 
-            string name = getRouteName();
-            MainPanel = new System.Windows.Forms.TableLayoutPanel();
+            // Two scrolling lists (tags and stations), one above the other, in the "routeData" group box.
             routeData.Text = ident;
-            // 
-            // ActivityPanel
-            // 
-            MainPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-                        | System.Windows.Forms.AnchorStyles.Left)
-                        | System.Windows.Forms.AnchorStyles.Right
-                        | System.Windows.Forms.AnchorStyles.Bottom)));
-            MainPanel.AutoScroll = true;
-            //MainPanel.AutoSize = true;
-            MainPanel.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            MainPanel.Location = new System.Drawing.Point(0, 15);
-            MainPanel.Name = "MainPanel";
-            MainPanel.Size = new System.Drawing.Size(190, routeData.Height - 10);
-            MainPanel.TabIndex = 0;
-            MainPanel.ColumnCount = 1;
-            MainPanel.RowCount = 3;
-            MainPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            MainPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
-            //MainPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
-            //MainPanel.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            MainPanel.Visible = true;
-            //
-            //  Label
-            //
-            //label = new System.Windows.Forms.Label();
-            //label.Location = new System.Drawing.Point(18, 113);
-            //label.Name = "label";
-            //label.Size = new System.Drawing.Size(150, 13);
-            //label.AutoSize = false;
-            //label.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Left
-            //    | System.Windows.Forms.AnchorStyles.Right | System.Windows.Forms.AnchorStyles.Top));
-            //label.TabIndex = 10;
-            //label.Text = ident;
-            //label.TextAlign = System.Drawing.ContentAlignment.TopCenter;
-
-
-            TagPanel = new System.Windows.Forms.FlowLayoutPanel();
-            TagPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Left
-                | System.Windows.Forms.AnchorStyles.Top));
-            TagPanel.AutoScroll = true;
-            TagPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            TagPanel.Location = new System.Drawing.Point(0, 4);
-            TagPanel.Name = "Tag Panel";
-            //TagPanel.Size = new System.Drawing.Size(MainPanel.Width - 20, (groupBox.Height/2) - 20);
-            TagPanel.Height = (routeData.Height / 2) - 20;
-            TagPanel.Width = MainPanel.Width - 15;
-            //TagPanel.TabIndex = 2;
-            TagPanel.FlowDirection = FlowDirection.TopDown;
-            TagPanel.WrapContents = false;
-            TagPanel.Visible = true;
-
-
-            StationPanel = new System.Windows.Forms.FlowLayoutPanel();
-            StationPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(System.Windows.Forms.AnchorStyles.Left
-                | System.Windows.Forms.AnchorStyles.Top));
-            StationPanel.AutoScroll = true;
-            StationPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            //StationPanel.Location = new System.Drawing.Point(3, 170);
-            StationPanel.Name = "Station Panel";
-            //StationPanel.Size = new System.Drawing.Size(MainPanel.Width - 20, (groupBox.Height / 2) - 20);
-            StationPanel.Height = (routeData.Height / 2) - 20;
-            StationPanel.Width = MainPanel.Width - 15;
-            //StationPanel.TabIndex = 2;
-            StationPanel.FlowDirection = FlowDirection.TopDown;
-            StationPanel.WrapContents = false;
-            StationPanel.Visible = true;
-
-            MainPanel.Controls.Add(TagPanel);
-            MainPanel.Controls.Add(StationPanel);
-            //groupBox.Controls.Add(label);
-            routeData.Controls.Add(MainPanel);
-            routeData.ResumeLayout(true);
+            TagPanel = new StackPanel { Orientation = Orientation.Vertical };
+            StationPanel = new StackPanel { Orientation = Orientation.Vertical };
+            MainPanel = new Grid { RowDefinitions = new RowDefinitions("*,*") };
+            var tagScroller = new ScrollViewer { Content = TagPanel, Margin = new Avalonia.Thickness(0, 0, 0, 4) };
+            var stationScroller = new ScrollViewer { Content = StationPanel };
+            Grid.SetRow(stationScroller, 1);
+            MainPanel.Children.Add(tagScroller);
+            MainPanel.Children.Add(stationScroller);
+            routeData.Content = MainPanel;
+            // Tags and stations may have been loaded before the panels were created.
+            if (Parent.tagGBList != null)
+                AddTagPanel(Parent.tagGBList.ToArray());
+            if (Parent.stationGBList != null)
+                AddStationPanel(Parent.stationGBList.ToArray());
         }
 
-
-        public void AddTagPanel(System.Windows.Forms.GroupBox[] groupBoxList)
+        /// <summary>Show this route's panels in the (shared) "routeData" group box.</summary>
+        public void ShowPanels(GroupBox routeData)
         {
-            if (this.TagPanel.Controls != null)
-                this.TagPanel.Controls.Clear();
-            this.TagPanel.Controls.AddRange(groupBoxList);
+            if (MainPanel != null && routeData.Content != MainPanel)
+            {
+                (MainPanel.Parent as Panel)?.Children.Remove(MainPanel);
+                routeData.Content = MainPanel;
+            }
         }
 
-        public void AddStationPanel(System.Windows.Forms.GroupBox[] groupBoxList)
+        public void AddTagPanel(GroupBox[] groupBoxList)
         {
-            this.StationPanel.Controls.Clear();
-            this.StationPanel.Controls.AddRange(groupBoxList);
+            if (this.TagPanel == null)
+                return;
+            this.TagPanel.Children.Clear();
+            this.TagPanel.Children.AddRange(groupBoxList);
+        }
+
+        public void AddStationPanel(GroupBox[] groupBoxList)
+        {
+            if (this.StationPanel == null)
+                return;
+            this.StationPanel.Children.Clear();
+            this.StationPanel.Children.AddRange(groupBoxList);
         }
 
         public System.Drawing.Point GetTagPanelPosition()
         {
-            System.Drawing.Point current = new System.Drawing.Point(TagPanel.AutoScrollPosition.X, TagPanel.AutoScrollPosition.Y);
+            System.Drawing.Point current = new System.Drawing.Point(0, 0);
             return current;
         }
 
         public System.Drawing.Point GetStationPanelPosition()
         {
-            System.Drawing.Point current = new System.Drawing.Point(StationPanel.AutoScrollPosition.X, StationPanel.AutoScrollPosition.Y);
+            System.Drawing.Point current = new System.Drawing.Point(0, 0);
             return current;
         }
 

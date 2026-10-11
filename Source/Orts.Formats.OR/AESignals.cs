@@ -269,14 +269,14 @@ namespace Orts.Formats.OR
 
             // get all filesnames in World directory
 
-            var WFilePath = data.RoutePath + @"/WORLD/";
+            var WFilePath = MSTSData.CombineIgnoreCase(data.RoutePath, "WORLD");
 
             var Tokens = new List<TokenID>();
             Tokens.Add(TokenID.Signal);
 
             // loop through files, use only extention .w, skip w+1000000+1000000.w file
 
-            foreach (var fileName in Directory.GetFiles(ORTS.IO.PathResolver.Resolve(WFilePath), "*.w"))
+            foreach (var fileName in Directory.GetFiles(WFilePath, "*.w", new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive }))
             {
                 // validate file name a little bit
 

@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace Orts.TimetableEditor.Model
 {
@@ -118,10 +117,23 @@ namespace Orts.TimetableEditor.Model
             }
         }
 
+        /// <summary>Load consists and paths if they have not been loaded yet.</summary>
+        public void LoadMissing()
+        {
+            if (Consists.Count == 0)
+            {
+                loadConsists();
+            }
+            if (Paths.Count == 0)
+            {
+                loadPaths();
+            }
+        }
+
         public void loadPaths()
         {
             Paths.Clear();
-            string[] files = Directory.GetFiles(PathsPath, "*.pat");
+            string[] files = PathCase.GetFiles(PathsPath, "*.pat");
             foreach(string file in files)
             {
                 bool siding = false;
@@ -144,7 +156,7 @@ namespace Orts.TimetableEditor.Model
                     {
                         name = Path.GetFileNameWithoutExtension(file);
                     }
-                    if(file.StartsWith("sid_"))
+                    if(Path.GetFileName(file).StartsWith("sid_", StringComparison.OrdinalIgnoreCase))
                     {
                         siding = true;
                     }
@@ -167,7 +179,7 @@ namespace Orts.TimetableEditor.Model
         public void loadConsists()
         {
             Consists.Clear();
-            string[] files = Directory.GetFiles(ConsistsPath, "*.con");
+            string[] files = PathCase.GetFiles(ConsistsPath, "*.con");
             foreach (string file in files)
             {
                 bool engine = false;

@@ -76,7 +76,7 @@ namespace Orts.TimetableEditor.ViewModel
             Files.Clear();
             foreach (string filter1 in filter)
             {
-                string[] files = Directory.GetFiles(path, filter1);
+                string[] files = PathCase.GetFiles(path, filter1);
                 foreach (string file in files)
                 {
                     Files.Add(Path.GetFileName(file));

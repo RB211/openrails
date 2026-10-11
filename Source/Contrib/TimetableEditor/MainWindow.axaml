@@ -1,0 +1,34 @@
+<Window x:Class="Orts.TimetableEditor.MainWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:Views="clr-namespace:Orts.TimetableEditor.Views"
+        Title="Open Rails Timetable Editor" Height="450" Width="800" WindowState="Maximized">
+    <Grid RowDefinitions="Auto,*">
+        <Menu>
+            <MenuItem Header="File">
+                <MenuItem Header="New Timetable" Click="Menu_NewTimetable"/>
+                <Separator/>
+                <MenuItem Header="Open Timetable" Click="Menu_LoadTimetable"/>
+                <MenuItem Header="Save Timetable" Click="Menu_SaveTimetable" x:Name="Menu_Save" IsEnabled="False"/>
+                <Separator/>
+                <MenuItem Header="Open Timetable List" Click="Menu_LoadTimetableList"/>
+                <MenuItem Header="Save To List" Click="Menu_SaveTimetableList" x:Name="Menu_SaveList" IsEnabled="False"/>
+                <Separator/>
+                <MenuItem Header="Close Timetable" Click="Menu_CloseTimetable" x:Name="Menu_CloseTT" IsEnabled="False"/>
+                <Separator/>
+                <MenuItem Header="Zip Timetable" Click="Menu_Zip_Timetable" x:Name="Menu_ZipTimetable" IsEnabled="False" IsVisible="False"/>
+                <Separator/>
+                <MenuItem Header="Close" Click="Close_Click"/>
+            </MenuItem>
+            <MenuItem Header="Pools" IsEnabled="False" x:Name="MenuItem_Pools">
+                <MenuItem Header="New">
+                    <MenuItem Header="Create Pool-File" Click="New_Pool_Click"/>
+                    <MenuItem Header="Create Turntable Pool-File" Click="New_Turntable_Pool_Click"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem Header="Open" Click="Open_Pool_CLick"/>
+            </MenuItem>
+        </Menu>
+        <Views:MainView Grid.Row="1" x:Name="MainView"/>
+    </Grid>
+</Window>

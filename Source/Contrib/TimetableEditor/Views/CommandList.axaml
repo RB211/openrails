@@ -1,0 +1,54 @@
+<UserControl x:Class="Orts.TimetableEditor.Views.CommandList"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Replaces the WPF ListView/GridView with "Command", "Command-Value" and "Parameter" columns, used by
+         the train and dispose dialogs. DataContext is the dialog's view model (Commands, SelectedCommand). -->
+    <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="100,215,460" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+            <TextBlock Text="Command" Margin="6 3" FontWeight="SemiBold"/>
+            <TextBlock Grid.Column="1" Text="Command-Value" Margin="6 3" FontWeight="SemiBold"/>
+            <TextBlock Grid.Column="2" Text="Parameter" Margin="6 3" FontWeight="SemiBold"/>
+        </Grid>
+        <ListBox ItemsSource="{Binding Commands}" SelectedItem="{Binding SelectedCommand}">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="100,215,460">
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        <Grid Grid.Column="1" ColumnDefinitions="90,80,40" VerticalAlignment="Top">
+                            <TextBox Text="{Binding Value}" IsVisible="{Binding HasValue}"/>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" IsVisible="{Binding HasItems}" Width="80"/>
+                            <Button Grid.Column="2" Content="Set" IsVisible="{Binding HasItems}" Command="{Binding SetValue}"/>
+                        </Grid>
+                        <Grid Grid.Column="2" ColumnDefinitions="350,80" RowDefinitions="Auto,Auto,Auto" IsVisible="{Binding CanHaveParameters}">
+                            <DockPanel Grid.RowSpan="3">
+                                <Grid DockPanel.Dock="Top" ColumnDefinitions="100,215">
+                                    <TextBlock Text="Parameter" Margin="4 0" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="1" Text="Parameter-Value" Margin="4 0" FontWeight="SemiBold"/>
+                                </Grid>
+                                <ListBox ItemsSource="{Binding Parameters}" SelectedItem="{Binding SelectedParameter}" MinHeight="60">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="100,90,80,40">
+                                                <TextBlock Text="{Binding ParameterName}" VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="1" Text="{Binding ParameterValue}" IsVisible="{Binding HasValue}"/>
+                                                <ComboBox Grid.Column="2" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" IsVisible="{Binding HasItems}"/>
+                                                <Button Grid.Column="3" Content="Set" Command="{Binding SetValue}" IsVisible="{Binding HasItems}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding PossibleParameters}" SelectedItem="{Binding SelectedPossibleParameter}" Width="80"/>
+                            <Button Grid.Row="1" Grid.Column="1" Command="{Binding AddParameter}" Width="32" ToolTip.Tip="Add Parameter" Padding="2">
+                                <Image Width="24" Height="24" Source="/Images/Add_24x24.png"/>
+                            </Button>
+                            <Button Grid.Row="2" Grid.Column="1" Command="{Binding RemoveParameter}" Width="32" ToolTip.Tip="Remove Parameter" Padding="2">
+                                <Image Width="24" Height="24" Source="/Images/Remove_24x24.png"/>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</UserControl>

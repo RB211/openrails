@@ -35,18 +35,39 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
-using System.Drawing.Drawing2D;
+using Brushes = ActivityEditor.Drawing.Brushes;
+using Pens = ActivityEditor.Drawing.Pens;
+using Image = ActivityEditor.Drawing.Image;
+using Matrix = ActivityEditor.Drawing.Matrix;
+using Cursor = Avalonia.Input.Cursor;
+using Graphics = ActivityEditor.Drawing.Graphics;
+using Font = ActivityEditor.Drawing.Font;
+using FontStyle = ActivityEditor.Drawing.FontStyle;
+using Pen = ActivityEditor.Drawing.Pen;
+using SolidBrush = ActivityEditor.Drawing.SolidBrush;
+using Icon = ActivityEditor.Drawing.Icon;
+using Size = System.Drawing.Size;
+using Point = System.Drawing.Point;
+using KeyEventArgs = Avalonia.Input.KeyEventArgs;
+using TextBox = Avalonia.Controls.TextBox;
+using Button = Avalonia.Controls.Button;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Windows.Forms;
+using ActivityEditor.Drawing;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Threading;
+using System.Threading.Tasks;
 using System.Xml.Serialization;
 using Color = System.Drawing.Color;
 
 namespace ActivityEditor.Engine
 {
-    public partial class Viewer2D : Form
+    public partial class Viewer2D : UserControl
     {
         public TypeEditor ViewerMode;
         public string ActivityPath;
@@ -94,8 +115,8 @@ namespace ActivityEditor.Engine
         float yScale = 1;
         public ToolClicks ToolClicked = ToolClicks.NO_TOOL;
         public Image ToolToUse = null;
-        public Cursor CursorToUse = Cursors.Default;
-        public Cursor reduit;
+        public Cursor CursorToUse = Cursor.Default;
+        public Cursor reduit = new Cursor(StandardCursorType.Cross);
 
         private float usedScale = 0;
         private float previousScale = 0;
@@ -125,7 +146,7 @@ namespace ActivityEditor.Engine
 
         private System.Drawing.Point CurrentMousePosition = new System.Drawing.Point(0, 0);
 
-        public Timer ActivityTimer;
+        public DispatcherTimer ActivityTimer;
 
         //  For Debugging
 
@@ -138,7 +159,7 @@ namespace ActivityEditor.Engine
         /// <param name="parent">The parent ActEditor</param>
         /// <param name="routePath">The Route ComponentItem where to get the information</param>
         /// <returns>Nothing</returns>
-        public Viewer2D(ActEditor parent, string routePath)
+        public Viewer2D(ActEditor parent, string routePath, PseudoSim simulator)
         {
             ViewerMode = TypeEditor.ROUTECONFIG;
             Program.actEditor.DisplayStatusMessage("Load Route for update: please wait");
@@ -146,13 +167,9 @@ namespace ActivityEditor.Engine
             ActivityPath = routePath;
 
             //  Simulator retains all datas from MSTS, Route Metadata and Activity.
-            Simulator = new PseudoSim(Program.aePreference.settings);
-            Simulator.Start();
+            //  It has already loaded all MSTS config, all OR config and synchronized both (in the background).
+            Simulator = simulator;
 
-            //  Now, load all MSTS config, all OR config and Synchronize both
-            Simulator.LoadRoute(routePath, ViewerMode);
-
-            MdiParent = parent;
             actParent = parent;
 
             //  Load the right side panel
@@ -162,17 +179,16 @@ namespace ActivityEditor.Engine
 
             InitializeComponent();
             this.Text = "Route MetaData";
-            sidingFont = new Font("Arial", 8, FontStyle.Regular);
-            stationFont = new Font("Arial", 12, FontStyle.Regular);
+            sidingFont = new Font("Arial", 8, ActivityEditor.Drawing.FontStyle.Regular);
+            stationFont = new Font("Arial", 12, ActivityEditor.Drawing.FontStyle.Regular);
             sidingBrush = new SolidBrush(Color.Black);
 
-            SetStyle(ControlStyles.ResizeRedraw, true);
             // initialise the timer used to handle user input
-            ActivityTimer = new Timer();
-            ActivityTimer.Interval = 50;
+            ActivityTimer = new DispatcherTimer();
+            ActivityTimer.Interval = TimeSpan.FromMilliseconds(50);
             ActivityTimer.Tick += new System.EventHandler(ActivityTimer_Tick);
             ActivityTimer.Start();
-            InitData();
+            // InitData needs the size of the drawing area: it is called once the view has been laid out.
             actParent.SelectTools(ViewerMode);
         }
 
@@ -183,17 +199,14 @@ namespace ActivityEditor.Engine
         /// <param name="parent">The parent ActEditor</param>
         /// <param name="activityInfo">The pre-loaded activity info object</param>
         /// <returns>Nothing</returns>
-        public Viewer2D(ActEditor parent, ActivityInfo activityInfo)
+        public Viewer2D(ActEditor parent, ActivityInfo activityInfo, PseudoSim simulator)
         {
             ViewerMode = TypeEditor.ACTIVITY;
             Program.actEditor.DisplayStatusMessage("Load Route and Activity for update: please wait");
             loadIcon();
-            MdiParent = parent;
             actParent = parent;
 
-            Simulator = new PseudoSim(Program.aePreference.settings);
-            Simulator.Start();
-            Simulator.LoadRoute(activityInfo.RoutePath, ViewerMode);
+            Simulator = simulator;
 
             aeConfig = new AEConfig(TypeEditor.ACTIVITY, actParent, this);
             aeConfig.LoadRoute();
@@ -201,17 +214,16 @@ namespace ActivityEditor.Engine
             aeConfig.LoadPanels("Info");
 
             InitializeComponent();
-            sidingFont = new Font("Arial", 8, FontStyle.Regular);
-            stationFont = new Font("Arial", 12, FontStyle.Regular);
+            sidingFont = new Font("Arial", 8, ActivityEditor.Drawing.FontStyle.Regular);
+            stationFont = new Font("Arial", 12, ActivityEditor.Drawing.FontStyle.Regular);
             sidingBrush = new SolidBrush(Color.Black);
 
-            SetStyle(ControlStyles.ResizeRedraw, true);
             // initialise the timer used to handle user input
-            ActivityTimer = new Timer();
-            ActivityTimer.Interval = 50;
+            ActivityTimer = new DispatcherTimer();
+            ActivityTimer.Interval = TimeSpan.FromMilliseconds(50);
             ActivityTimer.Tick += new System.EventHandler(ActivityTimer_Tick);
             ActivityTimer.Start();
-            InitData();
+            // InitData needs the size of the drawing area: it is called once the view has been laid out.
             actParent.SelectTools(ViewerMode);
         }
 #endregion
@@ -234,18 +246,18 @@ namespace ActivityEditor.Engine
             sizeZ = (Math.Abs(areaRoute.tileMaxZ - areaRoute.tileMinZ) + 1) * 2048f;
 
             ViewWindow = new RectangleF(0, 0, sizeX, sizeZ);
-            routePicture = routeDrawing.Size;
-            xScale = routeDrawing.Width / ViewWindow.Width;
-            yScale = routeDrawing.Height / ViewWindow.Height;
+            routePicture = new Size(RouteWidth, RouteHeight);
+            xScale = RouteWidth / ViewWindow.Width;
+            yScale = RouteHeight / ViewWindow.Height;
             previousScale = 1 / Math.Min(xScale, yScale);
-            origRules = currentRules = (routeDrawing.Width * previousScale);
-            if (routeDrawing.Width > (ViewWindow.Width / previousScale))
+            origRules = currentRules = (RouteWidth * previousScale);
+            if (RouteWidth > (ViewWindow.Width / previousScale))
             {
-                Distant2Origin.Width = ((int)(routeDrawing.Width - (ViewWindow.Width / previousScale)) / 2) * previousScale;
+                Distant2Origin.Width = ((int)(RouteWidth - (ViewWindow.Width / previousScale)) / 2) * previousScale;
             }
-            if (routeDrawing.Height > (ViewWindow.Height / previousScale))
+            if (RouteHeight > (ViewWindow.Height / previousScale))
             {
-                Distant2Origin.Height = ((int)(routeDrawing.Height - (ViewWindow.Height / previousScale)) / 2) * previousScale;
+                Distant2Origin.Height = ((int)(RouteHeight - (ViewWindow.Height / previousScale)) / 2) * previousScale;
             }
             Distant2Origin.Width += 1024f;  //  Origin is on center of tile
             Distant2Origin.Height += 1024f;  //  Origin is on center of tile
@@ -256,15 +268,7 @@ namespace ActivityEditor.Engine
 
         public void InitImage()
         {
-            routeDrawing.Width = IM_Width;
-            routeDrawing.Height = IM_Height;
             correctY.Height = IM_Height;
-
-            if (routeDrawing.Image != null)
-            {
-                routeDrawing.Image.Dispose();
-            }
-            routeDrawing.Image = new Bitmap(routeDrawing.Width, routeDrawing.Height);
         }
 
         [CallOnThread("Updater")]
@@ -294,23 +298,14 @@ namespace ActivityEditor.Engine
 
         public void needRedim()
         {
-            if (oldHeight != this.routeDrawing.Height || oldWidth != this.routeDrawing.Width)
+            if (oldHeight != RouteHeight || oldWidth != RouteWidth)
             {
-                oldWidth = this.routeDrawing.Width;
-                oldHeight = this.routeDrawing.Height;
-                IM_Width = this.routeDrawing.Width;
-                IM_Height = this.routeDrawing.Height;
+                oldWidth = RouteWidth;
+                oldHeight = RouteHeight;
+                IM_Width = RouteWidth;
+                IM_Height = RouteHeight;
                 correctY.Height = IM_Height;
-                if (routeDrawing.Image != null)
-                {
-                    routeDrawing.Image.Dispose();
-                }
-                //  TODO: Check this when the forms is minimized
-                if (routeDrawing.Width <= 0 || routeDrawing.Height <= 0)
-                   routeDrawing.Image = new Bitmap(1, 1);
-                else
-                   routeDrawing.Image = new Bitmap(routeDrawing.Width, routeDrawing.Height);
-                routePicture = routeDrawing.Size;
+                routePicture = new Size(RouteWidth, RouteHeight);
                 firstShow = true;
             }
         }
@@ -318,25 +313,35 @@ namespace ActivityEditor.Engine
         private void ComputeUsedScale()
         {
             previousScale = usedScale;  //  Keep the last usedScale
-            usedScale = currentRules / routeDrawing.Width;
+            usedScale = currentRules / RouteWidth;
             usedScale = (float)Math.Round((double)usedScale, 2, MidpointRounding.AwayFromZero);
         }
 
+        /// <summary>
+        /// Request a redraw of the route view (the drawing itself is done in <see cref="DrawView"/>, called while rendering).
+        /// </summary>
         public void GenerateView()
         {
+            routeDrawing?.InvalidateVisual();
+        }
 
-            if (routeDrawing.Image == null) InitImage();
+        /// <summary>
+        /// Draw the route view. This used to draw into a bitmap shown by a PictureBox; it is now called from
+        /// <see cref="RouteCanvas.Render"/> with a GDI+-like wrapper over Avalonia's DrawingContext.
+        /// </summary>
+        public void DrawView(Graphics g)
+        {
+            if (!loaded)
+                return;
             needRedim();
-            //this.routeDrawing.Select();
-            using (Graphics g = Graphics.FromImage(routeDrawing.Image))
             {
-                Graphics gMod = Graphics.FromImage(routeDrawing.Image);
+                Graphics gMod = g;
                 subX = 0; // areaRoute.getMinX() + ViewWindow.X; 
                 subY = 0; // areaRoute.getMinY() + ViewWindow.Y;
                 g.Clear(Color.White);
                 ComputeStartDrawing();
                 
-                usedScale = (currentRules / routeDrawing.Width);
+                usedScale = (currentRules / RouteWidth);
                 usedScale = (float)Math.Round((double)usedScale, 2, MidpointRounding.AwayFromZero);
                 if (usedScale == 0)
                     usedScale = 0.1f;
@@ -385,7 +390,7 @@ namespace ActivityEditor.Engine
                         g.DrawString((string)buffer.associateNode.Index.ToString(), sidingFont, sidingBrush, scaledA.X - 20, scaledA.Y);
                         if (Program.aePreference.ShowPlSiLabel && buffer.isItSeen())
                         {
-                            System.Drawing.Drawing2D.Matrix matrixSA = new System.Drawing.Drawing2D.Matrix();
+                            Matrix matrixSA = new Matrix();
                             matrixSA.RotateAt((float)0.0f, new System.Drawing.Point((int)scaledA.X, (int)scaledA.Y), MatrixOrder.Append);
                             g.Transform = matrixSA;
                             g.DrawString(buffer.NameBuffer, sidingFont, sidingBrush, scaledA.X + 15, scaledA.Y + 10);
@@ -498,7 +503,7 @@ namespace ActivityEditor.Engine
                     if ((scaledA.X < 0) || (scaledA.X > IM_Width) || (scaledA.Y > IM_Height) || (scaledA.Y < 0))
                         continue;
 
-                    if (item.NameDisplay.Checked)
+                    if (item.NameDisplay.IsChecked == true)
                     {
                         g.DrawString(item.TagName.Text, sidingFont, sidingBrush, scaledA);
                     }
@@ -507,14 +512,10 @@ namespace ActivityEditor.Engine
                         System.Drawing.Rectangle rect = new System.Drawing.Rectangle((int)scaledA.X, (int)scaledA.Y, 16, 16);
                         g.DrawIcon(TagIcon, rect);
                     }
-                    if (item.selectedTag)
-                    {
-                        item.TagName.SelectAll();
-                    }
                 }
                 foreach (var item in aeConfig.getStationWidgets())
                 {
-                    System.Drawing.Drawing2D.Matrix myMatrix = new System.Drawing.Drawing2D.Matrix();
+                    Matrix myMatrix = new Matrix();
                     var station = item.stationWidget;
                     station.SynchroLocation();
                     scaledA.X = (decal.Width + (station.Location.X - subX) / usedScale);
@@ -562,7 +563,7 @@ namespace ActivityEditor.Engine
                             polyPoints.Add(new System.Drawing.Point(X, Y));
                             if (SAWidget.IsInterface())
                             {
-                                System.Drawing.Drawing2D.Matrix matrixSA = new System.Drawing.Drawing2D.Matrix();
+                                Matrix matrixSA = new Matrix();
 
                                 rect = new System.Drawing.Rectangle((int)X, 
                                     (int)(Y - (2 / usedScale)), 
@@ -593,7 +594,7 @@ namespace ActivityEditor.Engine
                                 {
                                     if (SAWidget.getStationConnector().isConfigured())
                                     {
-                                        System.Drawing.SolidBrush myBrush = new System.Drawing.SolidBrush(Color.FromArgb(100, Color.Red));
+                                        SolidBrush myBrush = new SolidBrush(Color.FromArgb(100, Color.Red));
                                         g.FillEllipse(myBrush, (float)(X - 4), (float)(Y - 4), (float)8, (float)8);
                                         myBrush.Dispose();
                                     }
@@ -617,17 +618,13 @@ namespace ActivityEditor.Engine
                         }
                         g.DrawPolygon(Pens.DarkBlue, polyPoints.ToArray());
                     }
-                    if (item.NameDisplay.Checked)
+                    if (item.NameDisplay.IsChecked == true)
                     {
                         if ((scaledA.X < 0) || (scaledA.X > IM_Width) || (scaledA.Y > IM_Height) || (scaledA.Y < 0))
                             continue;
                         g.DrawString(item.StationName.Text, stationFont, sidingBrush, scaledA);
                     }
 
-                    if (item.selectedStation)
-                    {
-                        item.StationName.SelectAll();
-                    }
                 }
 
                 foreach (var item in aeConfig.getActItem())
@@ -647,7 +644,7 @@ namespace ActivityEditor.Engine
                         else
                         {
                             System.Drawing.Rectangle rect = new System.Drawing.Rectangle((int)scaledA.X, (int)scaledA.Y, 16, 16);
-                            g.DrawIcon(((PathEventItem)item).getIcon(), rect);
+                            g.DrawIcon(GetEventIcon((PathEventItem)item), rect);
                         }
                     }
                 }
@@ -664,7 +661,6 @@ namespace ActivityEditor.Engine
                     pen = t;
                 }
 
-                this.Cursor = CursorToUse;
                 if (Program.aePreference.ShowSnapCircle && (ToolClicked == ToolClicks.NO_TOOL))
                 {
                     PointF point = convertScreen2ViewCoord(CurrentMousePosition.X, CurrentMousePosition.Y);
@@ -740,7 +736,7 @@ namespace ActivityEditor.Engine
                             if (s.hasDir)
                             {
                                 System.Drawing.Point rotationLoc = new System.Drawing.Point((int)scaledItem.X-5, (int)scaledItem.Y+5);
-                                System.Drawing.Drawing2D.Matrix myMatrix = new System.Drawing.Drawing2D.Matrix();
+                                Matrix myMatrix = new Matrix();
                                 scaledB.X = decal.Width + (s.Dir.X - subX) / usedScale;
                                 scaledB.Y = decal.Height - (s.Dir.Y - subY) / usedScale;
                                 float a = ((float)(Math.Atan2(scaledB.Y - scaledItem.Y, scaledB.X - scaledItem.X) * 180.0d / Math.PI)) - 90.0f;
@@ -794,7 +790,7 @@ namespace ActivityEditor.Engine
 #region crossOver
                     foreach (AECrossOver crossOver in aeItems.getCrossOver())
                     {
-                        System.Drawing.Drawing2D.Matrix matrixSA = new System.Drawing.Drawing2D.Matrix();
+                        Matrix matrixSA = new Matrix();
                         if (float.IsNaN(crossOver.Location.X) || float.IsNaN(crossOver.Location.Y))
                             continue;
                         x = decal.Width + (crossOver.Location.X - subX) / usedScale;
@@ -817,7 +813,7 @@ namespace ActivityEditor.Engine
 #region drawSiding
                     foreach (SideItem siding in aeItems.getSidings())
                     {
-                        System.Drawing.Drawing2D.Matrix matrixSA = new System.Drawing.Drawing2D.Matrix();
+                        Matrix matrixSA = new Matrix();
                         if (float.IsNaN(siding.Location.X) || float.IsNaN(siding.Location.Y))
                             continue;
                         x = decal.Width + (siding.Location.X - subX) / usedScale;
@@ -861,7 +857,6 @@ namespace ActivityEditor.Engine
 #endregion
 #endif
             }
-            routeDrawing.Invalidate();
         }
 
         void showRules(Graphics g, float usedScale)
@@ -869,7 +864,7 @@ namespace ActivityEditor.Engine
             PointF scaledA = new PointF(0, 0);
             PointF scaledB = new PointF(0, 0);
             SizeF decal = (correctY - StartDrawing);
-            System.Drawing.Drawing2D.Matrix myMatrix = new System.Drawing.Drawing2D.Matrix();
+            Matrix myMatrix = new Matrix();
 
             scaledA.X = 10;
             scaledA.Y = 10;
@@ -915,7 +910,7 @@ namespace ActivityEditor.Engine
         #region MouseEvent
 
         private bool zoomed  = false;
-        private void routeDrawingMouseDown(object sender, MouseEventArgs e)
+        private void routeDrawingMouseDown(object sender, MouseArgs e)
         {
             bool shiftKey = false;
             if (e.Button == MouseButtons.Left)
@@ -926,7 +921,7 @@ namespace ActivityEditor.Engine
             {
                 RightClick = true;
             }
-            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+            if (ModifierKeys.HasFlag(KeyModifiers.Shift))
             {
                 shiftKey = true;
             }
@@ -946,7 +941,7 @@ namespace ActivityEditor.Engine
             LastCursorPosition.Y = e.Y;
         }
 
-        private void LeftMouseDown(object sender, MouseEventArgs e, bool shiftKey)
+        private void LeftMouseDown(object sender, MouseArgs e, bool shiftKey)
         {
             //this.routeDrawing.Focus();
             Dragging = false;
@@ -1009,7 +1004,7 @@ namespace ActivityEditor.Engine
 
         }
 
-        private void RightMouseDown(object sender, MouseEventArgs e, bool shiftKey)
+        private void RightMouseDown(object sender, MouseArgs e, bool shiftKey)
         {
             //this.routeDrawing.Focus();
             var item = findItemFromEvent(e);
@@ -1026,18 +1021,18 @@ namespace ActivityEditor.Engine
                 refZoomPoint.Y = e.Y;
                 PointF point = convertScreen2ViewCoord(refZoomPoint.X, refZoomPoint.Y);
                 coordZoomPoint = Simulator.mstsDataConfig.TileBase.getMstsCoord(point);
-                refZoomPoint.Y = routeDrawing.Height - e.Y;
+                refZoomPoint.Y = RouteHeight - e.Y;
                 ToolClicked = ToolClicks.ZOOM;
                 System.Drawing.Point refCoord = convertViewCoord2Screen(coordZoomPoint);
             }
         }
 
 
-        private void routeDrawingMouseMove(object sender, MouseEventArgs e)
+        private void routeDrawingMouseMove(object sender, MouseArgs e)
         {
             bool controlKey = false;
             Program.actEditor.DisplayStatusMessage((string)("Mouse move: " + e.X + "," + e.Y));
-            if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+            if (ModifierKeys.HasFlag(KeyModifiers.Control))
             {
                 controlKey = true;
             }
@@ -1102,7 +1097,7 @@ namespace ActivityEditor.Engine
 #endif
             {
                 float facteur = 0.98F;
-                if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+                if (ModifierKeys.HasFlag(KeyModifiers.Control))
                     facteur = 0.90F;
                 zoomed = true;
                 if (LastCursorPosition.Y - e.Y < 0)
@@ -1122,7 +1117,7 @@ namespace ActivityEditor.Engine
             GenerateView();
         }
 
-        private void dragWindow(MouseEventArgs e, int sens)
+        private void dragWindow(MouseArgs e, int sens)
         {
             int eX = e.X;
             int eY = e.Y;
@@ -1156,7 +1151,7 @@ namespace ActivityEditor.Engine
             GenerateView();
         }
 
-        private void routeDrawingMouseUp(object sender, MouseEventArgs e)
+        private async void routeDrawingMouseUp(object sender, MouseArgs e)
         {
             if ((ToolClicked == ToolClicks.AREA_ADD ||
                 ToolClicked == ToolClicks.MOVE) &&
@@ -1211,11 +1206,11 @@ namespace ActivityEditor.Engine
             {
                 PointF point = e.Location;
                 lastContextMenuPos = point;
-                PathContextMenu.Show(Cursor.Position);
+                PathContextMenu.Open(routeDrawing);
             }
             else if (RightClick && !zoomed && itemToEdit != null && itemToEdit.IsEditable())
             {
-                GlobalItem edited = aeConfig.EditItem(itemToEdit);
+                GlobalItem edited = await aeConfig.EditItem(itemToEdit);
                 if (edited != null && edited.GetType() == typeof(StationItem))
                 {
                     ((StationItem)edited).complete(aeConfig.aeRouteConfig.orRouteConfig,
@@ -1236,14 +1231,14 @@ namespace ActivityEditor.Engine
             }
         }
 
-        void routeDrawing_MouseDoubleClick(object sender, System.Windows.Forms.MouseEventArgs e)
+        void routeDrawing_MouseDoubleClick(object sender, MouseArgs e)
         {
             if (e.Button == MouseButtons.Left)
             {
             }
         }
 
-        private void routeDrawingMouseWheel(object sender, MouseEventArgs e)
+        private void routeDrawingMouseWheel(object sender, MouseArgs e)
         {
         }
 
@@ -1251,24 +1246,24 @@ namespace ActivityEditor.Engine
         {
             SizeF diff;
             //this.routeDrawing.Focus();
-            if (e.KeyCode == Keys.Escape)
+            if (e.Key == Key.Escape)
             {
                 CancelAllOperation();
                 return;
             }
-            else if (e.KeyCode == Keys.Up)
+            else if (e.Key == Key.Up)
             {
                 diff = new SizeF(0, -1);
             }
-            else if (e.KeyCode == Keys.Down)
+            else if (e.Key == Key.Down)
             {
                 diff = new SizeF(0, 1);
             }
-            else if (e.KeyCode == Keys.Left)
+            else if (e.Key == Key.Left)
             {
                 diff = new SizeF(1, 0);
             }
-            else if (e.KeyCode == Keys.Right)
+            else if (e.Key == Key.Right)
             {
                 diff = new SizeF(-1, 0);
             }
@@ -1281,20 +1276,6 @@ namespace ActivityEditor.Engine
 
         }
 
-        public void routeDrawing_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            switch (e.KeyCode)
-            {
-                case Keys.Down:
-                case Keys.Right:
-                    //action
-                    break;
-                case Keys.Up:
-                case Keys.Left:
-                    //action
-                    break;
-            }
-        }
     #endregion
 
 #region AlignView
@@ -1328,7 +1309,7 @@ namespace ActivityEditor.Engine
         public void CenterViewWindow(MSTSCoord coord)
         {
 
-            PointF point = new PointF(routeDrawing.Width / 2f, routeDrawing.Height / 2f);
+            PointF point = new PointF(RouteWidth / 2f, RouteHeight / 2f);
 
             RealignViewWindow(coord, System.Drawing.Point.Truncate(point));
             GenerateView();
@@ -1346,7 +1327,7 @@ namespace ActivityEditor.Engine
                 //File.AppendAllText(@"C:\temp\AE.txt", "No move needed");
                 return;
             }
-            var localScale = currentRules / routeDrawing.Width;
+            var localScale = currentRules / RouteWidth;
             Distant2Origin.Width = (Distant2Origin.Width + ((current.X - refCoord.X) * localScale));
             Distant2Origin.Height = (Distant2Origin.Height) + ((current.Y - refCoord.Y) * localScale);
             return;
@@ -1376,8 +1357,6 @@ namespace ActivityEditor.Engine
         void AddTag()
         {
             int cnt = rnd.Next(999999);
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(lastContextMenuPos.X, lastContextMenuPos.Y);
             MSTSCoord coord = Simulator.mstsDataConfig.TileBase.getMstsCoord(point);
             TagItem tag = new TagItem(ViewerMode);
@@ -1386,20 +1365,16 @@ namespace ActivityEditor.Engine
             aeConfig.AddORItem(tag);
             System.Drawing.Point current = aeConfig.aeRouteConfig.GetTagPanelPosition();
 
-            if (typeof(ActEditor) == ParentForm.GetType())
+            if (actParent != null)
             {
                 TagWidgetInfo newTagWidget = new TagWidgetInfo(this, tag, cnt);
                 aeConfig.AddTagWidgetInfo(newTagWidget);
             }
-            tmp.ResumeLayout(false);
-            tmp.Refresh();
         }
 
         private void AddStation()
         {
             int cnt = rnd.Next(999999);
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(lastContextMenuPos.X, lastContextMenuPos.Y);
             MSTSCoord coord = Simulator.mstsDataConfig.TileBase.getMstsCoord(point);
             StationItem station = new StationItem(ViewerMode, Simulator.traveller);
@@ -1408,21 +1383,17 @@ namespace ActivityEditor.Engine
             aeConfig.AddORItem(station);
             System.Drawing.Point current = aeConfig.aeRouteConfig.GetStationPanelPosition();
 
-            if (typeof(ActEditor) == ParentForm.GetType())
+            if (actParent != null)
             {
                 StationWidgetInfo newStationWidget = new StationWidgetInfo(this, station, cnt);
                 aeConfig.AddStationInfo(newStationWidget);
             }
-            tmp.ResumeLayout(false);
-            tmp.PerformLayout();
         }
 
         void AddStationArea()
         {
             int cnt = rnd.Next(999999);
             /*
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(lastContextMenuPos.X, lastContextMenuPos.Y);
             MSTSCoord coord = new MSTSCoord();
             coord.Convert(point);
@@ -1430,39 +1401,33 @@ namespace ActivityEditor.Engine
             stationArea.configCoord(coord);
             System.Drawing.Point current = aeRouteConfig.GetStationPanelPosition();
 
-            if (typeof(ActEditor) == ParentForm.GetType())
+            if (actParent != null)
             {
                 StationWidgetInfo newStationWidget = new StationWidgetInfo(station, cnt);
                 stationWidgetInfo.Add(newStationWidget);
                 stationGBList.Add(newStationWidget.getStation());
                 aeRouteConfig.AddStationPanel(stationGBList.ToArray());
             }
-            tmp.ResumeLayout(false);
-            tmp.PerformLayout();
              * */
 
         }
 
-        private void AddActStart (TrackSegment segment, System.Drawing.Point CurrentMousePosition)
+        private async void AddActStart (TrackSegment segment, System.Drawing.Point CurrentMousePosition)
         {
             int cnt = rnd.Next(999999);
             double dist;
             PointF closest = new PointF(0, 0);
 
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(CurrentMousePosition.X, CurrentMousePosition.Y);
             dist = DrawUtility.FindDistanceToSegment(point, segment, out closest);
             MSTSCoord coord = Simulator.mstsDataConfig.TileBase.getMstsCoord(closest);
             StartActivity newStart = new StartActivity(aeConfig);
-            newStart.ShowDialog();
+            await Dialogs.ShowDialog(newStart);
             ActStartItem actStart = new ActStartItem(ViewerMode);
             actStart.configCoord(coord);
             actStart.setNameStart(cnt);
             aeConfig.AddORItem(actStart);
             aeConfig.AddActItem(actStart);
-            tmp.ResumeLayout(false);
-            tmp.PerformLayout();
         }
 
         private void AddActStop (TrackSegment segment, System.Drawing.Point CurrentMousePosition)
@@ -1470,36 +1435,28 @@ namespace ActivityEditor.Engine
             int cnt = rnd.Next(999999);
             double dist;
             PointF closest = new PointF(0, 0);
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(CurrentMousePosition.X, CurrentMousePosition.Y);
             dist = DrawUtility.FindDistanceToSegment(point, segment, out closest);
             MSTSCoord coord = Simulator.mstsDataConfig.TileBase.getMstsCoord(closest);
-            tmp.ResumeLayout(false);
-            tmp.PerformLayout();
         }
 
-        private void AddActWait (TrackSegment segment, System.Drawing.Point CurrentMousePosition)
+        private async void AddActWait (TrackSegment segment, System.Drawing.Point CurrentMousePosition)
         {
             int cnt = rnd.Next(999999);
             double dist;
             PointF closest = new PointF(0, 0);
 
-            ActEditor tmp = Program.actEditor;
-            tmp.SuspendLayout();
             PointF point = convertScreen2ViewCoord(CurrentMousePosition.X, CurrentMousePosition.Y);
             dist = DrawUtility.FindDistanceToSegment(point, segment, out closest);
             MSTSCoord coord = Simulator.mstsDataConfig.TileBase.getMstsCoord(closest);
             WaitActivity newWait = new WaitActivity();
             newWait.SW_PlaceValue.Text = (string)"wait" + cnt;
-            newWait.ShowDialog();
+            await Dialogs.ShowDialog(newWait);
             ActWaitItem actWait = new ActWaitItem(ViewerMode);
             actWait.configCoord(coord);
             actWait.setNameWait(cnt);
             aeConfig.AddORItem(actWait);
             aeConfig.AddActItem(actWait);
-            tmp.ResumeLayout(false);
-            tmp.PerformLayout();
         }
 
 
@@ -1630,7 +1587,7 @@ namespace ActivityEditor.Engine
             PointF val = new PointF(0, 0);
             float scale = (float)getUsedScale();   //   
             x = x * scale;
-            y = (routeDrawing.Height - y) * scale;
+            y = (RouteHeight - y) * scale;
             float tempX = x - Distant2Origin.Width;
             val.X = tempX;
             val.Y = y - Distant2Origin.Height;
@@ -1669,16 +1626,15 @@ namespace ActivityEditor.Engine
             aeConfig.SetFocus(ViewerMode);
         }
 
-        private void CloseViewer(object sender, FormClosingEventArgs e)
+        /// <summary>Called when the view is closed (was the FormClosing handler of the MDI child).</summary>
+        public async Task CloseViewer()
         {
+            ActivityTimer.Stop();
             Simulator.StopUpdaterThread();
-            aeConfig.Close(ViewerMode);
+            await aeConfig.Close(ViewerMode);
             actParent.UnselectTools(ViewerMode);
         }
 
-        private void Viewer2D_Resize(Object sender, System.EventArgs e)
-        {
-        }
 
         private void routeDrawing_Click(object sender, EventArgs e)
         {
@@ -1757,28 +1713,28 @@ namespace ActivityEditor.Engine
             Assembly a = Assembly.GetExecutingAssembly();
             string[] resName = a.GetManifestResourceNames();
             st = a.GetManifestResourceStream("ActivityEditor.icon.tag.ico");
-            TagIcon = new System.Drawing.Icon(st);
+            TagIcon = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.SignalBox.ico");
-            StationIcon = new System.Drawing.Icon(st);
+            StationIcon = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.signal.ico");
-            SignalIco = new System.Drawing.Icon(st);
+            SignalIco = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.signalShunt.ico");
-            ShuntIco = new System.Drawing.Icon(st);
+            ShuntIco = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.signalOther.ico");
-            OtherSigIco = new System.Drawing.Icon(st);
+            OtherSigIco = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.speedLimit.ico");
-            SpeedIco = new System.Drawing.Icon(st);
+            SpeedIco = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.signalRepeat.ico");
-            RepeatIco = new System.Drawing.Icon(st);
+            RepeatIco = new Icon(st);
             st = a.GetManifestResourceStream("ActivityEditor.icon.StationConnector.ico");
-            StationConnector = new System.Drawing.Icon(st);
+            StationConnector = new Icon(st);
 
             st = a.GetManifestResourceStream("ActivityEditor.icon.Ruler.png");
             Ruler = Image.FromStream(st);
 
         }
 
-        private GlobalItem findItemFromEvent(MouseEventArgs e)
+        private GlobalItem findItemFromEvent(MouseArgs e)
         {
             PointF pt = convertScreen2ViewCoord(e.X, e.Y);
             GlobalItem item = findItemFromCoord(pt);
@@ -1839,7 +1795,7 @@ namespace ActivityEditor.Engine
             return item;
         }
 
-        private void FindItem(System.Drawing.Point Last, MouseEventArgs e)
+        private void FindItem(System.Drawing.Point Last, MouseArgs e)
         {
             if ((Last.X == e.X) && (Last.Y == e.Y))
             {
@@ -1870,58 +1826,59 @@ namespace ActivityEditor.Engine
         {
             ToolClicked = info;
 
-            this.Cursor = Cursors.Default;
+            routeDrawing.Cursor = Cursor.Default;
             if (info == ToolClicks.AREA_ADD)
             {   //  To prevent bad setting
-                ToolToUse = global::ActivityEditor.Properties.Resources._64;
+                ToolToUse = AppResources.LoadImage("Resources/64.png");
                 CursorToUse = reduit;
             }
             else if (info == ToolClicks.AREA)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources._32;
+                ToolToUse = AppResources.LoadImage("Resources/32.png");
                 CursorToUse = reduit;
             }
             else if (info == ToolClicks.DRAG)
             {
                 ToolToUse = null;
-                CursorToUse = Cursors.Hand;
+                CursorToUse = new Cursor(StandardCursorType.Hand);
             }
             else if (info == ToolClicks.ZOOM)
             {
                 ToolToUse = null;
-                CursorToUse = Cursors.SizeAll;
+                CursorToUse = new Cursor(StandardCursorType.SizeAll);
             }
             else if (info == ToolClicks.MOVE)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources.object_move;
-                CursorToUse = Cursors.Default;
+                ToolToUse = AppResources.LoadImage("icon/object_move.png");
+                CursorToUse = Cursor.Default;
             }
             else if (info == ToolClicks.ROTATE)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources.object_rotate;
+                ToolToUse = AppResources.LoadImage("icon/object_rotate.png");
                 CursorToUse = reduit;
             }
             else if (info == ToolClicks.TAG)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources.tag;
+                ToolToUse = AppResources.LoadImage("icon/tag.gif");
                 CursorToUse = reduit;
             }
             else if (info == ToolClicks.METASEGMENT)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources.metasegment;
+                ToolToUse = AppResources.LoadImage("Resources/metasegment.png");
                 CursorToUse = reduit;
             }
             else if (info == ToolClicks.STATION)
             {
-                ToolToUse = global::ActivityEditor.Properties.Resources.SignalBox;
+                ToolToUse = AppResources.LoadImage("icon/SignalBox.ico");
                 CursorToUse = reduit;
             }
             else
             {
                 ToolClicked = ToolClicks.NO_TOOL;
-                CursorToUse = Cursors.Default;
+                CursorToUse = Cursor.Default;
                 ToolToUse = null;
             }
+            routeDrawing.Cursor = CursorToUse;
         }
 
 
@@ -1993,13 +1950,149 @@ namespace ActivityEditor.Engine
 
     }
 
+    /// <summary>Mouse button, as System.Windows.Forms.MouseButtons.</summary>
+    public enum MouseButtons { None, Left, Right, Middle }
+
+    /// <summary>The parts of System.Windows.Forms.MouseEventArgs used by the viewer.</summary>
+    public class MouseArgs : EventArgs
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public MouseButtons Button { get; set; }
+        public PointF Location { get { return new PointF(X, Y); } }
+    }
+
+    /// <summary>
+    /// The drawing area of a <see cref="Viewer2D"/> (was a PictureBox showing a bitmap).
+    /// </summary>
+    public class RouteCanvas : Control
+    {
+        readonly Viewer2D Viewer;
+
+        public RouteCanvas(Viewer2D viewer)
+        {
+            Viewer = viewer;
+            Focusable = true;
+            ClipToBounds = true;
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            using (var g = new Graphics(context, Bounds.Size))
+            {
+                g.Clear(Color.White);
+                try
+                {
+                    Viewer.DrawView(g);
+                }
+                catch (Exception error)
+                {
+                    System.Diagnostics.Trace.TraceError("Error drawing the route view: {0}", error);
+                }
+            }
+        }
+    }
+
+    public partial class Viewer2D
+    {
+        public RouteCanvas routeDrawing;
+        public ContextMenu PathContextMenu;
+        MenuItem CenterCMItem1;
+        KeyModifiers ModifierKeys;
+
+        /// <summary>Title of the view (shown in the tab header).</summary>
+        public string Text { get; set; } = "Activity";
+
+        int RouteWidth { get { return routeDrawing == null ? IM_Width : Math.Max(1, (int)routeDrawing.Bounds.Width); } }
+        int RouteHeight { get { return routeDrawing == null ? IM_Height : Math.Max(1, (int)routeDrawing.Bounds.Height); } }
+
+        private void InitializeComponent()
+        {
+            routeDrawing = new RouteCanvas(this);
+            CenterCMItem1 = new MenuItem { Header = "Center view" };
+            CenterCMItem1.Click += CenterView;
+            PathContextMenu = new ContextMenu();
+            PathContextMenu.Items.Add(CenterCMItem1);
+
+            routeDrawing.PointerPressed += (s, e) =>
+            {
+                routeDrawing.Focus();
+                ModifierKeys = e.KeyModifiers;
+                var point = e.GetCurrentPoint(routeDrawing);
+                var button = point.Properties.PointerUpdateKind == PointerUpdateKind.RightButtonPressed ? MouseButtons.Right
+                    : point.Properties.PointerUpdateKind == PointerUpdateKind.MiddleButtonPressed ? MouseButtons.Middle : MouseButtons.Left;
+                var args = new MouseArgs { X = (int)point.Position.X, Y = (int)point.Position.Y, Button = button };
+                if (e.ClickCount == 2)
+                    routeDrawing_MouseDoubleClick(s, args);
+                routeDrawingMouseDown(s, args);
+                e.Handled = true;
+            };
+            routeDrawing.PointerMoved += (s, e) =>
+            {
+                ModifierKeys = e.KeyModifiers;
+                var point = e.GetPosition(routeDrawing);
+                routeDrawingMouseMove(s, new MouseArgs { X = (int)point.X, Y = (int)point.Y });
+            };
+            routeDrawing.PointerReleased += (s, e) =>
+            {
+                ModifierKeys = e.KeyModifiers;
+                var point = e.GetPosition(routeDrawing);
+                var button = e.InitialPressMouseButton == MouseButton.Right ? MouseButtons.Right
+                    : e.InitialPressMouseButton == MouseButton.Middle ? MouseButtons.Middle : MouseButtons.Left;
+                routeDrawingMouseUp(s, new MouseArgs { X = (int)point.X, Y = (int)point.Y, Button = button });
+                e.Handled = true;
+            };
+            routeDrawing.PointerWheelChanged += (s, e) =>
+            {
+                var point = e.GetPosition(routeDrawing);
+                routeDrawingMouseWheel(s, new MouseArgs { X = (int)point.X, Y = (int)point.Y });
+            };
+            routeDrawing.KeyDown += Viewer2D_KeyDown;
+            routeDrawing.SizeChanged += (s, e) =>
+            {
+                // The WinForms PictureBox had its size from the start; here the size is only known after layout.
+                if (!loaded && routeDrawing.Bounds.Width > 0 && routeDrawing.Bounds.Height > 0)
+                {
+                    IM_Width = RouteWidth;
+                    IM_Height = RouteHeight;
+                    InitData();
+                }
+                GenerateView();
+            };
+            Content = routeDrawing;
+        }
+
+        readonly Dictionary<string, Icon> EventIcons = new Dictionary<string, Icon>();
+
+        /// <summary>Icon of an activity event (start/stop/wait), loaded from LibAE's resources and cached.</summary>
+        Icon GetEventIcon(PathEventItem item)
+        {
+            string name = item.getIconName();
+            if (name == null)
+                return null;
+            if (!EventIcons.TryGetValue(name, out var icon))
+            {
+                using (var stream = item.getIconStream())
+                    icon = stream == null ? null : new Icon(stream);
+                EventIcons[name] = icon;
+            }
+            return icon;
+        }
+
+        /// <summary>Give the keyboard focus to the drawing area.</summary>
+        public void FocusView()
+        {
+            routeDrawing?.Focus();
+        }
+    }
+
     public class TagWidgetInfo
     {
-        public System.Windows.Forms.GroupBox OneTagGB;
-        public System.Windows.Forms.TextBox TagName;
-        public System.Windows.Forms.CheckBox NameDisplay;
-        public System.Windows.Forms.Button CenterTag;
-        public System.Windows.Forms.Button RemoveTag;
+        public GroupBox OneTagGB;
+        public TextBox TagName;
+        public CheckBox NameDisplay;
+        public Button CenterTag;
+        public Button RemoveTag;
         public TagItem tagWidget;
         public bool selectedTag = false;
         private Viewer2D Parent;
@@ -2007,76 +2100,34 @@ namespace ActivityEditor.Engine
         public TagWidgetInfo(Viewer2D parent, TagItem tag, int cnt)
         {
             Parent = parent;
-            OneTagGB = new System.Windows.Forms.GroupBox();
-            TagName = new System.Windows.Forms.TextBox();
-            NameDisplay = new System.Windows.Forms.CheckBox();
-            CenterTag = new System.Windows.Forms.Button();
-            RemoveTag = new System.Windows.Forms.Button();
-            this.OneTagGB.SuspendLayout();
-
-            // 
-            // tagName
-            // 
             string tagName = "tag" + cnt;
-            this.TagName.Location = new System.Drawing.Point(7, 22);
-            this.TagName.Name = tagName;
-            this.TagName.Size = new System.Drawing.Size(130, 20);
-            this.TagName.TabIndex = 0;
-            this.TagName.Text = tag.nameTag;
-            this.TagName.TextChanged += new System.EventHandler(Parent.TagName_TextChanged);
-            this.TagName.KeyDown += new System.Windows.Forms.KeyEventHandler(Parent.Viewer2D_KeyDown);
-            //
-            //  nameDisplay
-            //
-            this.NameDisplay.AutoSize = true;
-            this.NameDisplay.Location = new System.Drawing.Point(7, 50);
-            this.NameDisplay.Name = "checkBox1";
-            this.NameDisplay.Size = new System.Drawing.Size(80, 17);
-            this.NameDisplay.TabIndex = 9;
-            this.NameDisplay.Text = "Display";
-            this.NameDisplay.UseVisualStyleBackColor = true;
-            this.NameDisplay.Checked = false;
-            //
-            // CenterTag Button
-            //
-            this.RemoveTag.Name = tagName;
-            this.RemoveTag.Font = new System.Drawing.Font("Microsoft Sans Serif", 6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.RemoveTag.Location = new System.Drawing.Point(105, 50);
-            this.RemoveTag.Size = new System.Drawing.Size(15, 15);
-            this.RemoveTag.TabIndex = 9;
-            this.RemoveTag.Text = "x";
-            this.RemoveTag.UseVisualStyleBackColor = true;
-            this.RemoveTag.Click += new System.EventHandler(Parent.RemoveTag_Click);
-            //
-            // CenterTag Button
-            //
-            this.CenterTag.Name = tagName;
-            this.CenterTag.Font = new System.Drawing.Font("Microsoft Sans Serif", 6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.CenterTag.Location = new System.Drawing.Point(120, 50);
-            this.CenterTag.Size = new System.Drawing.Size(15, 15);
-            this.CenterTag.TabIndex = 9;
-            this.CenterTag.Text = "v";
-            this.CenterTag.UseVisualStyleBackColor = true;
-            this.CenterTag.Click += new System.EventHandler(Parent.CenterTag_Click);
-            // 
-            // OneTagGB
-            // 
-            this.OneTagGB.Controls.Add(this.TagName);
-            this.OneTagGB.Controls.Add(this.NameDisplay);
-            this.OneTagGB.Controls.Add(this.CenterTag);
-            this.OneTagGB.Controls.Add(this.RemoveTag);
-            //this.OneTagGB.Location = new System.Drawing.Point(6, 3);
-            this.OneTagGB.Name = "OneTagGB";
-            this.OneTagGB.Size = new System.Drawing.Size(145, 68);
-            this.OneTagGB.TabIndex = 1;
-            this.OneTagGB.TabStop = false;
-            this.OneTagGB.Text = "Tag";
-            this.OneTagGB.ResumeLayout(false);
+            TagName = new TextBox { Name = tagName, Width = 130, Text = tag.nameTag };
+            TagName.TextChanged += Parent.TagName_TextChanged;
+            TagName.KeyDown += Parent.Viewer2D_KeyDown;
+            NameDisplay = new CheckBox { Content = "Display", IsChecked = false };
+            RemoveTag = new Button { Name = tagName, Content = "x", FontSize = 9, Padding = new Avalonia.Thickness(4, 0) };
+            RemoveTag.Click += Parent.RemoveTag_Click;
+            CenterTag = new Button { Name = tagName, Content = "v", FontSize = 9, Padding = new Avalonia.Thickness(4, 0) };
+            CenterTag.Click += Parent.CenterTag_Click;
+            OneTagGB = new GroupBox
+            {
+                Text = "Tag",
+                Width = 175,
+                Content = new StackPanel
+                {
+                    Spacing = 2,
+                    Children =
+                    {
+                        TagName,
+                        new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4, Children = { NameDisplay, RemoveTag, CenterTag } },
+                    },
+                },
+            };
 
             tagWidget = tag;
         }
 
-        public System.Windows.Forms.GroupBox getTag()
+        public GroupBox getTag()
         {
             return OneTagGB;
         }
@@ -2085,11 +2136,11 @@ namespace ActivityEditor.Engine
 
     public class StationWidgetInfo
     {
-        public System.Windows.Forms.GroupBox OneStationGB;
-        public System.Windows.Forms.TextBox StationName;
-        public System.Windows.Forms.CheckBox NameDisplay;
-        public System.Windows.Forms.Button CenterStation;
-        public System.Windows.Forms.Button RemoveStation;
+        public GroupBox OneStationGB;
+        public TextBox StationName;
+        public CheckBox NameDisplay;
+        public Button CenterStation;
+        public Button RemoveStation;
         public StationItem stationWidget;
         public bool selectedStation = false;
         Viewer2D Parent;
@@ -2097,73 +2148,33 @@ namespace ActivityEditor.Engine
         public StationWidgetInfo(Viewer2D parent, StationItem station, int cnt)
         {
             Parent = parent;
-            OneStationGB = new System.Windows.Forms.GroupBox();
-            StationName = new System.Windows.Forms.TextBox();
-            NameDisplay = new System.Windows.Forms.CheckBox();
-            CenterStation = new System.Windows.Forms.Button();
-            RemoveStation = new System.Windows.Forms.Button();
-
-            // 
-            // tagName
-            // 
             string stationName = "st" + cnt;
-            this.StationName.Location = new System.Drawing.Point(7, 22);
-            this.StationName.Name = stationName;
-            this.StationName.Size = new System.Drawing.Size(130, 20);
-            this.StationName.TabIndex = 0;
-            this.StationName.Text = station.nameStation;
-            this.StationName.TextChanged += new System.EventHandler(Parent.StationName_TextChanged);
-            this.StationName.KeyDown += new System.Windows.Forms.KeyEventHandler(Parent.Viewer2D_KeyDown);
-            //
-            //  nameDisplay
-            //
-            this.NameDisplay.AutoSize = true;
-            this.NameDisplay.Location = new System.Drawing.Point(7, 50);
-            this.NameDisplay.Name = "checkBox1";
-            this.NameDisplay.Size = new System.Drawing.Size(80, 17);
-            this.NameDisplay.TabIndex = 9;
-            this.NameDisplay.Text = "Display";
-            this.NameDisplay.UseVisualStyleBackColor = true;
-            this.NameDisplay.Checked = false;
-            // 
-            // OneTagGB
-            // 
-            this.OneStationGB.Controls.Add(this.StationName);
-            this.OneStationGB.Controls.Add(this.NameDisplay);
-            this.OneStationGB.Controls.Add(this.CenterStation);
-            this.OneStationGB.Controls.Add(this.RemoveStation);
-            this.OneStationGB.Name = "OneStationGB";
-            this.OneStationGB.Size = new System.Drawing.Size(145, 68);
-            this.OneStationGB.TabIndex = 1;
-            this.OneStationGB.TabStop = false;
-            this.OneStationGB.Text = "Station";
-            this.OneStationGB.ResumeLayout(false);
-            //
-            // CenterTag Button
-            //
-            this.RemoveStation.Name = stationName;
-            this.RemoveStation.Font = new System.Drawing.Font("Microsoft Sans Serif", 6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.RemoveStation.Location = new System.Drawing.Point(105, 50);
-            this.RemoveStation.Size = new System.Drawing.Size(15, 15);
-            this.RemoveStation.TabIndex = 9;
-            this.RemoveStation.Text = "x";
-            this.RemoveStation.UseVisualStyleBackColor = true;
-            this.RemoveStation.Click += new System.EventHandler(Parent.RemoveStation_Click);
-            //
-            // CenterTag Button
-            //
-            this.CenterStation.Name = stationName;
-            this.CenterStation.Font = new System.Drawing.Font("Microsoft Sans Serif", 6F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.CenterStation.Location = new System.Drawing.Point(120, 50);
-            this.CenterStation.Size = new System.Drawing.Size(15, 15);
-            this.CenterStation.TabIndex = 9;
-            this.CenterStation.Text = "v";
-            this.CenterStation.UseVisualStyleBackColor = true;
-            this.CenterStation.Click += new System.EventHandler(Parent.CenterStation_Click);
+            StationName = new TextBox { Name = stationName, Width = 130, Text = station.nameStation };
+            StationName.TextChanged += Parent.StationName_TextChanged;
+            StationName.KeyDown += Parent.Viewer2D_KeyDown;
+            NameDisplay = new CheckBox { Content = "Display", IsChecked = false };
+            RemoveStation = new Button { Name = stationName, Content = "x", FontSize = 9, Padding = new Avalonia.Thickness(4, 0) };
+            RemoveStation.Click += Parent.RemoveStation_Click;
+            CenterStation = new Button { Name = stationName, Content = "v", FontSize = 9, Padding = new Avalonia.Thickness(4, 0) };
+            CenterStation.Click += Parent.CenterStation_Click;
+            OneStationGB = new GroupBox
+            {
+                Text = "Station",
+                Width = 175,
+                Content = new StackPanel
+                {
+                    Spacing = 2,
+                    Children =
+                    {
+                        StationName,
+                        new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4, Children = { NameDisplay, RemoveStation, CenterStation } },
+                    },
+                },
+            };
 
             stationWidget = station;
         }
-        public System.Windows.Forms.GroupBox getStation()
+        public GroupBox getStation()
         {
             return OneStationGB;
         }

@@ -55,7 +55,7 @@ namespace ORTS.ContentManager
     {
         public static bool IsValid(string pathName)
         {
-            return Directory.Exists(Path.Combine(pathName, "ROUTES")) || Directory.Exists(Path.Combine(pathName, "TRAINS"));
+            return Directory.Exists(PathCase.Combine(pathName, "ROUTES")) || Directory.Exists(PathCase.Combine(pathName, "TRAINS"));
         }
 
         public override ContentType Type { get { return ContentType.Package; } }
@@ -71,17 +71,17 @@ namespace ORTS.ContentManager
         {
             if (type == ContentType.Route)
             {
-                var path = Path.Combine(PathName, "Routes");
+                var path = PathCase.Combine(PathName, "Routes");
                 if (Directory.Exists(path))
                     foreach (var item in Directory.GetDirectories(path))
-                        yield return new ContentMSTSRoute(this, Path.Combine(path, item));
+                        yield return new ContentMSTSRoute(this, item);
             }
             else if (type == ContentType.Consist)
             {
-                var path = Path.Combine(Path.Combine(PathName, "Trains"), "Consists");
+                var path = PathCase.Combine(PathName, "Trains", "Consists");
                 if (Directory.Exists(path))
-                    foreach (var item in Directory.GetFiles(path, "*.con"))
-                        yield return new ContentMSTSConsist(this, Path.Combine(path, item));
+                    foreach (var item in PathCase.GetFiles(path, "*.con"))
+                        yield return new ContentMSTSConsist(this, item);
             }
         }
 
@@ -89,11 +89,11 @@ namespace ORTS.ContentManager
         {
             if (type == ContentType.Car)
             {
-                var pathEng = Path.Combine(Path.Combine(Path.Combine(PathName, "Trains"), "Trainset"), name + ".eng");
+                var pathEng = PathCase.Combine(PathName, "Trains", "Trainset", name + ".eng");
                 if (File.Exists(pathEng))
                     return new ContentMSTSCar(this, pathEng);
 
-                var pathWag = Path.Combine(Path.Combine(Path.Combine(PathName, "Trains"), "Trainset"), name + ".wag");
+                var pathWag = PathCase.Combine(PathName, "Trains", "Trainset", name + ".wag");
                 if (File.Exists(pathWag))
                     return new ContentMSTSCar(this, pathWag);
             }
@@ -117,22 +117,22 @@ namespace ORTS.ContentManager
         {
             if (type == ContentType.Activity)
             {
-                var path = Path.Combine(PathName, "Activities");
+                var path = PathCase.Combine(PathName, "Activities");
                 if (Directory.Exists(path))
-                    foreach (var item in Directory.GetFiles(path, "*.act"))
-                        yield return new ContentMSTSActivity(this, Path.Combine(path, item));
+                    foreach (var item in PathCase.GetFiles(path, "*.act"))
+                        yield return new ContentMSTSActivity(this, item);
 
-                var pathOR = Path.Combine(PathName, @"Activities\OpenRails");
+                var pathOR = PathCase.Combine(PathName, "Activities", "OpenRails");
                 if (Directory.Exists(pathOR))
-                    foreach (var item in Enumerable.Concat(Directory.GetFiles(pathOR, "*.timetable_or"), Directory.GetFiles(pathOR, "*.timetable-or")))
-                        yield return new ContentORTimetableActivity(this, Path.Combine(pathOR, item));
+                    foreach (var item in Enumerable.Concat(PathCase.GetFiles(pathOR, "*.timetable_or"), PathCase.GetFiles(pathOR, "*.timetable-or")))
+                        yield return new ContentORTimetableActivity(this, item);
             }
             else if (type == ContentType.Path)
             {
-                var path = Path.Combine(PathName, "Paths");
+                var path = PathCase.Combine(PathName, "Paths");
                 if (Directory.Exists(path))
-                    foreach (var item in Directory.GetFiles(path, "*.pat"))
-                        yield return new ContentMSTSPath(this, Path.Combine(path, item));
+                    foreach (var item in PathCase.GetFiles(path, "*.pat"))
+                        yield return new ContentMSTSPath(this, item);
             }
         }
 
@@ -140,7 +140,7 @@ namespace ORTS.ContentManager
         {
             if (type == ContentType.Path)
             {
-                var path = Path.Combine(Path.Combine(PathName, "Paths"), name + ".pat");
+                var path = PathCase.Combine(PathName, "Paths", name + ".pat");
                 if (File.Exists(path))
                     return new ContentMSTSPath(this, path);
             }
@@ -175,7 +175,7 @@ namespace ORTS.ContentManager
 
         string GetRelatedPath(string type, string name, string extension)
         {
-            return Path.Combine(Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(PathName)), type), name + extension);
+            return PathCase.Combine(Path.GetDirectoryName(Path.GetDirectoryName(PathName)), type, name + extension);
         }
     }
 
@@ -259,8 +259,8 @@ namespace ORTS.ContentManager
         {
             if (type == ContentType.Texture)
             {
-                foreach (var item in Directory.GetFiles(Path.GetDirectoryName(PathName), "*.ace"))
-                    yield return new ContentMSTSTexture(this, Path.Combine(PathName, item));
+                foreach (var item in PathCase.GetFiles(Path.GetDirectoryName(PathName), "*.ace"))
+                    yield return new ContentMSTSTexture(this, item);
             }
         }
     }

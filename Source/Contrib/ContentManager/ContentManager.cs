@@ -42,6 +42,7 @@ namespace ORTS.ContentManager
             if (type == ContentType.Package)
             {
                 // TODO: Support OR content folders.
+                if (Settings != null)
                 foreach (var folder in Settings.Folders)
                 {
                     if (ContentMSTSPackage.IsValid(folder.Value))

@@ -4,16 +4,13 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows.Controls;
+using Avalonia.Controls;
 using Orts.TimetableEditor.Views;
 using Orts.TimetableEditor.ViewModel;
 using System.ComponentModel;
 using Orts.TimetableEditor.Model;
 using System.IO;
 using System.IO.Compression;
-using System.Windows;
-using System.Data;
-using System.IO.Packaging;
 
 namespace Orts.TimetableEditor.ViewModel
 {
@@ -53,10 +50,11 @@ namespace Orts.TimetableEditor.ViewModel
             }
         }
 
-        public void NewTimetable(string tdbfilename, string routepath)
+        public async Task NewTimetable(string tdbfilename, string routepath)
         {
             TimetableViewModel viewModel = new TimetableViewModel();
-            viewModel.newTimetable(tdbfilename, routepath);
+            if (!await viewModel.newTimetable(tdbfilename, routepath))
+                return;
             viewModel.ConsAndPaths = ConsistsAndPaths;
             Tables.Add(viewModel);
             Table table = new Table();
@@ -74,7 +72,7 @@ namespace Orts.TimetableEditor.ViewModel
             Tables.Add(viewModel);
             Table table = new Table();
             table.DataContext = viewModel;
-            string header = Path.GetFileName(timetablefile).Replace("_","__");
+            string header = Path.GetFileName(timetablefile);
             Tabs.Add(new TabItem { Header = header, Content = table });
             SelectedTabIndex = Tabs.Count - 1;
         }
@@ -140,8 +138,8 @@ namespace Orts.TimetableEditor.ViewModel
         public void LoadPoolTrains(string path)
         {
             PoolTrains.Clear();
-            string[] poolfiles = Directory.GetFiles(path, "*.pool-or");
-            string[] turntablepoolfiles = Directory.GetFiles(path, "*.turntable-or");
+            string[] poolfiles = PathCase.GetFiles(path, "*.pool-or");
+            string[] turntablepoolfiles = PathCase.GetFiles(path, "*.turntable-or");
             if (poolfiles.Length > 0)
             {
                 foreach (string file in poolfiles)
@@ -198,8 +196,7 @@ namespace Orts.TimetableEditor.ViewModel
 
         public void GetUsedPathsAndCons()
         {            
-            string[] RouteNameArray = RoutePath.Split('\\');
-            string RouteName = RouteNameArray[RouteNameArray.Length-1];
+            string RouteName = Path.GetFileName(RoutePath.TrimEnd(Path.DirectorySeparatorChar));
             ConsForZip.Clear();
             PathsForZip.Clear();
             foreach (TimetableViewModel tvm in Tables)
@@ -209,11 +206,11 @@ namespace Orts.TimetableEditor.ViewModel
             }
             for(int i=0; i<ConsForZip.Count; i++)
             {
-                ConsForZip[i] = ConsistsAndPaths.ConsistsPath+"\\" + ConsForZip[i] + ".con";
+                ConsForZip[i] = PathCase.Combine(ConsistsAndPaths.ConsistsPath, ConsForZip[i] + ".con");
             }
             for(int i=0; i<PathsForZip.Count; i++)
             {
-                PathsForZip[i] = ConsistsAndPaths.PathsPath + "\\" + PathsForZip[i] + ".pat";
+                PathsForZip[i] = PathCase.Combine(ConsistsAndPaths.PathsPath, PathsForZip[i] + ".pat");
             }           
             if(File.Exists("test.zip"))
             {
@@ -223,14 +220,14 @@ namespace Orts.TimetableEditor.ViewModel
             foreach(string file in ConsForZip)
             {
                 if (File.Exists(file))
-                    zip.CreateEntryFromFile(file, "Consists\\" + Path.GetFileName(file), CompressionLevel.Optimal);
-                else MessageBox.Show(file, "File not found");
+                    zip.CreateEntryFromFile(file, "Consists/" + Path.GetFileName(file), CompressionLevel.Optimal);
+                else _ = Dialogs.Show(file, "File not found");
             }           
             foreach(string file in PathsForZip)
             {
                 if (File.Exists(file))
-                    zip.CreateEntryFromFile(file, "Routes\\" + RouteName + "\\Paths\\" + Path.GetFileName(file), CompressionLevel.Optimal);
-                else MessageBox.Show(file, "File not found");
+                    zip.CreateEntryFromFile(file, "Routes/" + RouteName + "/Paths/" + Path.GetFileName(file), CompressionLevel.Optimal);
+                else _ = Dialogs.Show(file, "File not found");
             }
             zip.Dispose();
         }

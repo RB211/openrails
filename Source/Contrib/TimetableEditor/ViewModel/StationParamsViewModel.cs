@@ -5,7 +5,6 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
 using Orts.TimetableEditor.Model;
 using Orts.TimetableEditor.Views;
 
@@ -16,7 +15,7 @@ namespace Orts.TimetableEditor.ViewModel
         public ObservableCollection<Station> Stations { get; set; }
         public ObservableCollection<string> PossibleCommands { get; set; }
         private Station selectedStation;
-        private Visibility commandsVisible;
+        private bool commandsVisible;
         private TimetableCommand selectedCommand;
         private string selectedPossibleCommand;
 
@@ -26,7 +25,7 @@ namespace Orts.TimetableEditor.ViewModel
         public StationParamsViewModel()
         {
             Stations = new ObservableCollection<Station>();
-            CommandsVisible = Visibility.Collapsed;
+            CommandsVisible = false;
             PossibleCommands = new ObservableCollection<string>();
             AddCommand = new MyICommand(OnAddCommand, CanAddCommand);
             RemoveCommand = new MyICommand(OnRemoveCommand, CanRemoveCommand);
@@ -45,12 +44,12 @@ namespace Orts.TimetableEditor.ViewModel
                 OnPropertyChanged(nameof(SelectedStation));
                 if (selectedStation != null)
                 {
-                    CommandsVisible = Visibility.Visible;
+                    CommandsVisible = true;
                 }
             }
         }
 
-        public Visibility CommandsVisible
+        public bool CommandsVisible
         {
             get
             {
@@ -113,7 +112,7 @@ namespace Orts.TimetableEditor.ViewModel
             PossibleCommands.Add("OTHER");
         }
 
-        private void OnAddCommand()
+        private async void OnAddCommand()
         {
             if(selectedPossibleCommand!="OTHER")
             {
@@ -130,8 +129,7 @@ namespace Orts.TimetableEditor.ViewModel
                 InputBox inp = new InputBox();
                 inp.Title = "New command";
                 inp.Question.Text = "Please enter the new Command";
-                inp.ShowDialog();
-                if(inp.DialogResult==true)
+                if(await Dialogs.ShowDialog(inp))
                 {
                     TimetableCommand newcmd = new TimetableCommand();
                     newcmd.Name = inp.Input.Text;
@@ -148,9 +146,9 @@ namespace Orts.TimetableEditor.ViewModel
             return SelectedPossibleCommand != null;
         }
 
-        private void OnRemoveCommand()
+        private async void OnRemoveCommand()
         {
-            if (MessageBox.Show("Remove item?", "Remove?", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (await Dialogs.AskYesNo("Remove item?", "Remove?"))
             {
                 SelectedStation.Commands.Remove(SelectedCommand);
             }

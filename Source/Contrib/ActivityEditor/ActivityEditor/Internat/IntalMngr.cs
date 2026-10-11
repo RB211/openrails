@@ -40,13 +40,20 @@ namespace ActivityEditor.Internat
             EnglishCulture = new CultureInfo("en");
             FrenchCulture = new CultureInfo("fr-FR");
             CultureInfo.DefaultThreadCurrentUICulture = EnglishCulture;
+            // There is no "ActivityEditor.ActEditor" string resource in the assembly; look up strings defensively.
             resMan = new ResourceManager("ActivityEditor.ActEditor", Assembly.GetExecutingAssembly());
         }
 
         public string GetString(string name)
         {
-            string info = resMan.GetString(name);
-            return info;
+            try
+            {
+                return resMan.GetString(name) ?? name;
+            }
+            catch (MissingManifestResourceException)
+            {
+                return name;
+            }
         }
     }
 }

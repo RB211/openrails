@@ -38,7 +38,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using System.Xml.Serialization;
 
 namespace ActivityEditor
@@ -84,7 +83,8 @@ namespace ActivityEditor
 
         public void StopUpdaterThread()
         {
-            Thread.Abort();
+            // Thread.Abort is not supported on .NET Core / .NET 5+; the updater thread has no work and ends by itself.
+            Thread.Join(1000);
         }
 
         public void Start()
