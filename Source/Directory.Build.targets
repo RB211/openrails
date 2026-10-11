@@ -5,4 +5,11 @@
     still builds there (e.g. on Linux, where you run Program/Menu directly instead of OpenRails.exe).
   -->
   <Import Project="WindowsOnly.targets" Condition="'$(OrtsWindowsOnly)' == 'true' AND !$([MSBuild]::IsOSPlatform('Windows'))" />
+  <!-- Optional locally built MonoGame native runtime, e.g. with fixes not yet in a release:
+       dotnet build -p:OrtsMgRuntimeOverride=/path/to/libmgruntime.so
+       Applied after every project that ships the MonoGame runtime, so a later project cannot overwrite it. -->
+  <Target Name="OrtsCopyMgRuntimeOverride" AfterTargets="Build" Condition="'$(OrtsMgRuntimeOverride)' != '' AND Exists('$(OutDir)libmgruntime.so')">
+    <Error Condition="!Exists('$(OrtsMgRuntimeOverride)')" Text="OrtsMgRuntimeOverride '$(OrtsMgRuntimeOverride)' does not exist" />
+    <Copy SourceFiles="$(OrtsMgRuntimeOverride)" DestinationFolder="$(OutDir)" />
+  </Target>
 </Project>

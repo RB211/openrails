@@ -643,12 +643,6 @@
     <Copy SourceFiles="@(OrtsWebContent)" DestinationFiles="@(OrtsWebContent->'$(OrtsProgramDir)Content/Web/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Delete Files="$(OrtsProgramDir)RunActivityLAA.exe;$(OrtsProgramDir)RunActivityLAA.dll" />
   </Target>
-  <!-- Optional locally built MonoGame native runtime, e.g. with fixes not yet in a release:
-       dotnet build -p:OrtsMgRuntimeOverride=/path/to/libmgruntime.so -->
-  <Target Name="OrtsCopyMgRuntimeOverride" AfterTargets="Build" Condition="'$(OrtsMgRuntimeOverride)' != ''">
-    <Error Condition="!Exists('$(OrtsMgRuntimeOverride)')" Text="OrtsMgRuntimeOverride '$(OrtsMgRuntimeOverride)' does not exist" />
-    <Copy SourceFiles="$(OrtsMgRuntimeOverride)" DestinationFolder="$(OrtsProgramDir)" />
-  </Target>
   <Target Name="OrtsRestoreTools" AfterTargets="Build">
     <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)../.." />
   </Target>
