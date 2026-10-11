@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.TelemetryWindow"
+        Title="{l:Tr 'Telemetry Options'}"
+        Width="640" SizeToContent="Height" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="12" Spacing="6">
+    <TextBlock Classes="bold" Text="{l:Tr 'Why share anonymous data with Open Rails?'}" />
+    <TextBlock x:Name="label2" Classes="wrap" />
+    <TextBlock Classes="bold" Text="{l:Tr 'How does Open Rails use anonymous data?'}" Margin="0,8,0,0" />
+    <TextBlock x:Name="label5" Classes="wrap" />
+    <TextBlock Classes="bold" Text="{l:Tr 'Choose which anonymous data to collect:'}" Margin="0,8,0,0" />
+    <DockPanel>
+      <ComboBox x:Name="comboBoxSystem" Width="140" DockPanel.Dock="Left" />
+      <Button x:Name="linkLabelPreviewSystem" Classes="flat" Content="{l:Tr Preview}" Foreground="{DynamicResource SystemAccentColor}" Cursor="Hand" DockPanel.Dock="Right" />
+      <TextBlock Text="{l:Tr 'Application, runtime, operating system, and hardware properties'}" VerticalAlignment="Center" Margin="8,0" TextWrapping="Wrap" />
+    </DockPanel>
+    <DockPanel Margin="0,10,0,0">
+      <Button x:Name="buttonClose" Content="{l:Tr Close}" DockPanel.Dock="Right" IsCancel="True" IsDefault="True" MinWidth="70" HorizontalContentAlignment="Center" />
+      <Button x:Name="linkLabelServer" Classes="flat" Content="{l:Tr 'Telemetry server and source code'}" Foreground="{DynamicResource SystemAccentColor}" Cursor="Hand" HorizontalAlignment="Left" />
+    </DockPanel>
+  </StackPanel>
+</Window>

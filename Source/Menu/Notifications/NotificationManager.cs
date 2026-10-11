@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2009 by the Open Rails project.
+// COPYRIGHT 2009 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -17,14 +17,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Resources;
 using System.Text;
-using System.Windows;
-using System.Windows.Forms;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
 using Newtonsoft.Json;
 using ORTS.Common;
 using ORTS.Settings;
@@ -68,44 +66,36 @@ namespace Menu.Notifications
         private bool Log = false;
         private const string LogFile = "notifications_trial_log.txt";
 
-        private readonly MainForm MainForm; // Needed so we can add controls to the NotificationPage
+        private readonly MainWindow MainForm; // Needed so we can add controls to the NotificationPage
         private readonly UpdateManager UpdateManager;
-        private readonly UserSettings Settings;
-        private readonly Panel Panel;
+        public UserSettings Settings { get; set; } // Replaced when the Menu re-reads the settings after the simulator exits.
+        private readonly StackPanel Panel;
 
-        public Image PreviousImage { get; private set; }
-        public Image NextImage { get; private set; }
-        public Image FirstImage { get; private set; }
-        public Image LastImage { get; private set; }
+        public Bitmap PreviousImage { get; private set; }
+        public Bitmap NextImage { get; private set; }
+        public Bitmap FirstImage { get; private set; }
+        public Bitmap LastImage { get; private set; }
         public PageTracking NewPages { get; private set; }
-        public double ScreenScaling { get; private set; }
-        public bool ScreenAdjusted { get; set; }
 
-        public NotificationManager(MainForm mainForm, ResourceManager resources, UpdateManager updateManager, UserSettings settings, Panel panel)
+        public NotificationManager(MainWindow mainForm, UpdateManager updateManager, UserSettings settings, StackPanel panel)
         {
             MainForm = mainForm;
             this.UpdateManager = updateManager;
             this.Settings = settings;
             Panel = panel;
             NewPages = new PageTracking();
-            ScreenScaling = GetScalingFactor();
 
             // Load images of arrows
-            PreviousImage = (Image)resources.GetObject("Notification_previous");
-            NextImage = (Image)resources.GetObject("Notification_next");
-            FirstImage = (Image)resources.GetObject("Notification_first");
-            LastImage = (Image)resources.GetObject("Notification_last");
+            PreviousImage = App.LoadBitmap("Notification-previous.png");
+            NextImage = App.LoadBitmap("Notification-next.png");
+            FirstImage = App.LoadBitmap("Notification-first.png");
+            LastImage = App.LoadBitmap("Notification-last.png");
         }
 
-        public double GetScalingFactor()
-        {
-#if NET5_0_OR_GREATER
-#warning GetScalingFactor() not implemented for NET5+
-            return 1;
-#else
-            return Screen.PrimaryScreen.Bounds.Width / SystemParameters.PrimaryScreenWidth;
-#endif
-        }
+        /// <summary>
+        /// The update channel; there is none where self-updating isn't supported (e.g. Linux).
+        /// </summary>
+        string ChannelName => UpdateManager.ChannelName ?? "";
 
         public void CheckNotifications()
         {
@@ -186,7 +176,7 @@ namespace Menu.Notifications
                 Encoding = Encoding.UTF8,
             };
             // Helpful to supply server with data for its log file.
-            client.Headers[HttpRequestHeader.UserAgent] = $"{System.Windows.Forms.Application.ProductName}/{VersionInfo.VersionOrBuild}";
+            client.Headers[HttpRequestHeader.UserAgent] = $"{App.ProductName}/{VersionInfo.VersionOrBuild}";
 
             return client.DownloadString(new Uri("https://static.openrails.org/api/notifications/menu.json"));
         }
@@ -264,7 +254,7 @@ namespace Menu.Notifications
             NewPages.Count = 0;
 
             // Reports notifications are not available.
-            var channelName = UpdateManager.ChannelName == "" ? "None" : UpdateManager.ChannelName;
+            var channelName = ChannelName == "" ? "None" : ChannelName;
             var today = DateTime.Now.Date;
             Page.NDetailList.Add(new NTitleControl(Panel, 1, 1, $"{today:dd-MMM-yy}", "Notifications are not available"));
 
@@ -431,7 +421,7 @@ namespace Menu.Notifications
             var url = link.Url;
             if (string.IsNullOrEmpty(url))
             {
-                switch (UpdateManager.ChannelName.ToLower())
+                switch (ChannelName.ToLower())
                 {
                     case "stable":
                     case "": // Channel None
@@ -494,13 +484,13 @@ namespace Menu.Notifications
                     // Update parameters
                     // Using "none" instead of "" so that records are readable.
                     case "update_mode":
-                        replacement = (UpdateManager.ChannelName == "")
+                        replacement = (ChannelName == "")
                             ? "none"
-                            : UpdateManager.ChannelName;
+                            : ChannelName;
                         break;
                     case "latest_version":
                         replacement = UpdateManager.LastUpdate == null
-                            || UpdateManager.ChannelName == ""
+                            || ChannelName == ""
                             ? "none"
                             : UpdateManager.LastUpdate.Version;
                         break;
@@ -586,7 +576,7 @@ namespace Menu.Notifications
             var contentDictionary = Settings.Folders.Folders;
             foreach (var folder in contentDictionary)
             {
-                var path = folder.Value + @"\ROUTES\";
+                var path = Path.Combine(folder.Value, "ROUTES");
                 if (Directory.Exists(path))
                 {
                     foreach (var routePath in Directory.GetDirectories(path))

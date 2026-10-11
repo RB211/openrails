@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.ResumeWindow"
+        Title="{l:Tr 'Saved Games'}"
+        Width="900" Height="560" MinWidth="760" MinHeight="420" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <Grid Margin="10" RowDefinitions="*,Auto" ColumnDefinitions="*,*">
+    <DataGrid x:Name="gridSaves" Grid.Row="0" Grid.Column="0" Margin="0,0,5,0"
+              IsReadOnly="True" SelectionMode="Extended" CanUserResizeColumns="True" CanUserSortColumns="True"
+              GridLinesVisibility="All" HeadersVisibility="Column" BorderThickness="1"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="{l:Tr File}" Binding="{ReflectionBinding File}" IsVisible="False" />
+        <DataGridTextColumn Header="{l:Tr 'Saved At'}" Binding="{ReflectionBinding RealTime}" />
+        <DataGridTextColumn Header="{l:Tr Path}" Binding="{ReflectionBinding PathName}" />
+        <DataGridTextColumn Header="{l:Tr Time}" Binding="{ReflectionBinding GameTime}" />
+        <DataGridTextColumn Header="{l:Tr Distance}" Binding="{ReflectionBinding Distance}" />
+        <DataGridTextColumn Header="{l:Tr Tile}" Binding="{ReflectionBinding CurrentTile}" />
+        <DataGridCheckBoxColumn Header="{l:Tr Valid}" Binding="{ReflectionBinding Valid}" IsThreeState="True" />
+      </DataGrid.Columns>
+    </DataGrid>
+    <Border Grid.Row="0" Grid.Column="1" Margin="5,0,0,0" BorderThickness="1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Background="Transparent" x:Name="panelScreenshot">
+      <Image x:Name="pictureBoxScreenshot" Stretch="Uniform" Cursor="Hand" />
+    </Border>
+
+    <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" ColumnDefinitions="*,Auto,Auto">
+      <HeaderedContentControl Grid.Column="0" Classes="group" Header="{l:Tr 'Invalid saves'}" Margin="0,0,10,0">
+        <StackPanel Spacing="6">
+          <TextBlock x:Name="labelInvalidSaves" TextWrapping="Wrap" />
+          <Button x:Name="buttonDeleteInvalid" Content="{l:Tr 'Delete all invalid saves'}" />
+        </StackPanel>
+      </HeaderedContentControl>
+      <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Bottom" Margin="0,0,10,0">
+        <Button x:Name="buttonDelete" Content="{l:Tr Delete}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                ToolTip.Tip="{l:Tr 'Deletes the currently selected save or saves.'}" />
+        <Button x:Name="buttonUndelete" Content="{l:Tr Undelete}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                ToolTip.Tip="{l:Tr 'Restores all saves deleted in this session.'}" />
+        <Button x:Name="buttonImportExportSaves" Content="{l:Tr 'Import/ export'}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+      </StackPanel>
+      <Grid Grid.Column="2" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto" VerticalAlignment="Bottom">
+        <CheckBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" x:Name="checkBoxReplayPauseBeforeEnd" Content="{l:Tr 'Pause replay at end'}" IsChecked="True" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="{l:Tr 'Pause seconds before end:'}" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="numericReplayPauseBeforeEnd" Minimum="-3600" Maximum="3600" Increment="1" Width="110" Margin="0,2" />
+        <Button Grid.Row="2" Grid.Column="0" x:Name="buttonReplayFromPreviousSave" Content="{l:Tr 'Replay from previous save'}" Margin="0,4,6,0" />
+        <Button Grid.Row="2" Grid.Column="1" x:Name="buttonReplayFromStart" Content="{l:Tr 'Replay from start'}" Margin="0,4,6,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+        <Button Grid.Row="2" Grid.Column="2" x:Name="buttonResume" Content="{l:Tr Resume}" Margin="0,4,0,0" MinWidth="90" HorizontalContentAlignment="Center" IsDefault="True" FontWeight="SemiBold" />
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

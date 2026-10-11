@@ -1,45 +1,54 @@
-﻿// COPYRIGHT 2009 - 2024 by the Open Rails project.
-// 
+// COPYRIGHT 2009 - 2024 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Resources;
-using System.Runtime.InteropServices;
-using System.Windows.Forms;
-using GNU.Gettext;
-using GNU.Gettext.WinForms;
+using System.Reflection.PortableExecutable;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using Menu.Notifications;
 using Orts.Formats.OR;
 using ORTS.Common;
 using ORTS.Menu;
 using ORTS.Settings;
 using ORTS.Updater;
-using static Menu.Notifications.NotificationPage;
 using Activity = ORTS.Menu.Activity;
 using Path = ORTS.Menu.Path;
+using KeyModifiers = Avalonia.Input.KeyModifiers;
 
 namespace Menu
 {
-    public partial class MainForm : Form
+    /// <summary>
+    /// The result of one of the Menu's dialogs, like the WinForms DialogResult.
+    /// </summary>
+    public enum DialogResult { None, OK, Cancel, Retry }
+
+    public partial class MainWindow : Window
     {
         public enum UserAction
         {
@@ -55,7 +64,7 @@ namespace Menu
             MultiplayerClientResumeSave
         }
 
-        bool Initialized;
+        bool MenuInitialized;
         UserSettings Settings;
         TelemetryManager TelemetryManager;
         List<Folder> Folders = new List<Folder>();
@@ -72,69 +81,63 @@ namespace Menu
         Task<List<Path>> PathLoader;
         Task<List<TimetableInfo>> TimetableSetLoader;
         Task<List<WeatherFileInfo>> TimetableWeatherFileLoader;
-        readonly ResourceManager Resources = new ResourceManager("Menu.Properties.Resources", typeof(MainForm).Assembly);
         readonly UpdateManager UpdateManager;
-        readonly Image ElevationIcon;
         NotificationManager NotificationManager;
 
-        internal string RunActivityProgram
-        {
-            get
-            {
-                return System.IO.Path.Combine(ApplicationInfo.ProcessDirectory, "RunActivity.exe");
-            }
-        }
+        readonly Bitmap ExpanderOpenImage = App.LoadBitmap("Expander-open.png");
+        readonly Bitmap ExpanderClosedImage = App.LoadBitmap("Expander-closed.png");
+        readonly Bitmap ExpanderClosedDisabledImage = App.LoadBitmap("Expander-closed-disabled.png");
+
+        // Keyboard modifiers at the time of the last click/key press, for "Alt+Start copies the command line".
+        KeyModifiers LastKeyModifiers;
+
+        internal string RunActivityProgram => ExternalProcess.ExecutablePath("RunActivity");
 
         // Base items
-        public Folder SelectedFolder { get { return (Folder)comboBoxFolder.SelectedItem; } }
-        public Route SelectedRoute { get { return (Route)comboBoxRoute.SelectedItem; } }
+        public Folder SelectedFolder => comboBoxFolder.SelectedItem as Folder;
+        public Route SelectedRoute => comboBoxRoute.SelectedItem as Route;
 
         // Activity mode items
-        public Activity SelectedActivity { get { return (Activity)comboBoxActivity.SelectedItem; } }
-        public Consist SelectedConsist { get { return (Consist)comboBoxConsist.SelectedItem; } }
-        public Path SelectedPath { get { return (Path)comboBoxHeadTo.SelectedItem; } }
-        public string SelectedStartTime { get { return comboBoxStartTime.Text; } }
+        public Activity SelectedActivity => comboBoxActivity.SelectedItem as Activity;
+        public Consist SelectedConsist => comboBoxConsist.SelectedItem as Consist;
+        public Path SelectedPath => comboBoxHeadTo.SelectedItem as Path;
+        public string SelectedStartTime => comboBoxStartTime.IsEditable ? comboBoxStartTime.Text : comboBoxStartTime.SelectedItem?.ToString();
 
         // Timetable mode items
-        public TimetableInfo SelectedTimetableSet { get { return (TimetableInfo)comboBoxTimetableSet.SelectedItem; } }
-        public TimetableFileLite SelectedTimetable { get { return (TimetableFileLite)comboBoxTimetable.SelectedItem; } }
-        public TimetableFileLite.TrainInformation SelectedTimetableTrain { get { return (TimetableFileLite.TrainInformation)comboBoxTimetableTrain.SelectedItem; } }
-        public int SelectedTimetableDay { get { return (comboBoxTimetableDay.SelectedItem as KeyedComboBoxItem).Key; } }
-        public WeatherFileInfo SelectedWeatherFile { get { return (WeatherFileInfo)comboBoxTimetableWeatherFile.SelectedItem; } }
+        public TimetableInfo SelectedTimetableSet => comboBoxTimetableSet.SelectedItem as TimetableInfo;
+        public TimetableFileLite SelectedTimetable => comboBoxTimetable.SelectedItem as TimetableFileLite;
+        public TimetableFileLite.TrainInformation SelectedTimetableTrain => comboBoxTimetableTrain.SelectedItem as TimetableFileLite.TrainInformation;
+        public int SelectedTimetableDay => (comboBoxTimetableDay.SelectedItem as KeyedComboBoxItem)?.Key ?? 0;
+        public WeatherFileInfo SelectedWeatherFile => comboBoxTimetableWeatherFile.SelectedItem as WeatherFileInfo;
         public Consist SelectedTimetableConsist;
         public Path SelectedTimetablePath;
 
         // Shared items
-        public int SelectedStartSeason { get { return radioButtonModeActivity.Checked ? (comboBoxStartSeason.SelectedItem as KeyedComboBoxItem).Key : (comboBoxTimetableSeason.SelectedItem as KeyedComboBoxItem).Key; } }
-        public int SelectedStartWeather { get { return radioButtonModeActivity.Checked ? (comboBoxStartWeather.SelectedItem as KeyedComboBoxItem).Key : (comboBoxTimetableWeather.SelectedItem as KeyedComboBoxItem).Key; } }
+        public int SelectedStartSeason => (IsModeActivity ? comboBoxStartSeason.SelectedItem as KeyedComboBoxItem : comboBoxTimetableSeason.SelectedItem as KeyedComboBoxItem)?.Key ?? 1;
+        public int SelectedStartWeather => (IsModeActivity ? comboBoxStartWeather.SelectedItem as KeyedComboBoxItem : comboBoxTimetableWeather.SelectedItem as KeyedComboBoxItem)?.Key ?? 0;
 
         public string SelectedSaveFile { get; set; }
         public UserAction SelectedAction { get; set; }
 
-        GettextResourceManager catalog = new GettextResourceManager("Menu");
+        bool IsModeActivity => radioButtonModeActivity.IsChecked == true;
+        bool IsModeTimetable => radioButtonModeTimetable.IsChecked == true;
 
         public string BaseDocumentationUrl;
 
         #region Main Form
-        public MainForm()
+        public MainWindow()
         {
             InitializeComponent();
-
-            // Windows 2000 and XP should use 8.25pt Tahoma, while Windows
-            // Vista and later should use 9pt "Segoe UI". We'll use the
-            // Message Box font to allow for user-customizations, though.
-            Font = SystemFonts.MessageBoxFont;
+            Icon = App.LoadIcon();
 
             // Set title to show revision or build info.
-            Text = String.Format(VersionInfo.Version.Length > 0 ? "{0} {1}" : "{0} build {2}", Application.ProductName, VersionInfo.Version, VersionInfo.Build);
+            Title = String.Format(VersionInfo.Version.Length > 0 ? "{0} {1}" : "{0} build {2}", App.ProductName, VersionInfo.Version, VersionInfo.Build);
 #if DEBUG
-            Text = Text + " (debug)";
+            Title = Title + " (debug)";
 #endif
-            panelModeTimetable.Location = panelModeActivity.Location;
             ShowDetails();
             UpdateEnabled();
-            UpdateManager = new UpdateManager(ApplicationInfo.ProcessDirectory, Application.ProductName, VersionInfo.VersionOrBuild);
-            ElevationIcon = new Icon(SystemIcons.Shield, SystemInformation.SmallIconSize).ToBitmap();
+            UpdateManager = new UpdateManager(ApplicationInfo.ProcessDirectory, App.ProductName, VersionInfo.VersionOrBuild);
 
             BaseDocumentationUrl = "https://open-rails.readthedocs.io/en/latest";
             if (VersionInfo.Version.Length > 0)
@@ -144,133 +147,129 @@ namespace Menu
                     BaseDocumentationUrl = "https://open-rails.readthedocs.io/en/unstable";
                 }
             }
- 
+
+            comboBoxFolder.SelectionChanged += comboBoxFolder_SelectedIndexChanged;
+            comboBoxRoute.SelectionChanged += comboBoxRoute_SelectedIndexChanged;
+            radioButtonModeActivity.IsCheckedChanged += radioButtonMode_CheckedChanged;
+            radioButtonModeTimetable.IsCheckedChanged += radioButtonMode_CheckedChanged;
+            comboBoxActivity.SelectionChanged += comboBoxActivity_SelectedIndexChanged;
+            comboBoxLocomotive.SelectionChanged += comboBoxLocomotive_SelectedIndexChanged;
+            comboBoxConsist.SelectionChanged += comboBoxConsist_SelectedIndexChanged;
+            comboBoxStartAt.SelectionChanged += comboBoxStartAt_SelectedIndexChanged;
+            comboBoxHeadTo.SelectionChanged += comboBoxHeadTo_SelectedIndexChanged;
+            comboBoxStartTime.PropertyChanged += (sender, e) =>
+            {
+                if (e.Property == ComboBox.TextProperty || e.Property == ComboBox.SelectedItemProperty)
+                    comboBoxStartTime_TextChanged(sender, e);
+            };
+            comboBoxStartSeason.SelectionChanged += comboBoxStartSeason_SelectedIndexChanged;
+            comboBoxStartWeather.SelectionChanged += comboBoxStartWeather_SelectedIndexChanged;
+            comboBoxTimetableSet.SelectionChanged += comboBoxTimetableSet_SelectedIndexChanged;
+            comboBoxTimetable.SelectionChanged += comboBoxTimetable_selectedIndexChanged;
+            comboBoxTimetable.PropertyChanged += (sender, e) =>
+            {
+                if (e.Property == IsEnabledProperty)
+                    comboBoxTimetable_EnabledChanged(sender, e);
+            };
+            comboBoxTimetableTrain.SelectionChanged += comboBoxTimetableTrain_SelectedIndexChanged;
+            comboBoxTimetableDay.SelectionChanged += comboBoxTimetableDay_SelectedIndexChanged;
+            comboBoxTimetableSeason.SelectionChanged += comboBoxTimetableSeason_SelectedIndexChanged;
+            comboBoxTimetableWeather.SelectionChanged += comboBoxTimetableWeather_SelectedIndexChanged;
+            comboBoxTimetableWeatherFile.SelectionChanged += comboBoxTimetableWeatherFile_SelectedIndexChanged;
+            textBoxMPUser.TextChanged += textBoxMPUser_TextChanged;
+            textBoxMPHost.TextChanged += textBoxMPUser_TextChanged;
+
+            buttonDownloadContent.Click += buttonDownloadContent_Click;
+            buttonOptions.Click += buttonOptions_Click;
+            buttonStart.Click += buttonStart_Click;
+            buttonResume.Click += buttonResume_Click;
+            buttonStartMP.Click += buttonStartMP_Click;
+            buttonResumeMP.Click += buttonResumeMP_Click;
+            panelNotificationIcon.PointerPressed += (sender, e) => ToggleNotificationPages();
+            panelDetails.SizeChanged += (sender, e) =>
+            {
+                if (e.WidthChanged)
+                    UpdateExpanders();
+            };
+
+            // Remember the modifier keys used to press a button; Alt+Start copies the command line instead of starting.
+            AddHandler(PointerPressedEvent, (sender, e) => LastKeyModifiers = e.KeyModifiers, RoutingStrategies.Tunnel, true);
+            AddHandler(PointerReleasedEvent, (sender, e) => LastKeyModifiers = e.KeyModifiers, RoutingStrategies.Tunnel, true);
+            AddHandler(KeyDownEvent, (sender, e) => LastKeyModifiers = e.KeyModifiers, RoutingStrategies.Tunnel, true);
+            AddHandler(KeyUpEvent, (sender, e) => LastKeyModifiers = e.KeyModifiers, RoutingStrategies.Tunnel, true);
+
+            // Only the first opening; after the simulator exits StartGame() re-runs this itself.
+            EventHandler opened = null;
+            opened = (sender, e) =>
+            {
+                Opened -= opened;
+                MainForm_Shown();
+            };
+            Opened += opened;
+            Closing += MainForm_FormClosing;
         }
 
-        void MainForm_Shown(object sender, EventArgs e)
+        void MainForm_Shown()
         {
-            var options = Environment.GetCommandLineArgs().Where(a => (a.StartsWith("-") || a.StartsWith("/"))).Select(a => a.Substring(1));
+            // Options on our own command line are passed to the settings, like RunActivity does.
+            // "/option" is only recognised on Windows as it's an absolute path elsewhere.
+            var options = Environment.GetCommandLineArgs().Skip(1)
+                .Where(a => a.StartsWith("-") || (OperatingSystem.IsWindows() && a.StartsWith("/")))
+                .Select(a => a.Substring(1));
             Settings = new UserSettings(options);
             TelemetryManager = new TelemetryManager(Settings.Telemetry);
 
-            Cursor = Cursors.Default;
+            Cursor = Cursor.Default;
 
             LoadOptions();
             LoadLanguage();
 
-            if (!Initialized)
+            if (!MenuInitialized)
             {
                 var Seasons = new[] {
-                    new KeyedComboBoxItem(0, catalog.GetString("Spring")),
-                    new KeyedComboBoxItem(1, catalog.GetString("Summer")),
-                    new KeyedComboBoxItem(2, catalog.GetString("Autumn")),
-                    new KeyedComboBoxItem(3, catalog.GetString("Winter")),
+                    new KeyedComboBoxItem(0, Localization.GetString("Spring")),
+                    new KeyedComboBoxItem(1, Localization.GetString("Summer")),
+                    new KeyedComboBoxItem(2, Localization.GetString("Autumn")),
+                    new KeyedComboBoxItem(3, Localization.GetString("Winter")),
                 };
                 var Weathers = new[] {
-                    new KeyedComboBoxItem(0, catalog.GetString("Clear")),
-                    new KeyedComboBoxItem(1, catalog.GetString("Snow")),
-                    new KeyedComboBoxItem(2, catalog.GetString("Rain")),
+                    new KeyedComboBoxItem(0, Localization.GetString("Clear")),
+                    new KeyedComboBoxItem(1, Localization.GetString("Snow")),
+                    new KeyedComboBoxItem(2, Localization.GetString("Rain")),
                 };
                 var Difficulties = new[] {
-                    catalog.GetString("Easy"),
-                    catalog.GetString("Medium"),
-                    catalog.GetString("Hard"),
+                    Localization.GetString("Easy"),
+                    Localization.GetString("Medium"),
+                    Localization.GetString("Hard"),
                     "",
                 };
                 var Days = new[] {
-                    new KeyedComboBoxItem(0, catalog.GetString("Monday")),
-                    new KeyedComboBoxItem(1, catalog.GetString("Tuesday")),
-                    new KeyedComboBoxItem(2, catalog.GetString("Wednesday")),
-                    new KeyedComboBoxItem(3, catalog.GetString("Thursday")),
-                    new KeyedComboBoxItem(4, catalog.GetString("Friday")),
-                    new KeyedComboBoxItem(5, catalog.GetString("Saturday")),
-                    new KeyedComboBoxItem(6, catalog.GetString("Sunday")),
+                    new KeyedComboBoxItem(0, Localization.GetString("Monday")),
+                    new KeyedComboBoxItem(1, Localization.GetString("Tuesday")),
+                    new KeyedComboBoxItem(2, Localization.GetString("Wednesday")),
+                    new KeyedComboBoxItem(3, Localization.GetString("Thursday")),
+                    new KeyedComboBoxItem(4, Localization.GetString("Friday")),
+                    new KeyedComboBoxItem(5, Localization.GetString("Saturday")),
+                    new KeyedComboBoxItem(6, Localization.GetString("Sunday")),
                 };
 
-                comboBoxStartSeason.Items.AddRange(Seasons);
-                comboBoxStartWeather.Items.AddRange(Weathers);
-                comboBoxDifficulty.Items.AddRange(Difficulties);
+                foreach (var item in Seasons) comboBoxStartSeason.Items.Add(item);
+                foreach (var item in Weathers) comboBoxStartWeather.Items.Add(item);
+                foreach (var item in Difficulties) comboBoxDifficulty.Items.Add(item);
 
-                comboBoxTimetableSeason.Items.AddRange(Seasons);
-                comboBoxTimetableWeather.Items.AddRange(Weathers);
-                comboBoxTimetableDay.Items.AddRange(Days);
+                // The same items can't be in two ComboBoxes at once in Avalonia, but the keys/values are all that matter.
+                foreach (var item in Seasons) comboBoxTimetableSeason.Items.Add(new KeyedComboBoxItem(item.Key, item.Value));
+                foreach (var item in Weathers) comboBoxTimetableWeather.Items.Add(new KeyedComboBoxItem(item.Key, item.Value));
+                foreach (var item in Days) comboBoxTimetableDay.Items.Add(item);
 
-                var coreExecutables = new[] {
-                    "OpenRails.exe",
-                    "Menu.exe",
-                    "RunActivity.exe",
-                    "Updater.exe",
-                };
-                var tools = new List<ToolStripItem>();
-                foreach (var executable in Directory.GetFiles(ApplicationInfo.ProcessDirectory, "*.exe"))
-                {
-                    // Don't show any of the core parts of the application.
-                    if (coreExecutables.Contains(System.IO.Path.GetFileName(executable)))
-                        continue;
+                buttonTools.Flyout = CreateToolsMenu();
+                buttonDocuments.Flyout = CreateDocumentsMenu();
 
-                    var toolInfo = FileVersionInfo.GetVersionInfo(executable);
-
-                    // Skip any executable that isn't part of this product (e.g. Visual Studio hosting files).
-                    if (toolInfo.ProductName != Application.ProductName)
-                        continue;
-
-                    // Remove the product name from the tool's name and localise.
-                    var toolName = catalog.GetString(toolInfo.FileDescription.Replace(Application.ProductName, "").Trim());
-
-                    // Create menu item to execute tool.
-                    tools.Add(new ToolStripMenuItem(toolName, null, (Object sender2, EventArgs e2) =>
-                    {
-                        var toolPath = (sender2 as ToolStripItem).Tag as string;
-                        var toolIsConsole = false;
-                        using (var reader = new BinaryReader(File.OpenRead(toolPath)))
-                        {
-                            toolIsConsole = GetImageSubsystem(reader) == ImageSubsystem.WindowsConsole;
-                        }
-                        if (toolIsConsole)
-                            Process.Start("cmd", "/k \"" + toolPath + "\"");
-                        else
-                            Process.Start(toolPath);
-                    })
-                    { Tag = executable });
-                }
-                // Add all the tools in alphabetical order.
-                contextMenuStripTools.Items.AddRange((from tool in tools
-                                                      orderby tool.Text
-                                                      select tool).ToArray());
-
-                // Just like above, buttonDocuments is a button that is treated like a menu.  The result is a button that acts like a combobox.
-                // Populate buttonDocuments.
-                // Documents button will be disabled if Documentation folder is not present.
-                var docs = new List<ToolStripItem>();
-                var dir = Directory.GetCurrentDirectory();
-                var path = dir + @"\Documentation\";
-
-                if (Directory.Exists(path))
-                {
-                    // Load English documents
-                    LoadDocuments(docs, path);
-
-                    // Find any non-English documents by looking in \Documentation\<language code>\, e.g. \Documentation\es\
-                    foreach (var codePath in Directory.GetDirectories(path))
-                    {
-                        // Extract the last folder in the path - the language code, e.g. "es"
-                        var code = System.IO.Path.GetFileName(codePath);
-
-                        // include any non-English documents that match the chosen language
-                        if (code == Settings.Language)
-                            LoadDocuments(docs, codePath, code);
-                    }
-                }
-
-                var item = new ToolStripMenuItem($"Online documents (opens browser)", null, (object sender2, EventArgs e2) =>
-                    {
-                        Process.Start(new ProcessStartInfo { FileName = "https://www.openrails.org/learn/documents/", UseShellExecute = true });
-                    }
-                );
-                contextMenuStripDocuments.Items.Add(new ToolStripSeparator());
-                contextMenuStripDocuments.Items.Add(item);
-
-                NotificationManager = new NotificationManager(this, this.Resources, UpdateManager, Settings, panelDetails);
+                NotificationManager = new NotificationManager(this, UpdateManager, Settings, panelDetails);
+            }
+            else
+            {
+                NotificationManager.Settings = Settings;
             }
 
             ShowEnvironment();
@@ -279,14 +278,133 @@ namespace Menu
             CheckForUpdate();
             CheckForTelemetry();
 
-            if (!Initialized)
+            if (!MenuInitialized)
             {
                 LoadFolderList();
-                Initialized = true;
+                MenuInitialized = true;
             }
         }
 
-        private void LoadDocuments(List<ToolStripItem> docs, string folderPath, string code = null)
+        MenuFlyout CreateToolsMenu()
+        {
+            var menu = new MenuFlyout();
+            var testing = new MenuItem { Header = Localization.GetString("Testing") };
+            testing.Click += testingToolStripMenuItem_Click;
+            menu.Items.Add(testing);
+
+            var coreExecutables = new[] {
+                "OpenRails",
+                "Menu",
+                "RunActivity",
+                "Updater",
+            };
+            var tools = new List<MenuItem>();
+            foreach (var executable in FindExecutables(ApplicationInfo.ProcessDirectory))
+            {
+                // Don't show any of the core parts of the application.
+                if (coreExecutables.Contains(System.IO.Path.GetFileNameWithoutExtension(executable), StringComparer.OrdinalIgnoreCase))
+                    continue;
+
+                // On Windows the version information is in the .exe; elsewhere the apphost has none, so use the managed .dll.
+                var assemblyFile = OperatingSystem.IsWindows() ? executable : executable + ".dll";
+                FileVersionInfo toolInfo;
+                try
+                {
+                    toolInfo = FileVersionInfo.GetVersionInfo(assemblyFile);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                // Skip any executable that isn't part of this product (e.g. Visual Studio hosting files).
+                if (toolInfo.ProductName != App.ProductName || String.IsNullOrEmpty(toolInfo.FileDescription))
+                    continue;
+
+                // Remove the product name from the tool's name and localise.
+                var toolName = Localization.GetString(toolInfo.FileDescription.Replace(App.ProductName, "").Trim());
+
+                // Create menu item to execute tool.
+                var toolPath = executable;
+                var toolIsConsole = GetImageSubsystem(assemblyFile) == Subsystem.WindowsCui;
+                var item = new MenuItem { Header = toolName };
+                item.Click += async (sender2, e2) =>
+                {
+                    try
+                    {
+                        if (toolIsConsole)
+                        {
+                            if (!ExternalProcess.StartInTerminal(toolPath, Array.Empty<string>()))
+                                await MessageBox.Show(this, Localization.GetStringFmt("No terminal emulator was found to run {0}. Please run it from a terminal.", toolPath), App.ProductName);
+                        }
+                        else
+                        {
+                            ExternalProcess.Start(toolPath, Array.Empty<string>());
+                        }
+                    }
+                    catch (Exception error)
+                    {
+                        await MessageBox.Show(this, error.Message, App.ProductName);
+                    }
+                };
+                tools.Add(item);
+            }
+            // Add all the tools in alphabetical order.
+            foreach (var tool in tools.OrderBy(t => (string)t.Header))
+                menu.Items.Add(tool);
+            return menu;
+        }
+
+        /// <summary>
+        /// Our executables: *.exe on Windows, or apphosts (an executable file with a matching .dll) elsewhere.
+        /// </summary>
+        static IEnumerable<string> FindExecutables(string directory)
+        {
+            if (OperatingSystem.IsWindows())
+                return Directory.GetFiles(directory, "*.exe");
+
+            return Directory.GetFiles(directory)
+                .Where(f => System.IO.Path.GetExtension(f).Length == 0 && File.Exists(f + ".dll"))
+                .Where(f => !OperatingSystem.IsWindows() && (File.GetUnixFileMode(f) & UnixFileMode.UserExecute) != 0);
+        }
+
+        MenuFlyout CreateDocumentsMenu()
+        {
+            // Just like the tools, buttonDocuments is a button that is treated like a menu.
+            var menu = new MenuFlyout();
+            var docs = new List<MenuItem>();
+            var path = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Documentation");
+            if (!Directory.Exists(path))
+                path = System.IO.Path.Combine(ApplicationInfo.ProcessDirectory, "Documentation");
+
+            if (Directory.Exists(path))
+            {
+                // Load English documents
+                LoadDocuments(docs, path);
+
+                // Find any non-English documents by looking in Documentation/<language code>/, e.g. Documentation/es/
+                foreach (var codePath in Directory.GetDirectories(path))
+                {
+                    // Extract the last folder in the path - the language code, e.g. "es"
+                    var code = System.IO.Path.GetFileName(codePath);
+
+                    // include any non-English documents that match the chosen language
+                    if (code == Settings.Language)
+                        LoadDocuments(docs, codePath, code);
+                }
+            }
+            foreach (var doc in docs.OrderBy(d => (string)d.Header))
+                menu.Items.Add(doc);
+
+            var item = new MenuItem { Header = Localization.GetString("Online documents (opens browser)") };
+            item.Click += (sender2, e2) => ExternalProcess.Open("https://www.openrails.org/learn/documents/");
+            if (menu.Items.Count > 0)
+                menu.Items.Add(new Separator());
+            menu.Items.Add(item);
+            return menu;
+        }
+
+        void LoadDocuments(List<MenuItem> docs, string folderPath, string code = null)
         {
             foreach (var filePath in Directory.GetFiles(folderPath))
             {
@@ -296,20 +414,15 @@ namespace Menu
                 if (new[] { ".pdf", ".doc", ".docx", ".pptx", ".txt" }.Contains(ext.ToLowerInvariant()))
                 {
                     var codeLabel = string.IsNullOrEmpty(code) ? "" : $" [{code}]";
-                    docs.Add(new ToolStripMenuItem($"{name}{ext}{codeLabel}", null, (object sender2, EventArgs e2) =>
-                    {
-                        var docPath = (sender2 as ToolStripItem).Tag as string;
-                        Process.Start(new ProcessStartInfo { FileName = docPath, UseShellExecute = true });
-                    })
-                    { Tag = filePath });
+                    var docPath = filePath;
+                    var item = new MenuItem { Header = $"{name}{ext}{codeLabel}" };
+                    item.Click += (sender2, e2) => ExternalProcess.Open(docPath);
+                    docs.Add(item);
                 }
-                contextMenuStripDocuments.Items.AddRange((from tool in docs
-                                                          orderby tool.Text
-                                                          select tool).ToArray());
             }
         }
 
-        void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        void MainForm_FormClosing(object sender, WindowClosingEventArgs e)
         {
             SaveOptions();
             if (RouteLoader != null)
@@ -330,7 +443,7 @@ namespace Menu
                 Directory.Delete(UserSettings.DeletedSaveFolder, true);   // true removes all contents as well as folder
 
             // Tidy up after versions which used SAVE.BIN
-            var file = UserSettings.UserDataFolder + @"\SAVE.BIN";
+            var file = System.IO.Path.Combine(UserSettings.UserDataFolder, "SAVE.BIN");
             if (File.Exists(file))
                 File.Delete(file);
         }
@@ -348,15 +461,12 @@ namespace Menu
             });
         }
 
-        private void LoadNotifications()
+        void LoadNotifications()
         {
             NotificationManager.CheckNotifications();
             ShowNotificationPages();
             UpdateNotificationPageAlert();
         }
-
-        // Event raised by Retry button in NotificationPages so user can retry updates following an error notification.
-        //public event EventHandler CheckUpdatesAgain;
 
         public virtual void OnCheckUpdatesAgain(EventArgs e)
         {
@@ -380,10 +490,14 @@ namespace Menu
 
         public virtual void OnRefreshUpdates(EventArgs e)
         {
-            var currentChannel = UpdateManager.ChannelName;
-            // Force a Refresh of the notifications, which will check for updates and show the notification pages if there are any new notifications.
-            UpdateManager.SetChannel(currentChannel); // The 'Refresh' button is only available for the 'Unstable' mode.
-            UpdateManager.Check();
+            // Self-updating is not available on every platform (there is no update channel), so there is nothing to refresh.
+            if (UpdateManager.ChannelName != null)
+            {
+                var currentChannel = UpdateManager.ChannelName;
+                // Force a Refresh of the notifications, which will check for updates and show the notification pages if there are any new notifications.
+                UpdateManager.SetChannel(currentChannel); // The 'Refresh' button is only available for the 'Unstable' mode.
+                UpdateManager.Check();
+            }
 
             // Reload the notifications and show them as the 'Latest version available' may have changed.
             LoadNotifications();
@@ -396,16 +510,16 @@ namespace Menu
                 try
                 {
                     CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(Settings.Language);
+                    CultureInfo.CurrentUICulture = CultureInfo.DefaultThreadCurrentUICulture;
                 }
                 catch { }
             }
-
-            Localizer.Localize(this, catalog);
+            // The window's texts are translated when it is created (see TrExtension); a change of language restarts the Menu.
         }
 
         void RestartMenu()
         {
-            Process.Start(ApplicationInfo.ProcessFile);
+            Process.Start(new ProcessStartInfo(ApplicationInfo.ProcessFile) { UseShellExecute = false });
             Close();
         }
         #endregion
@@ -432,8 +546,8 @@ namespace Menu
         #region Mode
         void radioButtonMode_CheckedChanged(object sender, EventArgs e)
         {
-            panelModeActivity.Visible = radioButtonModeActivity.Checked;
-            panelModeTimetable.Visible = radioButtonModeTimetable.Checked;
+            panelModeActivity.IsVisible = IsModeActivity;
+            panelModeTimetable.IsVisible = IsModeTimetable;
             UpdateEnabled();
             ShowDetails();
         }
@@ -520,8 +634,16 @@ namespace Menu
         void comboBoxTimetableTrain_SelectedIndexChanged(object sender, EventArgs e)
         {
             var selectedTrain = comboBoxTimetableTrain.SelectedItem as TimetableFileLite.TrainInformation;
-            SelectedTimetableConsist = Consist.GetConsist(SelectedFolder, selectedTrain.LeadingConsist, selectedTrain.ReverseConsist);
-            SelectedTimetablePath = Path.GetPath(SelectedRoute, selectedTrain.Path, false);
+            if (selectedTrain != null)
+            {
+                SelectedTimetableConsist = Consist.GetConsist(SelectedFolder, selectedTrain.LeadingConsist, selectedTrain.ReverseConsist);
+                SelectedTimetablePath = Path.GetPath(SelectedRoute, selectedTrain.Path, false);
+            }
+            else
+            {
+                SelectedTimetableConsist = null;
+                SelectedTimetablePath = null;
+            }
             ShowDetails();
         }
         #endregion
@@ -554,12 +676,12 @@ namespace Menu
             UpdateEnabled();
         }
 
-        bool CheckUserName(string text)
+        async System.Threading.Tasks.Task<bool> CheckUserName(string text)
         {
-            string tmp = text;
+            string tmp = text ?? "";
             if (tmp.Length < 4 || tmp.Length > 10 || tmp.Contains("\"") || tmp.Contains("\'") || tmp.Contains(" ") || tmp.Contains("-") || Char.IsDigit(tmp, 0))
             {
-                MessageBox.Show(catalog.GetString("User name must be 4-10 characters long, cannot contain space, ', \" or - and must not start with a digit."), Application.ProductName);
+                await MessageBox.Show(this, Localization.GetString("User name must be 4-10 characters long, cannot contain space, ', \" or - and must not start with a digit."), App.ProductName);
                 return false;
             }
             return true;
@@ -569,22 +691,9 @@ namespace Menu
 
         #region Misc. buttons and options
 
-        void buttonTools_Click(object sender, EventArgs e)
+        async void testingToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            contextMenuStripTools.Show(buttonTools, new Point(0, buttonTools.ClientSize.Height), ToolStripDropDownDirection.Default);
-        }
-
-        void buttonDocuments_Click(object sender, EventArgs e)
-        {
-            contextMenuStripDocuments.Show(buttonDocuments, new Point(0, buttonDocuments.ClientSize.Height), ToolStripDropDownDirection.Default);
-        }
-
-        void testingToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            using (var form = new TestingForm(this, Settings))
-            {
-                form.ShowDialog(this);
-            }
+            await new TestingWindow(this, Settings).ShowDialog(this);
         }
 
         void buttonOptions_Click(object sender, EventArgs e)
@@ -592,56 +701,58 @@ namespace Menu
             ShowOptionsDialog();
         }
 
-        public void ShowOptionsDialog()
+        public async void ShowOptionsDialog()
         {
             SaveOptions();
 
-            using (var form = new OptionsForm(Settings, UpdateManager, TelemetryManager, BaseDocumentationUrl))
+            var form = new OptionsWindow(Settings, UpdateManager, TelemetryManager, BaseDocumentationUrl);
+            switch (await form.ShowDialog<DialogResult>(this))
             {
-                switch (form.ShowDialog(this))
-                {
-                    case DialogResult.OK:
-                        LoadFolderList();
-                        CheckForUpdate();
-                        break;
-                    case DialogResult.Retry:
-                        RestartMenu();
-                        break;
-                }
+                case DialogResult.OK:
+                    LoadFolderList();
+                    CheckForUpdate();
+                    break;
+                case DialogResult.Retry:
+                    RestartMenu();
+                    break;
             }
         }
 
-        public void ShowTelemetryDialog()
+        public async void ShowTelemetryDialog()
         {
-            using (var telemetryForm = new TelemetryForm(TelemetryManager))
+            await new TelemetryWindow(TelemetryManager).ShowDialog(this);
+        }
+
+        async void buttonDownloadContent_Click(object sender, EventArgs e)
+        {
+            await ShowContentDialog();
+        }
+
+        async System.Threading.Tasks.Task ShowContentDialog()
+        {
+            switch (await new ContentWindow(this, Settings, BaseDocumentationUrl).ShowDialog<DialogResult>(this))
             {
-                telemetryForm.ShowDialog(this);
+                case DialogResult.Retry:
+                    RestartMenu();
+                    break;
             }
         }
 
-        void buttonDownloadContent_Click(object sender, EventArgs e)
-        {
-            using (var form = new ContentForm(Settings, BaseDocumentationUrl))
-            {
-                form.ShowDialog(this);
-            }
-        }
-        
         void buttonStart_Click(object sender, EventArgs e)
         {
             SaveOptions();
 
-            if (radioButtonModeActivity.Checked)
+            if (IsModeActivity)
             {
                 SelectedAction = UserAction.SingleplayerNewGame;
                 if (SelectedActivity != null)
-                    DialogResult = DialogResult.OK;
+                    StartGame();
             }
             else
             {
                 SelectedAction = UserAction.SinglePlayerTimetableGame;
                 if (SelectedTimetableTrain != null)
-                    DialogResult = DialogResult.OK;
+                    StartGame();
             }
         }
 
@@ -655,9 +766,9 @@ namespace Menu
             OpenResumeForm(true);
         }
 
-        void OpenResumeForm(bool multiplayer)
+        async void OpenResumeForm(bool multiplayer)
         {
-            if (radioButtonModeTimetable.Checked)
+            if (IsModeTimetable)
             {
                 SelectedAction = UserAction.SinglePlayerTimetableGame;
             }
@@ -665,7 +776,7 @@ namespace Menu
             {
                 SelectedAction = UserAction.SingleplayerNewGame;
             }
-            else if (radioButtonMPClient.Checked)
+            else if (radioButtonMPClient.IsChecked == true)
             {
                 SelectedAction = UserAction.MultiplayerClient;
             }
@@ -678,24 +789,72 @@ namespace Menu
                 return;
             }
 
-            using (var form = new ResumeForm(Settings, SelectedRoute, SelectedAction, SelectedActivity, SelectedTimetableSet, this))
+            // The Resume button's modifiers are what count for "Alt copies the command line", not the dialog's.
+            var form = new ResumeWindow(Settings, SelectedRoute, SelectedAction, SelectedActivity, SelectedTimetableSet, this);
+            if (await form.ShowDialog<DialogResult>(this) == DialogResult.OK)
             {
-                if (form.ShowDialog(this) == DialogResult.OK)
-                {
-                    SaveOptions();
-                    SelectedSaveFile = form.SelectedSaveFile;
-                    SelectedAction = form.SelectedAction;
-                    DialogResult = DialogResult.OK;
-                }
+                SaveOptions();
+                SelectedSaveFile = form.SelectedSaveFile;
+                SelectedAction = form.SelectedAction;
+                LastKeyModifiers = form.LastKeyModifiers;
+                StartGame();
             }
         }
 
-        void buttonStartMP_Click(object sender, EventArgs e)
+        async void buttonStartMP_Click(object sender, EventArgs e)
         {
-            if (CheckUserName(textBoxMPUser.Text) == false) return;
+            var modifiers = LastKeyModifiers;
+            if (await CheckUserName(textBoxMPUser.Text) == false) return;
             SaveOptions();
-            SelectedAction = radioButtonMPClient.Checked ? UserAction.MultiplayerClient : UserAction.MultiplayerServer;
-            DialogResult = DialogResult.OK;
+            SelectedAction = radioButtonMPClient.IsChecked == true ? UserAction.MultiplayerClient : UserAction.MultiplayerServer;
+            LastKeyModifiers = modifiers;
+            StartGame();
+        }
+
+        /// <summary>
+        /// Starts RunActivity for the selected action and waits for it to finish, hiding the Menu meanwhile.
+        /// This replaces the WinForms loop of closing the main form with DialogResult.OK.
+        /// </summary>
+        async void StartGame()
+        {
+            var parameters = Program.GetRunActivityArguments(this);
+            var joinedParameters = ExternalProcess.FormatCommandLine(parameters);
+
+            if ((LastKeyModifiers & KeyModifiers.Alt) == KeyModifiers.Alt)
+            {
+                if (Clipboard != null)
+                    await Clipboard.SetTextAsync(joinedParameters);
+                await MessageBox.Show(this,
+                    $"{ExternalProcess.ExecutableName("RunActivity")} arguments have been copied to the clipboard:" +
+                    $"\n\n{joinedParameters}\n\n" +
+                    "This is a debugging aid. If you wanted to start the simulator instead, select Start without holding down the Alt key.",
+                    App.ProductName);
+                return;
+            }
+
+            System.Diagnostics.Process process;
+            try
+            {
+                process = ExternalProcess.Start(RunActivityProgram, parameters);
+            }
+            catch (Exception error)
+            {
+                await MessageBox.Show(this, Localization.GetStringFmt("Unable to start {0}:\n\n{1}", RunActivityProgram, error.Message), App.Caption);
+                return;
+            }
+
+            Hide();
+            try
+            {
+                await process.WaitForExitAsync();
+            }
+            finally
+            {
+                Show();
+                Activate();
+                // Like showing the WinForms dialog again: reload the settings (the simulator may have changed them).
+                MainForm_Shown();
+            }
         }
 
         #endregion
@@ -703,9 +862,9 @@ namespace Menu
         #region Options
         void LoadOptions()
         {
-            checkBoxWarnings.Checked = Settings.Logging;
-            radioButtonModeActivity.Checked = Settings.IsModeActivity;
-            radioButtonModeTimetable.Checked = !Settings.IsModeActivity;
+            checkBoxWarnings.IsChecked = Settings.Logging;
+            radioButtonModeActivity.IsChecked = Settings.IsModeActivity;
+            radioButtonModeTimetable.IsChecked = !Settings.IsModeActivity;
 
             textBoxMPUser.Text = Settings.Multiplayer_User;
             textBoxMPHost.Text = Settings.Multiplayer_Host + ":" + Settings.Multiplayer_Port;
@@ -713,11 +872,14 @@ namespace Menu
 
         void SaveOptions()
         {
-            Settings.Logging = checkBoxWarnings.Checked;
-            Settings.Multiplayer_User = textBoxMPUser.Text;
-            Settings.IsModeActivity = radioButtonModeActivity.Checked;
+            if (Settings == null)
+                return;
 
-            var mpHost = textBoxMPHost.Text.Split(':');
+            Settings.Logging = checkBoxWarnings.IsChecked == true;
+            Settings.Multiplayer_User = textBoxMPUser.Text ?? "";
+            Settings.IsModeActivity = IsModeActivity;
+
+            var mpHost = (textBoxMPHost.Text ?? "").Split(':');
             Settings.Multiplayer_Host = mpHost[0];
             if (mpHost.Length > 1)
             {
@@ -729,31 +891,32 @@ namespace Menu
             {
                 Settings.Multiplayer_Port = (int)Settings.GetDefaultValue("Multiplayer_Port");
             }
+            var locomotive = comboBoxLocomotive.SelectedItem as Locomotive;
             Settings.Menu_Selection = new[] {
                 // Base items
                 SelectedFolder != null ? SelectedFolder.Path : "",
                 SelectedRoute != null ? SelectedRoute.Path : "",
                 // Activity mode items / Explore mode items
-                radioButtonModeActivity.Checked ?
+                IsModeActivity ?
                     SelectedActivity != null && SelectedActivity.FilePath != null ? SelectedActivity.FilePath : SelectedActivity != null? SelectedActivity.Name : "" :
                     SelectedTimetableSet != null ? SelectedTimetableSet.fileName : "",
-                radioButtonModeActivity.Checked ?
-                    SelectedActivity is ExploreActivity && comboBoxLocomotive.SelectedItem != null && (comboBoxLocomotive.SelectedItem as Locomotive).FilePath != null ? (comboBoxLocomotive.SelectedItem as Locomotive).FilePath : "" :
+                IsModeActivity ?
+                    SelectedActivity is ExploreActivity && locomotive != null && locomotive.FilePath != null ? locomotive.FilePath : "" :
                     SelectedTimetable != null ? SelectedTimetable.Description : "",
-                radioButtonModeActivity.Checked ?
+                IsModeActivity ?
                     SelectedActivity is ExploreActivity && SelectedConsist != null ? SelectedConsist.FilePath : "" :
                     SelectedTimetableTrain != null ? SelectedTimetableTrain.Column.ToString() : "",
-                radioButtonModeActivity.Checked ?
+                IsModeActivity ?
                     SelectedActivity is ExploreActivity && SelectedPath != null ? SelectedPath.FilePath : "" :
                     SelectedTimetableDay.ToString(),
-                radioButtonModeActivity.Checked ?
-                    SelectedActivity is ExploreActivity ? SelectedStartTime : "" :
+                IsModeActivity ?
+                    SelectedActivity is ExploreActivity ? SelectedStartTime ?? "" : "" :
                     "",
                 // Shared items
-                radioButtonModeActivity.Checked ?
+                IsModeActivity ?
                     SelectedActivity is ExploreActivity ? SelectedStartSeason.ToString() : "" :
                     SelectedStartSeason.ToString(),
-                radioButtonModeActivity.Checked ?
+                IsModeActivity ?
                     SelectedActivity is ExploreActivity ? SelectedStartWeather.ToString() : "" :
                     SelectedStartWeather.ToString(),
             };
@@ -764,34 +927,52 @@ namespace Menu
         #region Enabled state
         void UpdateEnabled()
         {
-            comboBoxFolder.Enabled = comboBoxFolder.Items.Count > 0;
-            comboBoxRoute.Enabled = comboBoxRoute.Items.Count > 0;
-            comboBoxActivity.Enabled = comboBoxActivity.Items.Count > 0;
-            comboBoxLocomotive.Enabled = comboBoxLocomotive.Items.Count > 0 && SelectedActivity is ExploreActivity;
-            comboBoxConsist.Enabled = comboBoxConsist.Items.Count > 0 && SelectedActivity is ExploreActivity;
-            comboBoxStartAt.Enabled = comboBoxStartAt.Items.Count > 0 && SelectedActivity is ExploreActivity;
-            comboBoxHeadTo.Enabled = comboBoxHeadTo.Items.Count > 0 && SelectedActivity is ExploreActivity;
-            comboBoxStartTime.Enabled = comboBoxStartSeason.Enabled = comboBoxStartWeather.Enabled = SelectedActivity is ExploreActivity;
-            comboBoxStartTime.DropDownStyle = SelectedActivity is ExploreActivity ? ComboBoxStyle.DropDown : ComboBoxStyle.DropDownList;
-            comboBoxTimetable.Enabled = comboBoxTimetableSet.Items.Count > 0;
-            comboBoxTimetableTrain.Enabled = comboBoxTimetable.Items.Count > 0;
-            comboBoxTimetableWeatherFile.Enabled = comboBoxTimetableWeatherFile.Items.Count > 0;
+            comboBoxFolder.IsEnabled = comboBoxFolder.Items.Count > 0;
+            comboBoxRoute.IsEnabled = comboBoxRoute.Items.Count > 0;
+            comboBoxActivity.IsEnabled = comboBoxActivity.Items.Count > 0;
+            comboBoxLocomotive.IsEnabled = comboBoxLocomotive.Items.Count > 0 && SelectedActivity is ExploreActivity;
+            comboBoxConsist.IsEnabled = comboBoxConsist.Items.Count > 0 && SelectedActivity is ExploreActivity;
+            comboBoxStartAt.IsEnabled = comboBoxStartAt.Items.Count > 0 && SelectedActivity is ExploreActivity;
+            comboBoxHeadTo.IsEnabled = comboBoxHeadTo.Items.Count > 0 && SelectedActivity is ExploreActivity;
+            comboBoxStartTime.IsEnabled = comboBoxStartSeason.IsEnabled = comboBoxStartWeather.IsEnabled = SelectedActivity is ExploreActivity;
+            SetEditable(comboBoxStartTime, SelectedActivity is ExploreActivity);
+            comboBoxTimetable.IsEnabled = comboBoxTimetableSet.Items.Count > 0;
+            comboBoxTimetableTrain.IsEnabled = comboBoxTimetable.Items.Count > 0;
+            comboBoxTimetableWeatherFile.IsEnabled = comboBoxTimetableWeatherFile.Items.Count > 0;
             //Avoid to Start with a non valid Activity/Locomotive/Consist.
-            buttonResume.Enabled = buttonStart.Enabled = radioButtonModeActivity.Checked && !comboBoxActivity.Text.StartsWith("<") && !comboBoxLocomotive.Text.StartsWith("<") ?
+            buttonResume.IsEnabled = buttonStart.IsEnabled = IsModeActivity && !GetText(comboBoxActivity).StartsWith("<") && !GetText(comboBoxLocomotive).StartsWith("<") ?
                 SelectedActivity != null && (!(SelectedActivity is ExploreActivity) || (comboBoxConsist.Items.Count > 0 && comboBoxHeadTo.Items.Count > 0)) :
                 SelectedTimetableTrain != null;
-            buttonResumeMP.Enabled = buttonStartMP.Enabled = buttonStart.Enabled && !String.IsNullOrEmpty(textBoxMPUser.Text) && !String.IsNullOrEmpty(textBoxMPHost.Text);
+            buttonResumeMP.IsEnabled = buttonStartMP.IsEnabled = buttonStart.IsEnabled && !String.IsNullOrEmpty(textBoxMPUser.Text) && !String.IsNullOrEmpty(textBoxMPHost.Text);
+        }
+
+        static string GetText(ComboBox comboBox)
+        {
+            return (comboBox.IsEditable ? comboBox.Text : comboBox.SelectedItem?.ToString()) ?? "";
+        }
+
+        /// <summary>
+        /// Switches between an editable combobox (WinForms DropDown) and a list-only one (WinForms DropDownList), keeping the text.
+        /// </summary>
+        static void SetEditable(ComboBox comboBox, bool editable)
+        {
+            if (comboBox.IsEditable == editable)
+                return;
+            var text = GetText(comboBox);
+            comboBox.IsEditable = editable;
+            if (editable)
+                comboBox.Text = text;
         }
         #endregion
 
         #region Folder list
         public void LoadFolderList()
         {
-            var initialized = Initialized;
+            var initialized = MenuInitialized;
             Folders.Clear();
             ShowFolderList();
 
-            FolderLoader = new Task<List<Folder>>(this, () => Folder.GetFolders(Settings).OrderBy(f => f.Name).ToList(), (folders) =>
+            FolderLoader = new Task<List<Folder>>(this, () => Folder.GetFolders(Settings).OrderBy(f => f.Name).ToList(), async (folders) =>
             {
                 Folders = folders;
                 ShowFolderList();
@@ -799,19 +980,7 @@ namespace Menu
                     comboBoxFolder.Focus();
 
                 if (!initialized && Folders.Count == 0)
-                {
-                    using (var form = new ContentForm(Settings, BaseDocumentationUrl))
-                    {
-                        switch (form.ShowDialog(this))
-                        {
-                            case DialogResult.OK:
-                                break;
-                            case DialogResult.Retry:
-                                RestartMenu();
-                                break;
-                        }
-                    }
-                }
+                    await ShowContentDialog();
             });
         }
 
@@ -846,6 +1015,8 @@ namespace Menu
             ShowHeadToList();
 
             var selectedFolder = SelectedFolder;
+            if (selectedFolder == null)
+                return;
             RouteLoader = new Task<List<Route>>(this, () => Route.GetRoutes(selectedFolder).OrderBy(r => r.ToString()).ToList(), (routes) =>
             {
                 Routes = routes;
@@ -864,9 +1035,9 @@ namespace Menu
                 var path = Settings.Menu_Selection[(int)UserSettings.Menu_SelectionIndex.Activity]; // Activity or Timetable
                 var extension = System.IO.Path.GetExtension(path).ToLower();
                 if (extension == ".act")
-                    radioButtonModeActivity.Checked = true;
+                    radioButtonModeActivity.IsChecked = true;
                 else if (extension == ".timetable_or" || extension == ".timetable-or")
-                    radioButtonModeTimetable.Checked = true;
+                    radioButtonModeTimetable.IsChecked = true;
             }
             UpdateEnabled();
         }
@@ -883,6 +1054,8 @@ namespace Menu
 
             var selectedFolder = SelectedFolder;
             var selectedRoute = SelectedRoute;
+            if (selectedFolder == null || selectedRoute == null)
+                return;
             ActivityLoader = new Task<List<Activity>>(this, () => Activity.GetActivities(selectedFolder, selectedRoute).OrderBy(a => a.ToString()).ToList(), (activities) =>
             {
                 Activities = activities;
@@ -924,6 +1097,8 @@ namespace Menu
             ShowConsistList();
 
             var selectedFolder = SelectedFolder;
+            if (selectedFolder == null)
+                return;
             ConsistLoader = new Task<List<Consist>>(this, () => Consist.GetConsists(selectedFolder).OrderBy(a => a.ToString()).ToList(), (consists) =>
             {
                 Consists = consists;
@@ -962,8 +1137,12 @@ namespace Menu
             if (SelectedActivity == null || SelectedActivity is ExploreActivity)
             {
                 comboBoxConsist.Items.Clear();
-                foreach (var consist in Consists.Where(c => comboBoxLocomotive.SelectedItem.Equals(c.Locomotive)).OrderBy(c => c.Name))
-                    comboBoxConsist.Items.Add(consist);
+                var locomotive = comboBoxLocomotive.SelectedItem;
+                if (locomotive != null)
+                {
+                    foreach (var consist in Consists.Where(c => locomotive.Equals(c.Locomotive)).OrderBy(c => c.Name))
+                        comboBoxConsist.Items.Add(consist);
+                }
                 UpdateFromMenuSelection<Consist>(comboBoxConsist, UserSettings.Menu_SelectionIndex.Consist, c => c.FilePath);
             }
             UpdateEnabled();
@@ -981,6 +1160,8 @@ namespace Menu
             ShowHeadToList();
 
             var selectedRoute = SelectedRoute;
+            if (selectedRoute == null)
+                return;
             PathLoader = new Task<List<Path>>(this, () => Path.GetPaths(selectedRoute, false).OrderBy(a => a.ToString()).ToList(), (paths) =>
             {
                 Paths = paths;
@@ -1029,6 +1210,8 @@ namespace Menu
         {
             if (SelectedActivity == null || SelectedActivity is ExploreActivity)
             {
+                // The start time can be typed in for exploring.
+                SetEditable(comboBoxStartTime, true);
                 comboBoxStartTime.Items.Clear();
                 foreach (var hour in Enumerable.Range(0, 24))
                     comboBoxStartTime.Items.Add(String.Format("{0}:00", hour));
@@ -1043,6 +1226,7 @@ namespace Menu
             }
             else
             {
+                SetEditable(comboBoxStartTime, false);
                 comboBoxStartTime.Items.Clear();
                 comboBoxStartTime.Items.Add(SelectedActivity.StartTime.FormattedStartTime());
                 comboBoxStartTime.SelectedIndex = 0;
@@ -1069,6 +1253,8 @@ namespace Menu
 
             var selectedFolder = SelectedFolder;
             var selectedRoute = SelectedRoute;
+            if (selectedFolder == null || selectedRoute == null)
+                return;
             TimetableSetLoader = new Task<List<TimetableInfo>>(this, () => TimetableInfo.GetTimetableInfo(selectedFolder, selectedRoute).OrderBy(a => a.ToString()).ToList(), (timetableSets) =>
             {
                 TimetableSets = timetableSets;
@@ -1113,7 +1299,8 @@ namespace Menu
 
         void UpdateTimetableWeatherSet()
         {
-            SelectedTimetableSet.WeatherFile = SelectedWeatherFile.GetFullName();
+            if (SelectedTimetableSet != null && SelectedWeatherFile != null)
+                SelectedTimetableSet.WeatherFile = SelectedWeatherFile.GetFullName();
         }
 
         #endregion
@@ -1160,58 +1347,58 @@ namespace Menu
         #region Details
         void ShowDetails()
         {
-            Win32.LockWindowUpdate(Handle);
+            if (NotificationManager != null)
+                NotificationManager.ArePagesVisible = false;
             ClearPanel();
             AddDetails();
-            FlowDetails();
-            Win32.LockWindowUpdate(IntPtr.Zero);
+            UpdateExpanders();
         }
 
         private void AddDetails()
         {
             if (SelectedRoute != null && SelectedRoute.Description != null)
-                AddDetail(catalog.GetStringFmt("Route: {0}", SelectedRoute.Name), SelectedRoute.Description.Split('\n'));
+                AddDetail(Localization.GetStringFmt("Route: {0}", SelectedRoute.Name), SelectedRoute.Description.Split('\n'));
 
-            if (radioButtonModeActivity.Checked)
+            if (IsModeActivity)
             {
                 if (SelectedConsist != null && SelectedConsist.Locomotive != null && SelectedConsist.Locomotive.Description != null)
                 {
-                    AddDetail(catalog.GetStringFmt("Locomotive: {0}", SelectedConsist.Locomotive.Name), SelectedConsist.Locomotive.Description.Split('\n'));
+                    AddDetail(Localization.GetStringFmt("Locomotive: {0}", SelectedConsist.Locomotive.Name), SelectedConsist.Locomotive.Description.Split('\n'));
                 }
                 if (SelectedActivity != null && SelectedActivity.Description != null)
                 {
-                    AddDetail(catalog.GetStringFmt("Activity: {0}", SelectedActivity.Name), SelectedActivity.Description.Split('\n'));
-                    AddDetail(catalog.GetString("Activity Briefing"), SelectedActivity.Briefing.Split('\n'));
+                    AddDetail(Localization.GetStringFmt("Activity: {0}", SelectedActivity.Name), SelectedActivity.Description.Split('\n'));
+                    AddDetail(Localization.GetString("Activity Briefing"), (SelectedActivity.Briefing ?? "").Split('\n'));
                 }
                 else if (SelectedPath != null)
                 {
-                    AddDetail(catalog.GetStringFmt("Path: {0}", SelectedPath.Name), new[] {
-                        catalog.GetStringFmt("Starting at: {0}", SelectedPath.Start),
-                        catalog.GetStringFmt("Heading to: {0}", SelectedPath.End)
+                    AddDetail(Localization.GetStringFmt("Path: {0}", SelectedPath.Name), new[] {
+                        Localization.GetStringFmt("Starting at: {0}", SelectedPath.Start),
+                        Localization.GetStringFmt("Heading to: {0}", SelectedPath.End)
                     });
                 }
             }
-            if (radioButtonModeTimetable.Checked)
+            if (IsModeTimetable)
             {
                 if (SelectedTimetableSet != null)
-                    AddDetail(catalog.GetStringFmt("Timetable set: {0}", SelectedTimetableSet), new string[0]);
+                    AddDetail(Localization.GetStringFmt("Timetable set: {0}", SelectedTimetableSet), new string[0]);
                 // Description not shown as no description is available for a timetable set.
 
                 if (SelectedTimetable != null)
-                    AddDetail(catalog.GetStringFmt("Timetable: {0}", SelectedTimetable), SelectedTimetable.Briefing.Split('\n'));
+                    AddDetail(Localization.GetStringFmt("Timetable: {0}", SelectedTimetable), SelectedTimetable.Briefing.Split('\n'));
 
                 if (SelectedTimetableTrain != null)
                 {
-                    AddDetail(catalog.GetStringFmt("Train: {0}", SelectedTimetableTrain), HideStartParameters(SelectedTimetableTrain.ToInfo()));
+                    AddDetail(Localization.GetStringFmt("Train: {0}", SelectedTimetableTrain), HideStartParameters(SelectedTimetableTrain.ToInfo()));
 
                     if (SelectedTimetableConsist != null)
                     {
-                        AddDetail(catalog.GetStringFmt("Consist: {0}", SelectedTimetableConsist.Name), new string[0]);
+                        AddDetail(Localization.GetStringFmt("Consist: {0}", SelectedTimetableConsist.Name), new string[0]);
                         if (SelectedTimetableConsist.Locomotive != null && SelectedTimetableConsist.Locomotive.Description != null)
-                            AddDetail(catalog.GetStringFmt("Locomotive: {0}", SelectedTimetableConsist.Locomotive.Name), SelectedTimetableConsist.Locomotive.Description.Split('\n'));
+                            AddDetail(Localization.GetStringFmt("Locomotive: {0}", SelectedTimetableConsist.Locomotive.Name), SelectedTimetableConsist.Locomotive.Description.Split('\n'));
                     }
                     if (SelectedTimetablePath != null)
-                        AddDetail(catalog.GetStringFmt("Path: {0}", SelectedTimetablePath.Name), SelectedTimetablePath.ToInfo());
+                        AddDetail(Localization.GetStringFmt("Path: {0}", SelectedTimetablePath.Name), SelectedTimetablePath.ToInfo());
                 }
             }
         }
@@ -1234,136 +1421,84 @@ namespace Menu
             return info;
         }
 
-        List<Detail> Details = new List<Detail>();
+        const int SummaryLines = 5;
+
+        readonly List<Detail> Details = new List<Detail>();
         class Detail
         {
-            public readonly Control Title;
-            public readonly Control Expander;
-            public readonly Control Summary;
-            public readonly Control Description;
+            public readonly TextBlock Title;
+            public readonly Button Expander;
+            public readonly Image ExpanderImage;
+            public readonly TextBlock Description;
             public bool Expanded;
-            public Detail(Control title, Control expander, Control summary, Control lines)
+            public Detail(TextBlock title, Button expander, Image expanderImage, TextBlock description)
             {
                 Title = title;
                 Expander = expander;
-                Summary = summary;
-                Description = lines;
+                ExpanderImage = expanderImage;
+                Description = description;
                 Expanded = false;
             }
         }
 
-        void ClearPanel()
+        internal void ClearPanel()
         {
             Details.Clear();
-            while (panelDetails.Controls.Count > 0)
-                panelDetails.Controls.RemoveAt(0);
+            panelDetails.Children.Clear();
         }
 
         void AddDetail(string title, string[] lines)
         {
-            var titleControl = new Label { Margin = new Padding(2), Text = title, UseMnemonic = false, Font = new Font(panelDetails.Font, FontStyle.Bold), TextAlign = ContentAlignment.BottomLeft };
-            panelDetails.Controls.Add(titleControl);
-            titleControl.Left = titleControl.Margin.Left;
-            titleControl.Width = panelDetails.ClientSize.Width - titleControl.Margin.Horizontal - titleControl.PreferredHeight;
-            titleControl.Height = titleControl.PreferredHeight;
-            titleControl.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
+            var titleControl = new TextBlock { Text = title, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 6, 2, 2) };
+            var expanderImage = new Image { Source = ExpanderClosedDisabledImage, Width = 9, Height = 9 };
+            var expanderControl = new Button { Classes = { "flat" }, Content = expanderImage, VerticalAlignment = VerticalAlignment.Center, IsEnabled = false, Width = 18, Height = 18 };
+            var header = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(expanderControl, Dock.Right);
+            header.Children.Add(expanderControl);
+            header.Children.Add(titleControl);
+            panelDetails.Children.Add(header);
 
-            var expanderControl = new Button { Margin = new Padding(0), Text = "", FlatStyle = FlatStyle.Flat };
-            panelDetails.Controls.Add(expanderControl);
-            expanderControl.Left = panelDetails.ClientSize.Width - titleControl.Height - titleControl.Margin.Right;
-            expanderControl.Width = expanderControl.Height = titleControl.Height;
-            expanderControl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            expanderControl.FlatAppearance.BorderSize = 0;
-            expanderControl.BackgroundImageLayout = ImageLayout.Center;
-
-            var summaryControl = new Label { Margin = new Padding(2), Text = String.Join("\n", lines), AutoSize = false, UseMnemonic = false, UseCompatibleTextRendering = false };
-            panelDetails.Controls.Add(summaryControl);
-            summaryControl.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-            summaryControl.Left = summaryControl.Margin.Left;
-            summaryControl.Width = panelDetails.ClientSize.Width - summaryControl.Margin.Horizontal;
-            summaryControl.Height = TextRenderer.MeasureText("1\n2\n3\n4\n5", summaryControl.Font).Height;
-
-            // Find out where we need to cut the text to make the summary 5 lines long. Uses a binary search to find the cut point.
-            var size = MeasureText(summaryControl.Text, summaryControl);
-            if (size > summaryControl.Height)
+            // Show only the first few lines (the summary) until the expander is clicked.
+            var descriptionControl = new SelectableTextBlock
             {
-                var index = (float)summaryControl.Text.Length;
-                var indexChunk = (float)summaryControl.Text.Length / 2;
-                while (indexChunk > 0.5f || size > summaryControl.Height)
-                {
-                    if (size > summaryControl.Height)
-                        index -= indexChunk;
-                    else
-                        index += indexChunk;
-                    if (indexChunk > 0.5f)
-                        indexChunk /= 2;
-                    size = MeasureText(summaryControl.Text.Substring(0, (int)index) + "...", summaryControl);
-                }
-                summaryControl.Text = summaryControl.Text.Substring(0, (int)index) + "...";
-            }
+                Text = String.Join("\n", lines),
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxLines = SummaryLines,
+                Margin = new Thickness(2),
+            };
+            panelDetails.Children.Add(descriptionControl);
 
-            var descriptionControl = new Label { Margin = new Padding(2), Text = String.Join("\n", lines), AutoSize = false, UseMnemonic = false, UseCompatibleTextRendering = false };
-            panelDetails.Controls.Add(descriptionControl);
-            descriptionControl.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-            descriptionControl.Left = descriptionControl.Margin.Left;
-            descriptionControl.Width = panelDetails.ClientSize.Width - descriptionControl.Margin.Horizontal;
-            descriptionControl.Height = MeasureText(descriptionControl.Text, descriptionControl);
-
-            // Enable the expander only if the full description is longer than the summary. Otherwise, disable the expander.
-            expanderControl.Enabled = descriptionControl.Height > summaryControl.Height;
-            if (expanderControl.Enabled)
+            var detail = new Detail(titleControl, expanderControl, expanderImage, descriptionControl);
+            expanderControl.Click += (sender, e) =>
             {
-                expanderControl.BackgroundImage = (Image)Resources.GetObject("ExpanderClosed");
-                expanderControl.Tag = Details.Count;
-                expanderControl.Click += new EventHandler(expanderControl_Click);
-            }
-            else
-            {
-                expanderControl.BackgroundImage = (Image)Resources.GetObject("ExpanderClosedDisabled");
-            }
-
-            Details.Add(new Detail(titleControl, expanderControl, summaryControl, descriptionControl));
+                detail.Expanded = !detail.Expanded;
+                detail.ExpanderImage.Source = detail.Expanded ? ExpanderOpenImage : ExpanderClosedImage;
+                detail.Description.MaxLines = detail.Expanded ? 0 : SummaryLines;
+            };
+            Details.Add(detail);
         }
 
-        static int MeasureText(string text, Label summaryControl)
+        /// <summary>
+        /// Enable the expander only if the full description is longer than the summary. Otherwise, disable the expander.
+        /// </summary>
+        void UpdateExpanders()
         {
-            return TextRenderer.MeasureText(text, summaryControl.Font, summaryControl.ClientSize, TextFormatFlags.TextBoxControl | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
-        }
-
-        void expanderControl_Click(object sender, EventArgs e)
-        {
-            Win32.LockWindowUpdate(Handle);
-            var index = (int)(sender as Control).Tag;
-            Details[index].Expanded = !Details[index].Expanded;
-            Details[index].Expander.BackgroundImage = (Image)Resources.GetObject(Details[index].Expanded ? "ExpanderOpen" : "ExpanderClosed");
-            FlowDetails();
-            Win32.LockWindowUpdate(IntPtr.Zero);
-        }
-
-        void FlowDetails()
-        {
-            var scrollPosition = panelDetails.AutoScrollPosition.Y;
-            panelDetails.AutoScrollPosition = Point.Empty;
-            panelDetails.AutoScrollMinSize = new Size(0, panelDetails.ClientSize.Height + 1);
-
-            var top = 0;
+            var width = panelDetails.Bounds.Width - 4;
+            if (width <= 0)
+                return;
             foreach (var detail in Details)
             {
-                top += detail.Title.Margin.Top;
-                detail.Title.Top = detail.Expander.Top = top;
-                top += detail.Title.Height + detail.Title.Margin.Bottom + detail.Description.Margin.Top;
-                detail.Summary.Top = detail.Description.Top = top;
-                detail.Summary.Visible = !detail.Expanded && detail.Expander.Enabled;
-                detail.Description.Visible = !detail.Summary.Visible;
-                if (detail.Description.Visible)
-                    top += detail.Description.Height + detail.Description.Margin.Bottom;
-                else
-                    top += detail.Summary.Height + detail.Summary.Margin.Bottom;
+                var full = new TextBlock { Text = detail.Description.Text, TextWrapping = TextWrapping.Wrap, FontSize = detail.Description.FontSize, FontFamily = detail.Description.FontFamily };
+                var summary = new TextBlock { Text = detail.Description.Text, TextWrapping = TextWrapping.Wrap, FontSize = detail.Description.FontSize, FontFamily = detail.Description.FontFamily, MaxLines = SummaryLines };
+                full.Measure(new Size(width, double.PositiveInfinity));
+                summary.Measure(new Size(width, double.PositiveInfinity));
+                var expandable = full.DesiredSize.Height > summary.DesiredSize.Height + 1;
+                detail.Expander.IsEnabled = expandable;
+                if (!expandable)
+                    detail.Expanded = false;
+                detail.ExpanderImage.Source = !expandable ? ExpanderClosedDisabledImage : detail.Expanded ? ExpanderOpenImage : ExpanderClosedImage;
             }
-
-            if (panelDetails.AutoScrollMinSize.Height < top)
-                panelDetails.AutoScrollMinSize = new Size(0, top);
-            panelDetails.AutoScrollPosition = new Point(0, -scrollPosition);
         }
         #endregion
 
@@ -1380,11 +1515,14 @@ namespace Menu
 
         /// <summary>
         /// Update the combobox with the selection stored in the menu selection settings (from the previous run).
-        /// If the menu selection settings do not match the current selection use the default; except for 
+        /// If the menu selection settings do not match the current selection use the default; except for
         /// "Explore in Activity Mode" also try the content route settings (for the route).
         /// </summary>
         void UpdateFromMenuSelection<T>(ComboBox comboBox, UserSettings.Menu_SelectionIndex index, Func<T, string> map, T defaultValue)
         {
+            if (Settings == null)
+                return;
+
             string value = GetValueFromMenuSelection(index);
             if (!string.IsNullOrEmpty(value))
             {
@@ -1399,7 +1537,7 @@ namespace Menu
                 }
                 else
                 {
-                    if (comboBox.DropDownStyle == ComboBoxStyle.DropDown) comboBox.Text = value;
+                    if (comboBox.IsEditable) comboBox.Text = value;
                     else SelectComboBoxItem<T>(comboBox, item => map(item) == value);
                 }
             }
@@ -1447,7 +1585,7 @@ namespace Menu
 
                     if (!string.IsNullOrEmpty(valueComboboxToSetTo))
                     {
-                        if (comboBox.DropDownStyle == ComboBoxStyle.DropDown) 
+                        if (comboBox.IsEditable)
                             comboBox.Text = valueComboboxToSetTo;
                         else
                             searchInComboBoxAndSet(comboBox, valueComboboxToSetTo);
@@ -1465,7 +1603,7 @@ namespace Menu
         }
 
         /// <summary>
-        /// Get the combobox's value from the menu selection in the settings. 
+        /// Get the combobox's value from the menu selection in the settings.
         /// Checks that folder, route and activity/timetable-set match.
         /// Returns the value from the settings, or an empty string.
         /// </summary>
@@ -1495,16 +1633,16 @@ namespace Menu
             else if (index == UserSettings.Menu_SelectionIndex.Activity || index == UserSettings.Menu_SelectionIndex.TimetableSet)
                 return Settings.Menu_Selection[(int)index];
 
-            else if (radioButtonModeActivity.Checked && SelectedActivity == null)
+            else if (IsModeActivity && SelectedActivity == null)
                 return ""; // no current activity to match to
 
-            else if (radioButtonModeTimetable.Checked && SelectedTimetableSet == null)
+            else if (IsModeTimetable && SelectedTimetableSet == null)
                 return ""; // no current timetable set to match to
 
-            else if (radioButtonModeActivity.Checked && SelectedActivity.Name != Settings.Menu_Selection[(int)UserSettings.Menu_SelectionIndex.Activity])
+            else if (IsModeActivity && SelectedActivity.Name != Settings.Menu_Selection[(int)UserSettings.Menu_SelectionIndex.Activity])
                 return ""; // current activity and menu selection settings activity don't match
 
-            else if (radioButtonModeTimetable.Checked && SelectedTimetableSet.fileName != Settings.Menu_Selection[(int)UserSettings.Menu_SelectionIndex.TimetableSet])
+            else if (IsModeTimetable && SelectedTimetableSet.fileName != Settings.Menu_Selection[(int)UserSettings.Menu_SelectionIndex.TimetableSet])
                 return ""; // current timetable set is different from timetable set in menu selection setting
 
             else
@@ -1520,7 +1658,7 @@ namespace Menu
         {
             for (var i = 0; i < comboBox.Items.Count; i++)
             {
-                if ((string)comboBox.Items[i].ToString() == valueComboboxToSetTo)
+                if (comboBox.Items[i].ToString() == valueComboboxToSetTo)
                 {
                     comboBox.SelectedIndex = i;
                     return;
@@ -1537,9 +1675,9 @@ namespace Menu
         /// </summary>
         void SetToDefault<T>(ComboBox comboBox, UserSettings.Menu_SelectionIndex index, Func<T, string> map, T defaultValue)
         {
-            if (comboBox.DropDownStyle == ComboBoxStyle.DropDown)
+            if (comboBox.IsEditable)
             {
-                comboBox.Text = map(defaultValue);
+                comboBox.Text = defaultValue != null ? map(defaultValue) : "";
             }
             else
             {
@@ -1595,75 +1733,23 @@ namespace Menu
                 Value = value;
             }
         }
-
-        private sealed class Win32
-        {
-            Win32() { }
-
-            /// <summary>
-            /// Lock ore relase the wndow for updating.
-            /// </summary>
-            [DllImport("user32")]
-            public static extern int LockWindowUpdate(IntPtr hwnd);
-        }
-        #endregion
-
-        #region Documentation
-        void CheckForDocumentation()
-        {
-
-        }
         #endregion
 
         #region Executable utils
-        enum ImageSubsystem
-        {
-            Unknown = 0,
-            Native = 1,
-            WindowsGui = 2,
-            WindowsConsole = 3,
-        }
-
-        ImageSubsystem GetImageSubsystem(BinaryReader stream)
+        /// <summary>
+        /// Reads the PE subsystem (GUI or console) of a Windows executable or a .NET assembly (which has a PE header on every platform).
+        /// </summary>
+        static Subsystem GetImageSubsystem(string fileName)
         {
             try
             {
-                var baseOffset = stream.BaseStream.Position;
-
-                // WORD IMAGE_DOS_HEADER.e_magic = 0x4D5A (MZ)
-                stream.BaseStream.Seek(baseOffset + 0, SeekOrigin.Begin);
-                var dosMagic = stream.ReadUInt16();
-                if (dosMagic != 0x5A4D)
-                    return ImageSubsystem.Unknown;
-
-                // LONG IMAGE_DOS_HEADER.e_lfanew
-                stream.BaseStream.Seek(baseOffset + 60, SeekOrigin.Begin);
-                var ntHeaderOffset = stream.ReadUInt32();
-                if (ntHeaderOffset == 0)
-                    return ImageSubsystem.Unknown;
-
-                // DWORD IMAGE_NT_HEADERS.Signature = 0x00004550 (PE..)
-                stream.BaseStream.Seek(baseOffset + ntHeaderOffset, SeekOrigin.Begin);
-                var ntMagic = stream.ReadUInt32();
-                if (ntMagic != 0x00004550)
-                    return ImageSubsystem.Unknown;
-
-                // WORD IMAGE_OPTIONAL_HEADER.Magic = 0x010A (32bit header) or 0x020B (64bit header)
-                stream.BaseStream.Seek(baseOffset + ntHeaderOffset + 24, SeekOrigin.Begin);
-                var optionalMagic = stream.ReadUInt16();
-                if (optionalMagic != 0x010B && optionalMagic != 0x020B)
-                    return ImageSubsystem.Unknown;
-
-                // WORD IMAGE_OPTIONAL_HEADER.Subsystem
-                // Note: There might need to be an adjustment for ImageBase being ULONGLONG in the 64bit header though this doesn't actually seem to be true.
-                stream.BaseStream.Seek(baseOffset + ntHeaderOffset + 92, SeekOrigin.Begin);
-                var peSubsystem = stream.ReadUInt16();
-
-                return (ImageSubsystem)peSubsystem;
+                using (var stream = File.OpenRead(fileName))
+                using (var reader = new PEReader(stream))
+                    return reader.PEHeaders.PEHeader?.Subsystem ?? Subsystem.Unknown;
             }
-            catch (EndOfStreamException)
+            catch
             {
-                return ImageSubsystem.Unknown;
+                return Subsystem.Unknown;
             }
         }
         #endregion
@@ -1671,35 +1757,24 @@ namespace Menu
         void comboBoxTimetable_EnabledChanged(object sender, EventArgs e)
         {
             //Debrief Eval TTActivity.
-            if (!comboBoxTimetable.Enabled)
+            if (!comboBoxTimetable.IsEnabled)
             {
                 //comboBoxTimetable.Enabled == false then we erase comboBoxTimetable and comboBoxTimetableTrain data.
                 if (comboBoxTimetable.Items.Count > 0)
                 {
                     comboBoxTimetable.Items.Clear();
                     comboBoxTimetableTrain.Items.Clear();
-                    buttonStart.Enabled = false;
+                    buttonStart.IsEnabled = false;
                 }
             }
             //TO DO: Debrief Eval TTActivity
         }
 
         #region Notifications
-        private void pbNotificationsNone_Click(object sender, EventArgs e)
-        {
-            ToggleNotificationPages();
-        }
-        private void pbNotificationsSome_Click(object sender, EventArgs e)
-        {
-            ToggleNotificationPages();
-        }
-        private void lblNotificationCount_Click(object sender, EventArgs e)
-        {
-            ToggleNotificationPages();
-        }
-
         private void ToggleNotificationPages()
         {
+            if (NotificationManager == null)
+                return;
             if (NotificationManager.ArePagesVisible == false)
             {
                 NotificationManager.ArePagesVisible = true; // Set before calling ShowNotifcations()
@@ -1714,52 +1789,33 @@ namespace Menu
 
         public void ShowNotificationPages()
         {
-            Win32.LockWindowUpdate(Handle);
+            NotificationManager.ArePagesVisible = true;
             ClearPanel();
             NotificationManager.PopulatePage();
             UpdateNotificationPageAlert();
             NotificationManager.Page.FlowNDetails();
-            Win32.LockWindowUpdate(IntPtr.Zero);
         }
 
         public void UpdateNotificationPageAlert()
         {
             if (NotificationManager.NewPages.Viewed < NotificationManager.NewPages.Count)
             {
-                pbNotificationsSome.Visible = true;
-                lblNotificationCount.Visible = true;
+                pbNotificationsSome.IsVisible = true;
+                pbNotificationsNone.IsVisible = false;
+                lblNotificationCount.IsVisible = true;
                 lblNotificationCount.Text = $"{NotificationManager.NewPages.Count - NotificationManager.NewPages.Viewed}";
-
-                // If screen scaling != 100%, then the count doesn't lie on top of the red circle, so adjust its position.
-                if (NotificationManager.ScreenScaling != 1.0 & NotificationManager.ScreenAdjusted == false)
-                {
-                    var adjustment = (int)((NotificationManager.ScreenScaling - 1.0) * 20); // 20 to adjust 125% by 5 pixels
-                    lblNotificationCount.Top -= adjustment;
-                    lblNotificationCount.Left -= adjustment;
-                    NotificationManager.ScreenAdjusted = true;
-                }
             }
             else
             {
-                pbNotificationsSome.Visible = false;
-                lblNotificationCount.Visible = false;
+                pbNotificationsSome.IsVisible = false;
+                pbNotificationsNone.IsVisible = true;
+                lblNotificationCount.IsVisible = false;
             }
         }
 
-        // 3 should be enough, but is there a way to get unlimited buttons?
-        public void Button0_Click(object sender, EventArgs e)
+        public void DoNotificationButton(int index)
         {
-            NotificationManager.Page.DoButton(UpdateManager, 0);
-        }
-
-        public void Button1_Click(object sender, EventArgs e)
-        {
-            NotificationManager.Page.DoButton(UpdateManager, 1);
-        }
-
-        public void Button2_Click(object sender, EventArgs e)
-        {
-            NotificationManager.Page.DoButton(UpdateManager, 2);
+            NotificationManager.Page.DoButton(UpdateManager, index);
         }
 
         public void Next_Click(object sender, EventArgs e)

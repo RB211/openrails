@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.TestingWindow"
+        Title="{l:Tr Testing}"
+        Width="840" Height="520" MinWidth="640" MinHeight="300" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="10">
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="0,8,0,0">
+      <Grid.Styles>
+        <Style Selector="Button">
+          <Setter Property="MinWidth" Value="80" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+      </Grid.Styles>
+      <Button Grid.Column="0" x:Name="buttonTestAll" Content="{l:Tr 'Test all'}" />
+      <Button Grid.Column="1" x:Name="buttonTest" Content="{l:Tr Test}" />
+      <Button Grid.Column="2" x:Name="buttonCancel" Content="{l:Tr Cancel}" />
+      <CheckBox Grid.Column="3" x:Name="checkBoxOverride" Content="{l:Tr 'Override user settings when running tests'}" Margin="6,0" />
+      <Button Grid.Column="4" x:Name="buttonNoSort" Content="{l:Tr 'Clear sort'}" />
+      <Button Grid.Column="5" x:Name="buttonSummary" Content="{l:Tr Summary}" />
+      <Button Grid.Column="6" x:Name="buttonDetails" Content="{l:Tr Details}" Margin="0" />
+    </Grid>
+    <DataGrid x:Name="gridTestActivities" IsReadOnly="True" SelectionMode="Extended" CanUserSortColumns="True" CanUserResizeColumns="True"
+              GridLinesVisibility="All" HeadersVisibility="Column" BorderThickness="1"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="{l:Tr Route}" Binding="{ReflectionBinding Route}" />
+        <DataGridTextColumn Header="{l:Tr Activity}" Binding="{ReflectionBinding Activity}" Width="*" />
+        <DataGridCheckBoxColumn Header="{l:Tr Tested}" Binding="{ReflectionBinding Tested}" />
+        <DataGridCheckBoxColumn Header="{l:Tr Passed}" Binding="{ReflectionBinding Passed}" />
+        <DataGridTextColumn Header="{l:Tr Errors}" Binding="{ReflectionBinding Errors}" />
+        <DataGridTextColumn Header="{l:Tr Load}" Binding="{ReflectionBinding Load}" />
+        <DataGridTextColumn Header="{l:Tr FPS}" Binding="{ReflectionBinding FPS}" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </DockPanel>
+</Window>

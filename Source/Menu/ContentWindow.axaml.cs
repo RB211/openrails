@@ -1,44 +1,79 @@
-﻿// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015 by the Open Rails project.
-// 
+// COPYRIGHT 2009, 2010, 2011, 2012, 2013, 2014, 2015 by the Open Rails project.
+//
 // This file is part of Open Rails.
-// 
+//
 // Open Rails is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-// 
+//
 // Open Rails is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
-// 
+//
 // You should have received a copy of the GNU General Public License
 // along with Open Rails.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Windows.Forms;
-using GNU.Gettext;
-using LibGit2Sharp;
-using ORTS.Settings;
-using System.Linq;
-using System.Diagnostics;
-using System.Threading;
-using System.ComponentModel;
-using System.Net;
 using System.IO.Compression;
-using System.Drawing;
-using System.Threading.Tasks;
-using GNU.Gettext.WinForms;
-using static Menu.Notifications.NotificationPage;
+using System.Linq;
+using System.Net.Http;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using LibGit2Sharp;
+using ORTS.Common;
+using ORTS.Settings;
+using KeyModifiers = Avalonia.Input.KeyModifiers;
+using CancellationTokenSource = System.Threading.CancellationTokenSource;
 
 namespace Menu
 {
-    public partial class ContentForm : Form
+    public partial class ContentWindow : Window
     {
-        private readonly GettextResourceManager Catalog;
+        /// <summary>
+        /// A row of the "Auto Installed" grid.
+        /// </summary>
+        public class AutoInstallRow : INotifyPropertyChanged
+        {
+            public string Route { get; set; }
+            string installed;
+            public string Installed { get => installed; set { installed = value; Changed(); } }
+            public string Url { get; set; }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            void Changed([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        /// <summary>
+        /// A row of the "Manually Installed" grid.
+        /// </summary>
+        public class ManualInstallRow : INotifyPropertyChanged
+        {
+            string route;
+            public string Route { get => route; set { route = value; Changed(); } }
+            string path;
+            public string Path { get => path; set { path = value; Changed(); } }
+            public bool IsAutoInstalled { get; set; }
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            void Changed([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        private readonly MainWindow MainForm;
         private readonly UserSettings Settings;
         private readonly string BaseDocumentationUrl;
 
@@ -46,14 +81,10 @@ namespace Menu
 
         private string AutoInstallRouteName;
 
-        private readonly string ImageTempFilename;
-        private Thread ImageThread;
+        private CancellationTokenSource ImageCancellation;
         private readonly string InfoTempFilename;
 
         private bool AutoInstallClosingBlocked;
-
-        //attribute used to refresh UI
-        private readonly SynchronizationContext AutoInstallSynchronizationContext;
 
         public bool AutoInstallDoingTheSumOfTheFileBytes = false;
 
@@ -66,21 +97,24 @@ namespace Menu
 
         private readonly bool NoInternet = false;
 
-        public ContentForm(UserSettings settings, string baseDocumentationUrl)
+        // Closing has been confirmed by the user, or isn't to be questioned.
+        private bool CloseConfirmed;
+
+        // Errors from the download/install threads, shown afterwards by the UI thread.
+        private string WorkerError;
+
+        readonly ObservableCollection<AutoInstallRow> AutoInstallRows = new ObservableCollection<AutoInstallRow>();
+        readonly ObservableCollection<ManualInstallRow> ManualInstallRows = new ObservableCollection<ManualInstallRow>();
+
+        AutoInstallRow CurrentAutoInstallRow => dataGridViewAutoInstall.SelectedItem as AutoInstallRow;
+        ManualInstallRow CurrentManualInstallRow => dataGridViewManualInstall.SelectedItem as ManualInstallRow;
+
+        public ContentWindow(MainWindow mainForm, UserSettings settings, string baseDocumentationUrl)
         {
             InitializeComponent();
+            Icon = App.LoadIcon();
 
-            // Windows 2000 and XP should use 8.25pt Tahoma, while Windows
-            // Vista and later should use 9pt "Segoe UI". We'll use the
-            // Message Box font to allow for user-customizations, though.
-            Font = SystemFonts.MessageBoxFont;
-
-            this.FormBorderStyle = FormBorderStyle.FixedSingle; // remove resize control
-            this.MaximizeBox = false; // disable maximize button
-
-            Catalog = new GettextResourceManager("Menu");
-            Localizer.Localize(this, Catalog);
-
+            MainForm = mainForm;
             Settings = settings;
             BaseDocumentationUrl = baseDocumentationUrl;
 
@@ -91,27 +125,27 @@ namespace Menu
             Settings.Content.ContentRouteSettings.LoadContent(ref errorMsg);
             if (!string.IsNullOrEmpty(errorMsg))
             {
-                string message = Catalog.GetStringFmt("Failed to access the content repository (check Internet connection); automatic download not available. Error: {0}", errorMsg);
-                MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 NoInternet = true;
+                var message = Localization.GetStringFmt("Failed to access the content repository (check Internet connection); automatic download not available. Error: {0}", errorMsg);
+                Opened += async (sender, e) => await MessageBox.Show(this, message, Localization.GetString("Attention"));
             }
             AutoInstallRoutes = Settings.Content.ContentRouteSettings.Routes;
-            for (int index = 0; index < AutoInstallRoutes.Count; index++)
+            foreach (var pair in AutoInstallRoutes.OrderBy(r => r.Key))
             {
-                string routeName = AutoInstallRoutes.ElementAt(index).Key;
-                ContentRouteSettings.Route route = AutoInstallRoutes.ElementAt(index).Value;
-                int indexAdded = dataGridViewAutoInstall.Rows.Add(new string[] {
-                    routeName,
-                    route.Installed ? route.DateInstalled.ToString(CultureInfo.CurrentCulture.DateTimeFormat) : "",
-                    route.Url });
-                dataGridViewAutoInstall.Rows[indexAdded].Cells[2].ToolTipText = route.Url;
+                string routeName = pair.Key;
+                ContentRouteSettings.Route route = pair.Value;
+                AutoInstallRows.Add(new AutoInstallRow
+                {
+                    Route = routeName,
+                    Installed = route.Installed ? route.DateInstalled.ToString(CultureInfo.CurrentCulture.DateTimeFormat) : "",
+                    Url = route.Url,
+                });
                 if (!route.Installed)
                 {
                     changeManualInstallRoute(routeName);
                 }
             }
-
-            dataGridViewAutoInstall.Sort(dataGridViewAutoInstall.Columns[0], ListSortDirection.Ascending);
+            dataGridViewAutoInstall.ItemsSource = AutoInstallRows;
 
             if (string.IsNullOrEmpty(settings.ContentInstallPath))
             {
@@ -119,53 +153,80 @@ namespace Menu
             }
             textBoxAutoInstallPath.Text = settings.ContentInstallPath;
 
-            ImageTempFilename = Path.GetTempFileName();
-            InfoTempFilename = Path.GetTempFileName();
-            File.Delete(InfoTempFilename);
-            InfoTempFilename = Path.ChangeExtension(ImageTempFilename, "html");
-
-            AutoInstallSynchronizationContext = SynchronizationContext.Current;
-
-            // set focus to datagridview so that arrow keys can be used to scroll thru the list
-            dataGridViewAutoInstall.Select();
+            InfoTempFilename = Path.ChangeExtension(Path.GetTempFileName(), "html");
 
             // tab "Auto Installed" does not contain a Cancel button
             // it's too difficult and not logical to rollback an "Auto Installed" route
-            buttonCancel.Hide();
+            buttonCancel.IsVisible = false;
 
             //
             // "Manually Installed" tab
             //
-            foreach (var folder in Settings.Folders.Folders)
+            foreach (var folder in Settings.Folders.Folders.OrderBy(f => f.Key))
             {
-                int indexAdded = dataGridViewManualInstall.Rows.Add(new string[] {
-                    folder.Key,
-                    folder.Value});
-                dataGridViewManualInstall.Rows[indexAdded].Cells[1].ToolTipText = folder.Value;
-                if (AutoInstallRoutes.ContainsKey(folder.Key))
-                {     
-                    dataGridViewManualInstall.Rows[indexAdded].DefaultCellStyle.ForeColor = Color.Gray;
-                }
+                ManualInstallRows.Add(new ManualInstallRow
+                {
+                    Route = folder.Key,
+                    Path = folder.Value,
+                    IsAutoInstalled = AutoInstallRoutes.ContainsKey(folder.Key),
+                });
             }
-            dataGridViewManualInstall.Sort(dataGridViewManualInstall.Columns[0], ListSortDirection.Ascending);
+            dataGridViewManualInstall.ItemsSource = ManualInstallRows;
+            dataGridViewManualInstall.LoadingRow += (sender, e) =>
+            {
+                // Rows which belong to the "Auto Installed" routes are shown grey.
+                if (e.Row.DataContext is ManualInstallRow row && row.IsAutoInstalled)
+                    e.Row.Foreground = Brushes.Gray;
+                else
+                    e.Row.ClearValue(ForegroundProperty);
+            };
 
             ManualInstallBrouwseDir = determineBrowseDir();
-            buttonCancel.Enabled = false;
+            buttonCancel.IsEnabled = false;
+
+            dataGridViewAutoInstall.SelectionChanged += dataGridViewAutoInstall_SelectionChanged;
+            dataGridViewManualInstall.SelectionChanged += dataGridViewManualInstall_SelectionChanged;
+            dataGridViewAutoInstall.AddHandler(KeyDownEvent, dataGridViewAutoInstall_KeyDown, RoutingStrategies.Tunnel);
+            dataGridViewManualInstall.AddHandler(KeyDownEvent, dataGridViewManualInstall_KeyDown, RoutingStrategies.Tunnel);
+            textBoxAutoInstallPath.TextChanged += textBoxAutoInstallPath_TextChanged;
+            buttonAutoInstallBrowse.Click += buttonAutoInstallBrowse_Click;
+            buttonAutoInstallInfo.Click += buttonAutoInstallInfo_Click;
+            buttonAutoInstallInstall.Click += buttonAutoInstallInstall_Click;
+            buttonAutoInstallUpdate.Click += buttonAutoInstallUpdate_Click;
+            buttonAutoInstallDelete.Click += buttonAutoInstallDelete_Click;
+            textBoxManualInstallRoute.TextChanged += textBoxManualInstallRoute_TextChanged;
+            textBoxManualInstallRoute.LostFocus += textBoxManualInstallRoute_Leave;
+            textBoxManualInstallPath.TextChanged += textBoxManualInstallPath_TextChanged;
+            buttonManualInstallBrowse.Click += buttonManualInstallBrowse_Click;
+            buttonManualInstallAdd.Click += buttonManualInstallAdd_Click;
+            buttonManualInstallDelete.Click += buttonManualInstallDelete_Click;
+            tabControlContent.SelectionChanged += tabControlContent_Selecting;
+            pbContent.PointerPressed += pbContent_Click;
+            buttonOK.Click += buttonOK_Click;
+            buttonCancel.Click += buttonCancel_Click;
+            Closing += DownloadContentForm_FormClosing;
 
             setTextBoxesManualInstall();
 
             if (NoInternet)
             {
                 // open the Manually Installed tab since the Auto Installed tab needs internet
-                tabControlContent.SelectTab(tabPageManuallyInstall);
+                tabControlContent.SelectedItem = tabPageManuallyInstall;
             }
 
-            if (dataGridViewAutoInstall.Rows.Count == 0) 
+            if (AutoInstallRows.Count == 0)
             {
                 // disable all auto install buttons for a complete empty auto install grid
                 // might be the case when no internet available
                 DisableAutoInstallButtonsWithoutWait();
             }
+            else
+            {
+                dataGridViewAutoInstall.SelectedIndex = 0;
+            }
+
+            // set focus to datagridview so that arrow keys can be used to scroll thru the list
+            Opened += (sender, e) => dataGridViewAutoInstall.Focus();
         }
 
         void changeManualInstallRoute(string Route)
@@ -204,39 +265,41 @@ namespace Menu
             }
         }
 
-        private void tabControlContent_Selecting(object sender, TabControlCancelEventArgs e)
+        private void tabControlContent_Selecting(object sender, SelectionChangedEventArgs e)
         {
-            switch ((sender as TabControl).SelectedTab.Name)
+            if (e.Source != tabControlContent)
+                return;
+            if (tabControlContent.SelectedItem == tabPageAutoInstall)
             {
-                case "tabPageAutoInstall":
-                    dataGridViewAutoInstall.Select();
-                    buttonCancel.Hide();
-                    break;
-                case "tabPageManuallyInstall":
-                    dataGridViewManualInstall.Select();
-                    buttonCancel.Show();
-                    buttonCancel.Enabled = ManualInstallChangesMade;
-                    break;
+                dataGridViewAutoInstall.Focus();
+                buttonCancel.IsVisible = false;
+            }
+            else if (tabControlContent.SelectedItem == tabPageManuallyInstall)
+            {
+                dataGridViewManualInstall.Focus();
+                buttonCancel.IsVisible = true;
+                buttonCancel.IsEnabled = ManualInstallChangesMade;
             }
         }
 
         private void pbContent_Click(object sender, EventArgs e)
         {
             string fileName = "";
-            if (tabControlContent.SelectedTab == tabControlContent.TabPages["tabPageAutoInstall"])
+            if (tabControlContent.SelectedItem == tabPageAutoInstall)
             {
                 fileName = BaseDocumentationUrl + "/start.html#content";
             }
-            if (tabControlContent.SelectedTab == tabControlContent.TabPages["tabPageManuallyInstall"])
+            if (tabControlContent.SelectedItem == tabPageManuallyInstall)
             {
                 fileName = BaseDocumentationUrl + "/start.html#installation-profiles";
             }
 
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = fileName,
-                UseShellExecute = true
-            });
+            ExternalProcess.Open(fileName);
+        }
+
+        System.Threading.Tasks.Task<MessageBoxResult> ShowMessage(string message, MessageBoxButtons buttons = MessageBoxButtons.OK, MessageBoxResult defaultResult = MessageBoxResult.None)
+        {
+            return MessageBox.Show(this, message, Localization.GetString("Attention"), buttons, defaultResult);
         }
 
         #region Auto Installed
@@ -246,70 +309,41 @@ namespace Menu
 
         private void dataGridViewAutoInstall_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Tab && !(e.Modifiers == Keys.Shift))
+            if (e.Key == Key.Tab && e.KeyModifiers != KeyModifiers.Shift)
             {
                 // pressing tab in this datagridview now takes you into the next field
                 // default unwanted behaviour is going thru the rows/columns of the datagridview
-                textBoxAutoInstallPath.Select();
-                e.SuppressKeyPress = true;
+                textBoxAutoInstallPath.Focus();
+                e.Handled = true;
             }
-            if (e.KeyCode == Keys.Tab && e.Modifiers == Keys.Shift)
+            if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Shift)
             {
                 // same for pressing shift-tab
-                tabControlContent.Select();
-                e.SuppressKeyPress = true;
+                tabControlContent.Focus();
+                e.Handled = true;
             }
         }
 
-        private void dataGridViewAutoInstall_SelectionChanged(object sender, EventArgs e)
+        private async void dataGridViewAutoInstall_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (CurrentAutoInstallRow == null)
+                return;
+
             DisableAutoInstallButtons();
 
-            AutoInstallRouteName = dataGridViewAutoInstall.CurrentRow.Cells[0].Value.ToString();
+            AutoInstallRouteName = CurrentAutoInstallRow.Route;
 
             // picture box handling
 
-            if (pictureBoxAutoInstallRoute.Image != null)
+            if (pictureBoxAutoInstallRoute.Source is Bitmap oldImage)
             {
-                pictureBoxAutoInstallRoute.Image.Dispose();
-                pictureBoxAutoInstallRoute.Image = null;
+                pictureBoxAutoInstallRoute.Source = null;
+                oldImage.Dispose();
             }
+            ImageCancellation?.Cancel();
+            ImageCancellation = null;
 
-            if (!string.IsNullOrEmpty(AutoInstallRoutes[AutoInstallRouteName].Image))
-            {
-                if (ImageThread != null)
-                {
-                    if (ImageThread.IsAlive)
-                    {
-                        ImageThread.Abort();
-                    }
-                }
-
-                // use a thread as grabbing the picture from the web might take a few seconds
-                ImageThread = new Thread(() =>
-                {
-                    // wait one second as the user might scroll through the list
-                    Stopwatch sw = Stopwatch.StartNew();
-                    while (sw.ElapsedMilliseconds <= 1000) { }
-
-                    try
-                    {
-                        using (WebClient myWebClient = new WebClient())
-                                {
-                            myWebClient.DownloadFile(AutoInstallRoutes[AutoInstallRouteName].Image, ImageTempFilename);
-                            }
-                        if (File.Exists(ImageTempFilename))
-                        {
-                            pictureBoxAutoInstallRoute.Image = new Bitmap(ImageTempFilename);
-                        }
-                    }
-                    catch
-                    {
-                        // route lives whithout a picture, not such a problem
-                    }
-                });
-                ImageThread.Start();
-            }
+            var imageUrl = AutoInstallRoutes[AutoInstallRouteName].Image;
 
             // text box with description
 
@@ -320,6 +354,30 @@ namespace Menu
 
             // set focus back to datagridview
             dataGridViewAutoInstall.Focus();
+
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                // grabbing the picture from the web might take a few seconds, so do it in the background
+                var cancellation = ImageCancellation = new CancellationTokenSource();
+                try
+                {
+                    // wait one second as the user might scroll through the list
+                    await System.Threading.Tasks.Task.Delay(1000, cancellation.Token);
+                    using (var client = new HttpClient())
+                    {
+                        var bytes = await client.GetByteArrayAsync(imageUrl, cancellation.Token);
+                        if (!cancellation.IsCancellationRequested)
+                        {
+                            using (var stream = new MemoryStream(bytes))
+                                pictureBoxAutoInstallRoute.Source = new Bitmap(stream);
+                        }
+                    }
+                }
+                catch
+                {
+                    // route lives whithout a picture, not such a problem
+                }
+            }
         }
 
         private void textBoxAutoInstallPath_TextChanged(object sender, EventArgs e)
@@ -327,26 +385,28 @@ namespace Menu
             Settings.ContentInstallPath = textBoxAutoInstallPath.Text;
         }
 
-        private void buttonAutoInstallBrowse_Click(object sender, EventArgs e)
+        private async void buttonAutoInstallBrowse_Click(object sender, EventArgs e)
         {
-            using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
-            {
-                folderBrowser.SelectedPath = textBoxAutoInstallPath.Text;
-                folderBrowser.Description = Catalog.GetString("Main Path where route is to be installed");
-                folderBrowser.ShowNewFolderButton = true;
-                if (folderBrowser.ShowDialog(this) == DialogResult.OK)
-                {
-                    textBoxAutoInstallPath.Text = folderBrowser.SelectedPath;
-                }
-            }
+            var folder = await BrowseForFolder(textBoxAutoInstallPath.Text, Localization.GetString("Main Path where route is to be installed"));
+            if (folder != null)
+                textBoxAutoInstallPath.Text = folder;
         }
 
-        private void buttonAutoInstallInfo_Click(object sender, EventArgs e)
+        async System.Threading.Tasks.Task<string> BrowseForFolder(string initialPath, string title)
         {
-            writeAndStartInfoFile();
+            var options = new FolderPickerOpenOptions { Title = title, AllowMultiple = false };
+            if (!string.IsNullOrEmpty(initialPath) && Directory.Exists(initialPath))
+                options.SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(initialPath);
+            var folders = await StorageProvider.OpenFolderPickerAsync(options);
+            return folders.FirstOrDefault()?.TryGetLocalPath();
         }
 
-        private void writeAndStartInfoFile()
+        private async void buttonAutoInstallInfo_Click(object sender, EventArgs e)
+        {
+            await writeAndStartInfoFile();
+        }
+
+        private async System.Threading.Tasks.Task writeAndStartInfoFile()
         {
             using (StreamWriter outputFile = new StreamWriter(InfoTempFilename))
             {
@@ -362,81 +422,81 @@ namespace Menu
 
                 if (string.IsNullOrWhiteSpace(route.AuthorUrl))
                 {
-                    outputFile.WriteLine(string.Format("<p>" + Catalog.GetString("created by") + ": {0}</p>",
+                    outputFile.WriteLine(string.Format("<p>" + Localization.GetString("created by") + ": {0}</p>",
                         route.AuthorName));
                 }
                 else
                 {
-                    outputFile.WriteLine(string.Format("<p>" + Catalog.GetString("created by") + ": <a href='{0}'>{1}</a></p>",
+                    outputFile.WriteLine(string.Format("<p>" + Localization.GetString("created by") + ": <a href='{0}'>{1}</a></p>",
                         route.AuthorUrl, route.AuthorName));
                 }
 
                 if (!string.IsNullOrWhiteSpace(route.Screenshot))
                 {
-                    outputFile.WriteLine(string.Format("<p>" + Catalog.GetString("screenshots") + ": <a href='{0}'>{1}</a></p>",
+                    outputFile.WriteLine(string.Format("<p>" + Localization.GetString("screenshots") + ": <a href='{0}'>{1}</a></p>",
                         route.Screenshot, route.Screenshot));
                 }
 
                 if (route.getDownloadType() == ContentRouteSettings.DownloadType.github)
                 {
-                    outputFile.WriteLine("<p>" + Catalog.GetString("Downloadable: GitHub format") + "<br>");
-                    outputFile.WriteLine(Catalog.GetStringFmt("- " + Catalog.GetString("From:") + "{0}<br>", route.Url));
+                    outputFile.WriteLine("<p>" + Localization.GetString("Downloadable: GitHub format") + "<br>");
+                    outputFile.WriteLine(Localization.GetStringFmt("- " + Localization.GetString("From:") + "{0}<br>", route.Url));
                     if (route.InstallSize > 0)
                     {
-                        outputFile.WriteLine("- " + Catalog.GetStringFmt("Install size: {0} GB",
+                        outputFile.WriteLine("- " + Localization.GetStringFmt("Install size: {0} GB",
                             (route.InstallSize / (1024.0 * 1024 * 1024)).ToString("N")) + "<br></p>");
                     }
                 }
                 if (route.getDownloadType() == ContentRouteSettings.DownloadType.zip)
                 {
-                    outputFile.WriteLine(Catalog.GetString("<p>Downloadable: zip format<br>"));
-                    outputFile.WriteLine(Catalog.GetStringFmt("- From: {0}<br>", route.Url));
+                    outputFile.WriteLine(Localization.GetString("<p>Downloadable: zip format<br>"));
+                    outputFile.WriteLine(Localization.GetStringFmt("- From: {0}<br>", route.Url));
                     if (route.InstallSize > 0)
                     {
-                        outputFile.WriteLine("- " + Catalog.GetStringFmt("Install size: {0} GB",
+                        outputFile.WriteLine("- " + Localization.GetStringFmt("Install size: {0} GB",
                             (route.InstallSize / (1024.0 * 1024 * 1024)).ToString("N")) + "<br>");
                     }
                     if (route.DownloadSize > 0)
                     {
-                        outputFile.WriteLine("- " + Catalog.GetStringFmt("Download size: {0} GB",
+                        outputFile.WriteLine("- " + Localization.GetStringFmt("Download size: {0} GB",
                             (route.DownloadSize / (1024.0 * 1024 * 1024)).ToString("N")) + "<br></p>");
                     }
                 }
 
                 if (route.Installed)
                 {
-                    outputFile.WriteLine("<p>" + Catalog.GetString("Installed") + ":<br>");
-                    outputFile.WriteLine(Catalog.GetStringFmt("- " + Catalog.GetString("At") + ": {0}<br>", route.DateInstalled.ToString(CultureInfo.CurrentCulture.DateTimeFormat)));
-                    outputFile.WriteLine(Catalog.GetStringFmt("- " + Catalog.GetString("In") + ": \"{0}\"<br>", route.DirectoryInstalledIn));
-                    outputFile.WriteLine(Catalog.GetStringFmt("- " + Catalog.GetString("Content name") + ": \"{0}\"<br>", route.ContentName));
-                    outputFile.WriteLine(Catalog.GetStringFmt("- " + Catalog.GetString("Content Directory") + ": \"{0}\"<br></p>", route.ContentDirectory));
+                    outputFile.WriteLine("<p>" + Localization.GetString("Installed") + ":<br>");
+                    outputFile.WriteLine(Localization.GetStringFmt("- " + Localization.GetString("At") + ": {0}<br>", route.DateInstalled.ToString(CultureInfo.CurrentCulture.DateTimeFormat)));
+                    outputFile.WriteLine(Localization.GetStringFmt("- " + Localization.GetString("In") + ": \"{0}\"<br>", route.DirectoryInstalledIn));
+                    outputFile.WriteLine(Localization.GetStringFmt("- " + Localization.GetString("Content name") + ": \"{0}\"<br>", route.ContentName));
+                    outputFile.WriteLine(Localization.GetStringFmt("- " + Localization.GetString("Content Directory") + ": \"{0}\"<br></p>", route.ContentDirectory));
                 }
 
-                outputFile.WriteLine("<p>" + Catalog.GetString("Start options") + ":<br>");
+                outputFile.WriteLine("<p>" + Localization.GetString("Start options") + ":<br>");
                 if (string.IsNullOrWhiteSpace(route.Start.Route))
                 {
                     // no start information
-                    outputFile.WriteLine("- " + Catalog.GetString("None") + "<br></p>");
+                    outputFile.WriteLine("- " + Localization.GetString("None") + "<br></p>");
                 }
                 else
                 {
-                    outputFile.WriteLine("- " + Catalog.GetString("Installation profile") + ": " + AutoInstallRouteName + "<br>");
-                    outputFile.WriteLine("- " + Catalog.GetString("Route") + ": " + route.Start.Route + "<br>");
-                    outputFile.WriteLine("- " + Catalog.GetString("Activity") + ": " + route.Start.Activity + "<br>");
+                    outputFile.WriteLine("- " + Localization.GetString("Installation profile") + ": " + AutoInstallRouteName + "<br>");
+                    outputFile.WriteLine("- " + Localization.GetString("Route") + ": " + route.Start.Route + "<br>");
+                    outputFile.WriteLine("- " + Localization.GetString("Activity") + ": " + route.Start.Activity + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.Locomotive))
-                        outputFile.WriteLine("- " + Catalog.GetString("Locomotive") + ": " + route.Start.Locomotive + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Locomotive") + ": " + route.Start.Locomotive + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.Consist))
-                        outputFile.WriteLine("- " + Catalog.GetString("Consist") + ": " + route.Start.Consist + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Consist") + ": " + route.Start.Consist + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.StartingAt))
-                        outputFile.WriteLine("- " + Catalog.GetString("Starting at") + ": " + route.Start.StartingAt + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Starting at") + ": " + route.Start.StartingAt + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.HeadingTo))
-                        outputFile.WriteLine("- " + Catalog.GetString("Heading to") + ": " + route.Start.HeadingTo + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Heading to") + ": " + route.Start.HeadingTo + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.Time))
-                        outputFile.WriteLine("- " + Catalog.GetString("Time") + ": " + route.Start.Time + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Time") + ": " + route.Start.Time + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.Season))
-                        outputFile.WriteLine("- " + Catalog.GetString("Season") + ": " + route.Start.Season + "<br>");
+                        outputFile.WriteLine("- " + Localization.GetString("Season") + ": " + route.Start.Season + "<br>");
                     if (!string.IsNullOrEmpty(route.Start.Weather))
-                        outputFile.WriteLine("- " + Catalog.GetString("Weather") + ": " + route.Start.Weather + "<br></p>");
+                        outputFile.WriteLine("- " + Localization.GetString("Weather") + ": " + route.Start.Weather + "<br></p>");
                 }
 
                 if (Directory.Exists(route.DirectoryInstalledIn))
@@ -447,13 +507,13 @@ namespace Menu
                     }
                     if (route.Installed && route.getDownloadType() == ContentRouteSettings.DownloadType.github)
                     {
-                        bool bothLocalAsRemoteUpdatesFound = infoChangedAndAddedFileForGitHubDownloadType(route, outputFile);
+                        bool bothLocalAsRemoteUpdatesFound = await infoChangedAndAddedFileForGitHubDownloadType(route, outputFile);
                         if (bothLocalAsRemoteUpdatesFound)
                         {
-                            outputFile.WriteLine("<p><b>" + Catalog.GetString("ATTENTION: both local and remote updates found.") + "</b><br>");
-                            outputFile.WriteLine("<b>" + Catalog.GetString("Update might fail if the update tries to overwrite a changed local file.") + "</b><br>");
-                            outputFile.WriteLine("<b>" + Catalog.GetString("If that's the case you are on your own!") + "</b><br>");
-                            outputFile.WriteLine("<b>" + Catalog.GetString("Get a git expert at your desk or just Delete and Install the route again.") + "</b><br></p>");
+                            outputFile.WriteLine("<p><b>" + Localization.GetString("ATTENTION: both local and remote updates found.") + "</b><br>");
+                            outputFile.WriteLine("<b>" + Localization.GetString("Update might fail if the update tries to overwrite a changed local file.") + "</b><br>");
+                            outputFile.WriteLine("<b>" + Localization.GetString("If that's the case you are on your own!") + "</b><br>");
+                            outputFile.WriteLine("<b>" + Localization.GetString("Get a git expert at your desk or just Delete and Install the route again.") + "</b><br></p>");
                         }
                     }
                 }
@@ -461,29 +521,29 @@ namespace Menu
                 {
                     if (!string.IsNullOrEmpty(route.DirectoryInstalledIn))
                     {
-                        outputFile.WriteLine("<p>" + Catalog.GetStringFmt("Directory {0} does not exist", route.DirectoryInstalledIn) + "</b><br></p>");
+                        outputFile.WriteLine("<p>" + Localization.GetStringFmt("Directory {0} does not exist", route.DirectoryInstalledIn) + "</b><br></p>");
                     }
                 }
             }
             try
             {
                 // show html file in default browser
-                Process.Start(new ProcessStartInfo { FileName = InfoTempFilename, UseShellExecute = true });
+                ExternalProcess.Open(InfoTempFilename);
             }
             catch (Exception e)
             {
-                string message = Catalog.GetStringFmt("Error opening html page {0} in browser. Error: {1}", InfoTempFilename, e.ToString());
-                MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                string message = Localization.GetStringFmt("Error opening html page {0} in browser. Error: {1}", InfoTempFilename, e.ToString());
+                await ShowMessage(message);
             }
         }
 
         private void infoChangedAndAddedFileForZipDownloadType(ContentRouteSettings.Route route, StreamWriter outputFile)
         {
             List<string> changedAndAddedFiles = getChangedFiles(route.DirectoryInstalledIn, route.DateInstalled);
-            outputFile.WriteLine("<p id='changed'>" + Catalog.GetString("Changed local file(s) after the install (timestamp check)") + ":<br>");
+            outputFile.WriteLine("<p id='changed'>" + Localization.GetString("Changed local file(s) after the install (timestamp check)") + ":<br>");
             if (changedAndAddedFiles.Count == 0)
             {
-                outputFile.WriteLine("- " + Catalog.GetString("No changed files found") + "<br></p>");
+                outputFile.WriteLine("- " + Localization.GetString("No changed files found") + "<br></p>");
             }
             else
             {
@@ -494,10 +554,10 @@ namespace Menu
                 outputFile.WriteLine("</p>");
             }
             changedAndAddedFiles = getAddedFiles(route.DirectoryInstalledIn, route.DateInstalled);
-            outputFile.WriteLine("<p>" + Catalog.GetString("Added local file(s) after the install (timestamp check)") + ":<br>");
+            outputFile.WriteLine("<p>" + Localization.GetString("Added local file(s) after the install (timestamp check)") + ":<br>");
             if (changedAndAddedFiles.Count == 0)
             {
-                outputFile.WriteLine("- " + Catalog.GetString("No added files found") + "<br></p>");
+                outputFile.WriteLine("- " + Localization.GetString("No added files found") + "<br></p>");
             }
             else
             {
@@ -509,16 +569,16 @@ namespace Menu
             }
         }
 
-        private bool infoChangedAndAddedFileForGitHubDownloadType(ContentRouteSettings.Route route, StreamWriter outputFile)
+        private async System.Threading.Tasks.Task<bool> infoChangedAndAddedFileForGitHubDownloadType(ContentRouteSettings.Route route, StreamWriter outputFile)
         {
             bool changedFound = false;
             bool remoteUpdateFound = false;
 
             List<string> changedAndAddedFiles = getChangedGitFiles(route.DirectoryInstalledIn);
-            outputFile.WriteLine("<p>" + Catalog.GetString("Changed local file(s) after the install (git status)") + ":<br>");
+            outputFile.WriteLine("<p>" + Localization.GetString("Changed local file(s) after the install (git status)") + ":<br>");
             if (changedAndAddedFiles.Count == 0)
             {
-                outputFile.WriteLine("- " + Catalog.GetString("No changed files found") + "<br></p>");
+                outputFile.WriteLine("- " + Localization.GetString("No changed files found") + "<br></p>");
             }
             else
             {
@@ -530,10 +590,10 @@ namespace Menu
                 outputFile.WriteLine("</p>");
             }
             changedAndAddedFiles = getAddedGitFiles(route.DirectoryInstalledIn);
-            outputFile.WriteLine("<p>" + Catalog.GetString("Added local file(s) after the install (git status)") + ":<br>");
+            outputFile.WriteLine("<p>" + Localization.GetString("Added local file(s) after the install (git status)") + ":<br>");
             if (changedAndAddedFiles.Count == 0)
             {
-                outputFile.WriteLine("- " + Catalog.GetString("No added files found") + "<br></p>");
+                outputFile.WriteLine("- " + Localization.GetString("No added files found") + "<br></p>");
             }
             else
             {
@@ -545,16 +605,16 @@ namespace Menu
                 outputFile.WriteLine("</p>");
             }
 
-            outputFile.WriteLine("<p>" + Catalog.GetString("Remote GitHub Updates available:") + "<br>");
+            outputFile.WriteLine("<p>" + Localization.GetString("Remote GitHub Updates available:") + "<br>");
 
-            List<string> commitStrings = getCommits(route.DirectoryInstalledIn);
+            List<string> commitStrings = await getCommits(route.DirectoryInstalledIn);
             if (commitStrings.Count > 0)
             {
                 remoteUpdateFound = true;
                 for (int index = 0; index < commitStrings.Count; index += 4)
                 {
                     outputFile.WriteLine(string.Format("- commit {0}<br>", commitStrings[index]));
-                    outputFile.WriteLine(Catalog.GetStringFmt("On {0} by {1}",
+                    outputFile.WriteLine(Localization.GetStringFmt("On {0} by {1}",
                         commitStrings[index + 1], commitStrings[index + 2]) + ":<br>");
                     outputFile.WriteLine(commitStrings[index + 3] + "<br><br>");
                 }
@@ -562,7 +622,7 @@ namespace Menu
             }
             else
             {
-                outputFile.WriteLine("- " + Catalog.GetString("No updates found") + "<br></p>");
+                outputFile.WriteLine("- " + Localization.GetString("No updates found") + "<br></p>");
             }
 
             return changedFound && remoteUpdateFound;
@@ -571,9 +631,10 @@ namespace Menu
         private async void buttonAutoInstallInstall_Click(object sender, EventArgs e)
         {
             ContentRouteSettings.Route route = AutoInstallRoutes[AutoInstallRouteName];
+            var row = CurrentAutoInstallRow;
 
-            string installPath = textBoxAutoInstallPath.Text;
-            if (installPath.EndsWith(@"\"))
+            string installPath = textBoxAutoInstallPath.Text ?? "";
+            if (installPath.EndsWith(Path.DirectorySeparatorChar.ToString()) || installPath.EndsWith(Path.AltDirectorySeparatorChar.ToString()))
             {
                 installPath = installPath.Remove(installPath.Length - 1, 1);
             }
@@ -584,8 +645,8 @@ namespace Menu
 
             DisableAutoInstallButtons();
 
-            message = Catalog.GetStringFmt("Route to be installed in \"{0}\", are you sure?", installPathRoute);
-            if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            message = Localization.GetStringFmt("Route to be installed in \"{0}\", are you sure?", installPathRoute);
+            if (await ShowMessage(message, MessageBoxButtons.YesNo) != MessageBoxResult.Yes)
             {
                 // cancelled
                 EnableAutoInstalButtons();
@@ -594,12 +655,8 @@ namespace Menu
 
             // various checks for the directory where the route is installed
 
-            string pathDirectoryExe = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase);
-
-            string topPathDirectoryExe = determineTopDirectory(pathDirectoryExe.Substring(6));
-            string topInstallPath = determineTopDirectory(installPath);
-
-            if (isWrongPath(installPath, Catalog)) {
+            if (await isWrongPath(this, installPath))
+            {
                 // cancelled
                 EnableAutoInstalButtons();
                 return;
@@ -607,19 +664,23 @@ namespace Menu
 
             try
             {
-                DriveInfo dInfo = new DriveInfo(installPathRoute);
+                // The route's directory may not exist yet; check the space where it will be.
+                var existingPath = installPathRoute;
+                while (!Directory.Exists(existingPath) && Path.GetDirectoryName(existingPath) != null)
+                    existingPath = Path.GetDirectoryName(existingPath);
+                DriveInfo dInfo = new DriveInfo(existingPath);
 
                 long size = route.InstallSize + route.DownloadSize;
 
                 if (size > (dInfo.AvailableFreeSpace * 1.1))
                 {
-                    message = Catalog.GetStringFmt("Not enough diskspace on drive {0} ({1}), available {2} kB, needed {3} kB, still continue?",
+                    message = Localization.GetStringFmt("Not enough diskspace on drive {0} ({1}), available {2} kB, needed {3} kB, still continue?",
                         dInfo.Name,
                         dInfo.VolumeLabel,
                         (dInfo.AvailableFreeSpace / 1024).ToString("N0"),
                         (size / 1024).ToString("N0"));
 
-                    if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    if (await ShowMessage(message, MessageBoxButtons.YesNo) != MessageBoxResult.Yes)
                     {
                         // cancelled
                         EnableAutoInstalButtons();
@@ -627,10 +688,10 @@ namespace Menu
                     }
                 }
             }
-            catch (System.IO.DriveNotFoundException)
+            catch (Exception error) when (error is DriveNotFoundException || error is IOException || error is ArgumentException || error is UnauthorizedAccessException)
             {
-                message = Catalog.GetStringFmt("Drive not available");
-                MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                message = Localization.GetStringFmt("Drive not available");
+                await ShowMessage(message);
                 // cancelled
                 EnableAutoInstalButtons();
                 return;
@@ -644,9 +705,9 @@ namespace Menu
                 }
                 catch (Exception createDirectoryException)
                 {
-                    message = Catalog.GetStringFmt("Directory \"{0}\" cannot be created: {1}",
+                    message = Localization.GetStringFmt("Directory \"{0}\" cannot be created: {1}",
                         installPathRoute, createDirectoryException.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    await ShowMessage(message);
                     EnableAutoInstalButtons();
                     return;
                 }
@@ -656,8 +717,8 @@ namespace Menu
                 if ((Directory.GetFiles(installPathRoute).Length != 0) ||
                     (Directory.GetDirectories(installPathRoute).Length != 0))
                 {
-                    message = Catalog.GetStringFmt("Directory \"{0}\" exists and is not empty", installPathRoute);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    message = Localization.GetStringFmt("Directory \"{0}\" exists and is not empty", installPathRoute);
+                    await ShowMessage(message);
                     EnableAutoInstalButtons();
                     return;
                 }
@@ -665,18 +726,21 @@ namespace Menu
 
             // the download
 
-            dataGridViewAutoInstall.CurrentRow.Cells[1].Value = Catalog.GetString("Installing...");
-            Refresh();
+            row.Installed = Localization.GetString("Installing...");
 
-            if (!await Task.Run(() => downloadRoute(installPathRoute)))
+            WorkerError = null;
+            var routeName = AutoInstallRouteName;
+            if (!await System.Threading.Tasks.Task.Run(() => downloadRoute(routeName, row, installPathRoute)))
             {
+                if (WorkerError != null)
+                    await ShowMessage(WorkerError);
                 EnableAutoInstalButtons();
                 return;
             }
 
             // insert row in Options, tab Content
 
-            if (!insertRowInOptions(installPathRoute))
+            if (!await insertRowInOptions(installPathRoute))
             {
                 EnableAutoInstalButtons();
                 return;
@@ -685,7 +749,7 @@ namespace Menu
             route.Installed = true;
 
             DateTime dateTimeNow = DateTime.Now;
-            dataGridViewAutoInstall.CurrentRow.Cells[1].Value = dateTimeNow.ToString(CultureInfo.CurrentCulture.DateTimeFormat);
+            row.Installed = dateTimeNow.ToString(CultureInfo.CurrentCulture.DateTimeFormat);
             route.DateInstalled = dateTimeNow;
 
             route.DirectoryInstalledIn = installPathRoute;
@@ -693,32 +757,28 @@ namespace Menu
             Settings.Folders.Save();
             Settings.Content.Save();
 
-            MainForm mainForm = ((MainForm)Owner);
-            mainForm.LoadFolderListWithoutTask();
-            mainForm.comboBoxFolder.SelectedIndex = determineSelectedIndex(mainForm.comboBoxFolder, AutoInstallRouteName);
+            MainForm.LoadFolderListWithoutTask();
+            SelectInComboBox(MainForm.comboBoxFolder, AutoInstallRouteName);
 
-            MessageBox.Show(Catalog.GetString("Route installed."),
-            Catalog.GetString("Done"), MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
-
-            Refresh();
+            await MessageBox.Show(this, Localization.GetString("Route installed."), Localization.GetString("Done"));
 
             EnableAutoInstalButtons();
         }
 
-        private bool downloadRoute(string installPathRoute)
+        private bool downloadRoute(string routeName, AutoInstallRow row, string installPathRoute)
         {
-            ContentRouteSettings.Route route = AutoInstallRoutes[AutoInstallRouteName];
+            ContentRouteSettings.Route route = AutoInstallRoutes[routeName];
             bool returnValue = false;
 
             Thread downloadThread = new Thread(() =>
             {
                 if (route.getDownloadType() == ContentRouteSettings.DownloadType.github)
                 {
-                    returnValue = doTheClone(installPathRoute);
+                    returnValue = doTheClone(route.Url, installPathRoute);
                 }
                 if (route.getDownloadType() == ContentRouteSettings.DownloadType.zip)
                 {
-                    returnValue = doTheZipDownload(route.Url, Path.Combine(installPathRoute, AutoInstallRouteName + ".zip"));
+                    returnValue = doTheZipDownload(route.Url, Path.Combine(installPathRoute, routeName + ".zip"));
                 }
             });
             // start download in thread to be able to show the progress in the main thread
@@ -729,16 +789,10 @@ namespace Menu
                 TotalBytes = 0;
 
                 sumMB(installPathRoute);
-                AutoInstallSynchronizationContext.Post(new SendOrPostCallback(o =>
-                {
-                    ((MainForm)Owner).Cursor = Cursors.WaitCursor;
+                var kB = (TotalBytes / 1024).ToString("N0");
+                Dispatcher.UIThread.Post(() => row.Installed = string.Format("Downloaded: {0} kB", kB));
 
-                    dataGridViewAutoInstall.CurrentRow.Cells[1].Value = 
-                        string.Format("Downloaded: {0} kB", (string)o);
-                }), (TotalBytes / 1024).ToString("N0"));
-
-                Stopwatch sw = Stopwatch.StartNew();
-                while ((downloadThread.IsAlive) && (sw.ElapsedMilliseconds <= 1000)) { }
+                downloadThread.Join(1000);
             }
 
             if (returnValue)
@@ -747,7 +801,7 @@ namespace Menu
                 {
                     Thread installThread = new Thread(() =>
                     {
-                        returnValue = doTheUnzipInstall(Path.Combine(installPathRoute, AutoInstallRouteName + ".zip"), installPathRoute);
+                        returnValue = doTheUnzipInstall(Path.Combine(installPathRoute, routeName + ".zip"), installPathRoute);
                     });
                     installThread.Start();
 
@@ -757,42 +811,29 @@ namespace Menu
                     {
                         TotalBytes = -bytesZipfile;
                         sumMB(installPathRoute);
-                        AutoInstallSynchronizationContext.Post(new SendOrPostCallback(o =>
-                        {
-                            ((MainForm)Owner).Cursor = Cursors.WaitCursor;
+                        var kB = (TotalBytes / 1024).ToString("N0");
+                        Dispatcher.UIThread.Post(() => row.Installed = string.Format("Installed: {0} kB", kB));
 
-                            dataGridViewAutoInstall.CurrentRow.Cells[1].Value = 
-                                string.Format("Installed: {0} kB", (string)o);
-                        }), (TotalBytes / 1024).ToString("N0"));
-
-                        Stopwatch sw = Stopwatch.StartNew();
-                        while ((installThread.IsAlive) && (sw.ElapsedMilliseconds <= 1000)) { }
+                        installThread.Join(1000);
                     }
                 }
             }
 
-            AutoInstallSynchronizationContext.Post(new SendOrPostCallback(o =>
-            {
-                dataGridViewAutoInstall.CurrentRow.Cells[1].Value = "";
-            }), "");
-
+            Dispatcher.UIThread.Post(() => row.Installed = "");
 
             return returnValue;
         }
 
-        private bool doTheClone(string installPathRoute)
+        private bool doTheClone(string url, string installPathRoute)
         {
             try
             {
-                Repository.Clone(AutoInstallRoutes[AutoInstallRouteName].Url, installPathRoute);
+                Repository.Clone(url, installPathRoute);
             }
             catch (LibGit2SharpException libGit2SharpException)
             {
-                {
-                    string message = Catalog.GetStringFmt("Error during github download: {0}", libGit2SharpException.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return false;
-                }
+                WorkerError = Localization.GetStringFmt("Error during github download: {0}", libGit2SharpException.Message);
+                return false;
             }
 
             return true;
@@ -802,16 +843,19 @@ namespace Menu
         {
             try
             {
-                WebClient myWebClient = new WebClient();
-                myWebClient.DownloadFile(url, installPathRouteZipfileName);
+                using (var client = new HttpClient())
+                using (var response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
+                {
+                    response.EnsureSuccessStatusCode();
+                    using (var input = response.Content.ReadAsStream())
+                    using (var output = File.Create(installPathRouteZipfileName))
+                        input.CopyTo(output);
+                }
             }
             catch (Exception error)
             {
-                {
-                    string message = Catalog.GetStringFmt("Error during download zipfile {0}: {1}", url, error.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return false;
-                }
+                WorkerError = Localization.GetStringFmt("Error during download zipfile {0}: {1}", url, error.Message);
+                return false;
             }
 
             return true;
@@ -826,11 +870,8 @@ namespace Menu
             }
             catch (Exception error)
             {
-                {
-                    string message = Catalog.GetStringFmt("Error during unzip zipfile {0}: {1}", installPathRouteZipfileName, error.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return false;
-                }
+                WorkerError = Localization.GetStringFmt("Error during unzip zipfile {0}: {1}", installPathRouteZipfileName, error.Message);
+                return false;
             }
 
             return true;
@@ -840,7 +881,7 @@ namespace Menu
 
         private bool sumMB(string path)
         {
-            try 
+            try
             {
                 foreach (string fileName in Directory.GetFiles(path))
                 {
@@ -875,12 +916,12 @@ namespace Menu
             return true;
         }
 
-        private bool insertRowInOptions(string installPathRoute)
+        private async System.Threading.Tasks.Task<bool> insertRowInOptions(string installPathRoute)
         {
             // sometimes the route is located one directory level deeper, determine real installPathRoute
             string installPathRouteReal;
 
-            if (Directory.Exists(Path.Combine(installPathRoute, "routes")))
+            if (Directory.Exists(Path.Combine(installPathRoute, "routes")) || Directory.Exists(Path.Combine(installPathRoute, "ROUTES")))
             {
                 installPathRouteReal = installPathRoute;
             }
@@ -889,7 +930,8 @@ namespace Menu
                 string[] directories = Directory.GetDirectories(installPathRoute);
                 int indexDirectories = 0;
                 while ((indexDirectories < directories.Length) &&
-                    !Directory.Exists(Path.Combine(directories[indexDirectories], "routes")))
+                    !Directory.Exists(Path.Combine(directories[indexDirectories], "routes")) &&
+                    !Directory.Exists(Path.Combine(directories[indexDirectories], "ROUTES")))
                 {
                     indexDirectories++;
                 }
@@ -899,8 +941,8 @@ namespace Menu
                 }
                 else
                 {
-                    string message = Catalog.GetString("Incorrect route, directory \"routes\" not found");
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    string message = Localization.GetString("Incorrect route, directory \"routes\" not found");
+                    await ShowMessage(message);
                     return false;
                 }
             }
@@ -924,29 +966,40 @@ namespace Menu
             AutoInstallRoutes[AutoInstallRouteName].ContentDirectory = installPathRouteReal;
 
             // insert into Manually Installed data grid
-            int indexAdded = dataGridViewManualInstall.Rows.Add(new string[] {
-                routeName,
-                installPathRouteReal
+            ManualInstallRows.Add(new ManualInstallRow
+            {
+                Route = routeName,
+                Path = installPathRouteReal,
+                IsAutoInstalled = true,
             });
-            dataGridViewManualInstall.Rows[indexAdded].Cells[1].ToolTipText = installPathRouteReal;
-            dataGridViewManualInstall.Rows[indexAdded].DefaultCellStyle.ForeColor = Color.Gray;
-            dataGridViewManualInstall.Sort(dataGridViewManualInstall.Columns[0], ListSortDirection.Ascending);
+            SortManualInstallRows();
 
             return true;
         }
 
-        private void buttonAutoInstallUpdate_Click(object sender, EventArgs e)
+        void SortManualInstallRows()
+        {
+            var sorted = ManualInstallRows.OrderBy(r => r.Route, StringComparer.CurrentCulture).ToList();
+            for (var i = 0; i < sorted.Count; i++)
+            {
+                var oldIndex = ManualInstallRows.IndexOf(sorted[i]);
+                if (oldIndex != i)
+                    ManualInstallRows.Move(oldIndex, i);
+            }
+        }
+
+        private async void buttonAutoInstallUpdate_Click(object sender, EventArgs e)
         {
             ContentRouteSettings.Route route = AutoInstallRoutes[AutoInstallRouteName];
             string message;
 
             DisableAutoInstallButtons();
 
-            List<string> commitStrings = getCommits(route.DirectoryInstalledIn);
+            List<string> commitStrings = await getCommits(route.DirectoryInstalledIn);
             if (commitStrings.Count > 0)
             {
-                message = Catalog.GetString("Remote updates found. Do you want to continue?");
-                if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                message = Localization.GetString("Remote updates found. Do you want to continue?");
+                if (await ShowMessage(message, MessageBoxButtons.YesNo, MessageBoxResult.No) != MessageBoxResult.Yes)
                 {
                     // cancelled
                     EnableAutoInstalButtons();
@@ -954,30 +1007,32 @@ namespace Menu
                 }
                 if (areThereChangedAddedFiles(route))
                 {
-                    message = Catalog.GetString("Changed or added local files found, Update might fail. Do you want to continue?");
-                    if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                    message = Localization.GetString("Changed or added local files found, Update might fail. Do you want to continue?");
+                    if (await ShowMessage(message, MessageBoxButtons.YesNo, MessageBoxResult.No) != MessageBoxResult.Yes)
                     {
                         // cancelled
                         EnableAutoInstalButtons();
                         return;
                     }
                 }
-                if (doThePull(route))
+                WorkerError = null;
+                if (await System.Threading.Tasks.Task.Run(() => doThePull(route)))
                 {
-                    message = Catalog.GetString("Updates installed");
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    message = Localization.GetString("Updates installed");
+                    await ShowMessage(message);
+                }
+                else if (WorkerError != null)
+                {
+                    await ShowMessage(WorkerError);
                 }
             }
             else
             {
-                message = Catalog.GetString("No updates found");
-                MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+                message = Localization.GetString("No updates found");
+                await ShowMessage(message);
             }
 
-            MainForm mainForm = ((MainForm)Owner);
-            mainForm.comboBoxFolder.SelectedIndex = determineSelectedIndex(mainForm.comboBoxFolder, AutoInstallRouteName);
-
-            Refresh();
+            SelectInComboBox(MainForm.comboBoxFolder, AutoInstallRouteName);
 
             EnableAutoInstalButtons();
         }
@@ -1003,11 +1058,8 @@ namespace Menu
             }
             catch (LibGit2SharpException libGit2SharpException)
             {
-                {
-                    string message = Catalog.GetStringFmt("Error during github pull: {0}", libGit2SharpException.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return false;
-                }
+                WorkerError = Localization.GetStringFmt("Error during github pull: {0}", libGit2SharpException.Message);
+                return false;
             }
             return true;
         }
@@ -1015,24 +1067,26 @@ namespace Menu
         private async void buttonAutoInstallDelete_Click(object sender, EventArgs e)
         {
             ContentRouteSettings.Route route = AutoInstallRoutes[AutoInstallRouteName];
+            var row = CurrentAutoInstallRow;
             string message;
 
             DisableAutoInstallButtons();
 
-            message = Catalog.GetStringFmt("Directory \"{0}\" is to be deleted, are you really sure?", route.DirectoryInstalledIn);
-            if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            message = Localization.GetStringFmt("Directory \"{0}\" is to be deleted, are you really sure?", route.DirectoryInstalledIn);
+            if (await ShowMessage(message, MessageBoxButtons.YesNo, MessageBoxResult.No) != MessageBoxResult.Yes)
             {
                 // cancelled
                 EnableAutoInstalButtons();
                 return;
             }
 
-            if (Directory.Exists(route.DirectoryInstalledIn)) {
+            if (Directory.Exists(route.DirectoryInstalledIn))
+            {
 
                 if (areThereChangedAddedFiles(route))
                 {
-                    message = Catalog.GetStringFmt("Changed or added local files found in Directory \"{0}\". Do you want to continue?", route.DirectoryInstalledIn);
-                    if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                    message = Localization.GetStringFmt("Changed or added local files found in Directory \"{0}\". Do you want to continue?", route.DirectoryInstalledIn);
+                    if (await ShowMessage(message, MessageBoxButtons.YesNo, MessageBoxResult.No) != MessageBoxResult.Yes)
                     {
                         // cancelled
                         EnableAutoInstalButtons();
@@ -1040,7 +1094,7 @@ namespace Menu
                     }
                 }
 
-                await Task.Run(() => deleteRoute(route.DirectoryInstalledIn));
+                await System.Threading.Tasks.Task.Run(() => deleteRoute(row, route.DirectoryInstalledIn));
             }
 
             if (Settings.Folders.Folders.ContainsKey(route.ContentName))
@@ -1048,10 +1102,10 @@ namespace Menu
                 if (Settings.Folders.Folders[route.ContentName] == route.ContentDirectory)
                 {
                     Settings.Folders.Folders.Remove(route.ContentName);
-                    int index = findIndexDgvManualInstall(route.ContentName);
-                    if (index > -1)
+                    var manualRow = ManualInstallRows.FirstOrDefault(r => r.Route == route.ContentName);
+                    if (manualRow != null)
                     {
-                        dataGridViewManualInstall.Rows.RemoveAt(index);
+                        ManualInstallRows.Remove(manualRow);
                     }
                 }
                 Settings.Folders.Save();
@@ -1066,17 +1120,14 @@ namespace Menu
             Settings.Content.Save();
             AutoInstallRoutes[AutoInstallRouteName] = routeSaved;
 
-            dataGridViewAutoInstall.CurrentRow.Cells[1].Value = "";
+            row.Installed = "";
 
-            MainForm mainForm = ((MainForm)Owner);
-            mainForm.LoadFolderListWithoutTask();
-
-            Refresh();
+            MainForm.LoadFolderListWithoutTask();
 
             EnableAutoInstalButtons();
         }
 
-        private void deleteRoute(string directoryInstalledIn)
+        private void deleteRoute(AutoInstallRow row, string directoryInstalledIn)
         {
             Thread deleteThread = new Thread(() =>
             {
@@ -1093,25 +1144,14 @@ namespace Menu
                 TotalBytes = 0;
                 if (sumMB(directoryInstalledIn))
                 {
-                    AutoInstallSynchronizationContext.Post(new SendOrPostCallback(o =>
-                    {
-                        ((MainForm)Owner).Cursor = Cursors.WaitCursor;
-
-                        dataGridViewAutoInstall.CurrentRow.Cells[1].Value =
-                            string.Format("Left: {0} kB", (string)o);
-                    }), (TotalBytes / 1024).ToString("N0"));
+                    var kB = (TotalBytes / 1024).ToString("N0");
+                    Dispatcher.UIThread.Post(() => row.Installed = string.Format("Left: {0} kB", kB));
                 }
 
                 AutoInstallDoingTheSumOfTheFileBytes = false;
 
-                Stopwatch sw = Stopwatch.StartNew();
-                while (deleteThread.IsAlive && (sw.ElapsedMilliseconds <= 1000)) { }
+                deleteThread.Join(1000);
             }
-        }
-
-        void buttonAutoInstallOK_Click(object sender, EventArgs e)
-        {
-            DialogResult = DialogResult.OK;
         }
 
         private void DisableAutoInstallButtons()
@@ -1122,44 +1162,68 @@ namespace Menu
 
         private void DisableAutoInstallButtonsWithoutWait()
         {
-            dataGridViewAutoInstall.Enabled = false;
-            textBoxAutoInstallPath.Enabled = false;
-            buttonAutoInstallBrowse.Enabled = false;
-            buttonAutoInstallInfo.Enabled = false;
-            buttonAutoInstallInstall.Enabled = false;
-            buttonAutoInstallUpdate.Enabled = false;
-            buttonAutoInstallDelete.Enabled = false;
-            buttonOK.Enabled = false;
+            dataGridViewAutoInstall.IsEnabled = false;
+            textBoxAutoInstallPath.IsEnabled = false;
+            buttonAutoInstallBrowse.IsEnabled = false;
+            buttonAutoInstallInfo.IsEnabled = false;
+            buttonAutoInstallInstall.IsEnabled = false;
+            buttonAutoInstallUpdate.IsEnabled = false;
+            buttonAutoInstallDelete.IsEnabled = false;
+            buttonOK.IsEnabled = false;
+            if (AutoInstallRows.Count == 0)
+            {
+                // Nothing to wait for in an empty grid; the OK button must still work.
+                buttonOK.IsEnabled = true;
+                textBoxAutoInstallPath.IsEnabled = true;
+                buttonAutoInstallBrowse.IsEnabled = true;
+            }
         }
 
         private void setCursorToWaitCursor()
         {
             AutoInstallClosingBlocked = true;
 
-            ((MainForm)Owner).Cursor = Cursors.WaitCursor;
+            Cursor = new Cursor(StandardCursorType.Wait);
+            MainForm.Cursor = new Cursor(StandardCursorType.Wait);
         }
 
         private void EnableAutoInstalButtons()
-        { 
+        {
             ContentRouteSettings.Route route = AutoInstallRoutes[AutoInstallRouteName];
 
-            dataGridViewAutoInstall.Enabled = true;
-            textBoxAutoInstallPath.Enabled = true;
-            buttonAutoInstallBrowse.Enabled = true;
-            buttonAutoInstallInfo.Enabled = !NoInternet;
-            buttonAutoInstallInstall.Enabled = !(route.Installed || NoInternet);
-            buttonAutoInstallUpdate.Enabled = route.Installed && (route.getDownloadType() == ContentRouteSettings.DownloadType.github) && !NoInternet;
-            buttonAutoInstallDelete.Enabled = route.Installed;
-            buttonOK.Enabled = true;
+            dataGridViewAutoInstall.IsEnabled = true;
+            textBoxAutoInstallPath.IsEnabled = true;
+            buttonAutoInstallBrowse.IsEnabled = true;
+            buttonAutoInstallInfo.IsEnabled = !NoInternet;
+            buttonAutoInstallInstall.IsEnabled = !(route.Installed || NoInternet);
+            buttonAutoInstallUpdate.IsEnabled = route.Installed && (route.getDownloadType() == ContentRouteSettings.DownloadType.github) && !NoInternet;
+            buttonAutoInstallDelete.IsEnabled = route.Installed;
+            buttonOK.IsEnabled = true;
 
             setCursorToDefaultCursor();
         }
 
         private void setCursorToDefaultCursor()
         {
-            ((MainForm)Owner).Cursor = Cursors.Default;
+            Cursor = Cursor.Default;
+            MainForm.Cursor = Cursor.Default;
 
             AutoInstallClosingBlocked = false;
+        }
+
+        /// <summary>
+        /// Selects the main window's installation profile (or other item) by name, like the WinForms determineSelectedIndex().
+        /// </summary>
+        private void SelectInComboBox(ComboBox comboBox, string compareWith)
+        {
+            try
+            {
+                comboBox.SelectedIndex = determineSelectedIndex(comboBox, compareWith);
+            }
+            catch (StartNotFound)
+            {
+                // The installation profile isn't (yet) in the list; leave the selection alone.
+            }
         }
 
         private int determineSelectedIndex(ComboBox comboBox, string compareWith)
@@ -1174,7 +1238,7 @@ namespace Menu
             }
             else
             {
-                throw new StartNotFound(Catalog.GetStringFmt(compareWith));
+                throw new StartNotFound(compareWith);
             }
 
             if ((classOfItem == "DefaultExploreActivity") && (compareWith == "- Explore Route -"))
@@ -1218,7 +1282,7 @@ namespace Menu
                         comboboxName = ((ORTS.Menu.Path)comboBox.Items[index]).End;
                         break;
                     case "KeyedComboBoxItem":
-                        comboboxName = ((MainForm.KeyedComboBoxItem)comboBox.Items[index]).Value;
+                        comboboxName = ((MainWindow.KeyedComboBoxItem)comboBox.Items[index]).Value;
                         break;
                 }
 
@@ -1231,11 +1295,7 @@ namespace Menu
                     index++;
                 }
             }
-            if (found)
-            {
-                comboBox.SelectedIndex = index;
-            }
-            else
+            if (!found)
             {
                 if (classOfItem == "Route")
                 {
@@ -1247,12 +1307,12 @@ namespace Menu
                     }
                     else
                     {
-                        throw new StartNotFound(Catalog.GetStringFmt(compareWith));
+                        throw new StartNotFound(compareWith);
                     }
                 }
                 else
                 {
-                    throw new StartNotFound(Catalog.GetStringFmt(compareWith));
+                    throw new StartNotFound(compareWith);
                 }
             }
 
@@ -1270,7 +1330,7 @@ namespace Menu
         {
             if (route.getDownloadType() == ContentRouteSettings.DownloadType.zip)
             {
-                return 
+                return
                     (getChangedFiles(route.DirectoryInstalledIn, route.DateInstalled).Count > 0) ||
                     (getAddedFiles(route.DirectoryInstalledIn, route.DateInstalled).Count > 0);
             }
@@ -1282,25 +1342,6 @@ namespace Menu
             }
 
             return false;
-        }
-
-        //
-        // example:
-        //  input:  D:\OpenRailsMaster\Program
-        //  output: D:\OpenRailsMaster
-        //
-        private static string determineTopDirectory(string directoryName)
-        {
-            string tmpDirectoryName = directoryName;
-            string topDirectoryName = directoryName;
-
-            while (Directory.GetParent(tmpDirectoryName) != null)
-            {
-                topDirectoryName = tmpDirectoryName;
-                tmpDirectoryName = Directory.GetParent(tmpDirectoryName).ToString();
-            }
-
-            return topDirectoryName;
         }
 
         private static List<string> getChangedFiles(string directoryName, DateTime dateInstalled)
@@ -1390,7 +1431,7 @@ namespace Menu
             return changedFiles;
         }
 
-        private List<string> getCommits(string installPathRoute)
+        private async System.Threading.Tasks.Task<List<string>> getCommits(string installPathRoute)
         {
             List<string> commits = new List<string>();
 
@@ -1427,10 +1468,8 @@ namespace Menu
             }
             catch (LibGit2SharpException libGit2SharpException)
             {
-                {
-                    string message = Catalog.GetStringFmt("Error during GitHub pull, updates might not be installed, error: {0}", libGit2SharpException.Message);
-                    MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                string message = Localization.GetStringFmt("Error during GitHub pull, updates might not be installed, error: {0}", libGit2SharpException.Message);
+                await ShowMessage(message);
             }
 
             return commits;
@@ -1444,22 +1483,22 @@ namespace Menu
 
         private void dataGridViewManualInstall_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Tab && !(e.Modifiers == Keys.Shift))
+            if (e.Key == Key.Tab && e.KeyModifiers != KeyModifiers.Shift)
             {
                 // pressing tab in this datagridview now takes you into the next field
                 // default unwanted behaviour is going thru the rows/columns of the datagridview
-                buttonManualInstallAdd.Select();
-                e.SuppressKeyPress = true;
+                buttonManualInstallAdd.Focus();
+                e.Handled = true;
             }
-            if (e.KeyCode == Keys.Tab && e.Modifiers == Keys.Shift)
+            if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Shift)
             {
                 // same for pressing shift-tab
-                tabControlContent.Select();
-                e.SuppressKeyPress = true;
+                tabControlContent.Focus();
+                e.Handled = true;
             }
         }
 
-        private void dataGridViewManualInstall_SelectionChanged(object sender, EventArgs e)
+        private void dataGridViewManualInstall_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!In_buttonManualInstallAdd_Click)
             {
@@ -1471,134 +1510,125 @@ namespace Menu
 
         private void textBoxManualInstallRoute_TextChanged(object sender, EventArgs e)
         {
-            if (!In_dataGridViewManualInstall_SelectionChanged)
+            if (!In_dataGridViewManualInstall_SelectionChanged && CurrentManualInstallRow != null)
             {
                 // only update the grid when user is filling/changing the route in the textbox
-                dataGridViewManualInstall.CurrentRow.Cells[0].Value = textBoxManualInstallRoute.Text;
+                CurrentManualInstallRow.Route = textBoxManualInstallRoute.Text;
                 ManualInstallChangesMade = true;
-                buttonCancel.Enabled = true;
+                buttonCancel.IsEnabled = true;
             }
         }
 
         private void textBoxManualInstallRoute_Leave(object sender, EventArgs e)
         {
-            string route = textBoxManualInstallRoute.Text.Trim();
+            if (CurrentManualInstallRow == null || !textBoxManualInstallRoute.IsEnabled)
+                return;
+            string route = (textBoxManualInstallRoute.Text ?? "").Trim();
             textBoxManualInstallRoute.Text = determineUniqueRoute(route);
             if (textBoxManualInstallRoute.Text != route)
             {
-                dataGridViewManualInstall.CurrentRow.Cells[0].Value = textBoxManualInstallRoute.Text;
+                CurrentManualInstallRow.Route = textBoxManualInstallRoute.Text;
             }
         }
 
-        private void textBoxManualInstallPath_TextChanged(object sender, EventArgs e)
+        private async void textBoxManualInstallPath_TextChanged(object sender, EventArgs e)
         {
-            if (!In_dataGridViewManualInstall_SelectionChanged)
+            if (!In_dataGridViewManualInstall_SelectionChanged && CurrentManualInstallRow != null)
             {
+                var row = CurrentManualInstallRow;
+                var path = textBoxManualInstallPath.Text ?? "";
                 // only update the grid when user is filling/changing the path in the textbox
-                if (!isWrongPath(textBoxManualInstallPath.Text, Catalog))
+                if (!await isWrongPath(this, path))
                 {
-                    dataGridViewManualInstall.CurrentRow.Cells[1].Value = textBoxManualInstallPath.Text;
+                    row.Path = path;
+                    ManualInstallChangesMade = true;
+                    buttonCancel.IsEnabled = true;
                 }
             }
         }
 
-        private void buttonManualInstallBrowse_Click(object sender, EventArgs e)
+        private async void buttonManualInstallBrowse_Click(object sender, EventArgs e)
         {
-            using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
-            {
-                folderBrowser.SelectedPath = textBoxManualInstallPath.Text;
-                folderBrowser.ShowNewFolderButton = false;
-                folderBrowser.Description = Catalog.GetString("Path where the route is installed");
-                if (folderBrowser.ShowDialog(this) == DialogResult.OK)
-                {
-                    textBoxManualInstallPath.Text = folderBrowser.SelectedPath;
-                }
-            }
+            var folder = await BrowseForFolder(textBoxManualInstallPath.Text, Localization.GetString("Path where the route is installed"));
+            if (folder != null)
+                textBoxManualInstallPath.Text = folder;
         }
 
-        private void buttonManualInstallAdd_Click(object sender, EventArgs e)
+        private async void buttonManualInstallAdd_Click(object sender, EventArgs e)
         {
             In_buttonManualInstallAdd_Click = true;
 
-            int currentIndex = -1;
-            if (dataGridViewManualInstall.CurrentCell != null)
+            var currentRow = CurrentManualInstallRow;
+            var addedRow = new ManualInstallRow { Route = "", Path = "" };
+            ManualInstallRows.Add(addedRow);
+            dataGridViewManualInstall.SelectedItem = addedRow;
+            dataGridViewManualInstall.ScrollIntoView(addedRow, null);
+
+            var folder = await BrowseForFolder(ManualInstallBrouwseDir, Localization.GetString("Path where the route is installed"));
+            if (folder != null)
             {
-                currentIndex = dataGridViewManualInstall.CurrentCell.RowIndex;
+                // OK, fill the empty row
+                string route = determineUniqueRoute(Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
+                addedRow.Route = route;
+                addedRow.Path = folder;
+                ManualInstallChangesMade = true;
+                buttonCancel.IsEnabled = ManualInstallChangesMade;
             }
-            int addedIndex = dataGridViewManualInstall.Rows.Add();
-            dataGridViewManualInstall.Rows[addedIndex].Selected = true;
-            dataGridViewManualInstall.FirstDisplayedScrollingRowIndex = addedIndex;
-            dataGridViewManualInstall.CurrentCell = dataGridViewManualInstall.Rows[addedIndex].Cells[0];
-
-            using (FolderBrowserDialog folderBrowser = new FolderBrowserDialog())
+            else
             {
-                folderBrowser.SelectedPath = ManualInstallBrouwseDir;
-                folderBrowser.ShowNewFolderButton = false;
-                folderBrowser.Description = Catalog.GetString("Path where the route is installed");
-                if (folderBrowser.ShowDialog(this) == DialogResult.OK)
+                // Cancel, set focus back to where is was and remove the empty row
+                ManualInstallRows.Remove(addedRow);
+                if (currentRow != null)
                 {
-                    // OK, fill the empty row
-                    string route = determineUniqueRoute(Path.GetFileName(folderBrowser.SelectedPath));
-                    dataGridViewManualInstall.CurrentRow.Cells[0].Value = route;
-                    dataGridViewManualInstall.CurrentRow.Cells[1].Value = folderBrowser.SelectedPath;
-                    ManualInstallChangesMade = true;
-                    buttonCancel.Enabled = ManualInstallChangesMade;
-                }
-                else
-                {
-                    if (currentIndex > -1)
-                    {
-                        // Cancel, set focus back to where is was and remove the empty row
-                        dataGridViewManualInstall.CurrentCell = dataGridViewManualInstall.Rows[currentIndex].Cells[0];
-                        dataGridViewManualInstall.Rows[currentIndex].Selected = true;
-                        dataGridViewManualInstall.FirstDisplayedScrollingRowIndex = currentIndex;
-                    }
-
-                    dataGridViewManualInstall.Rows.Remove(dataGridViewManualInstall.Rows[addedIndex]);
+                    dataGridViewManualInstall.SelectedItem = currentRow;
+                    dataGridViewManualInstall.ScrollIntoView(currentRow, null);
                 }
             }
-
-            setTextBoxesManualInstall();
 
             In_buttonManualInstallAdd_Click = false;
+
+            In_dataGridViewManualInstall_SelectionChanged = true;
+            setTextBoxesManualInstall();
+            In_dataGridViewManualInstall_SelectionChanged = false;
         }
 
         private void buttonManualInstallDelete_Click(object sender, EventArgs e)
         {
-            if (dataGridViewManualInstall.CurrentRow != null)
+            if (CurrentManualInstallRow != null)
             {
-                dataGridViewManualInstall.Rows.Remove(dataGridViewManualInstall.CurrentRow);
+                ManualInstallRows.Remove(CurrentManualInstallRow);
                 ManualInstallChangesMade = true;
-                buttonCancel.Enabled = ManualInstallChangesMade;
+                buttonCancel.IsEnabled = ManualInstallChangesMade;
             }
         }
 
         private void setTextBoxesManualInstall()
         {
-            if (dataGridViewManualInstall.CurrentRow != null)
+            var row = CurrentManualInstallRow;
+            if (row != null)
             {
-                string route = dataGridViewManualInstall.CurrentRow.Cells[0].Value.ToString();
-                string path = dataGridViewManualInstall.CurrentRow.Cells[1].Value.ToString();
+                string route = row.Route ?? "";
+                string path = row.Path ?? "";
 
                 if (!AutoInstallRoutes.ContainsKey(route))
                 {
                     // route not automatically installed
                     textBoxManualInstallRoute.Text = route;
                     textBoxManualInstallPath.Text = path;
-                    textBoxManualInstallRoute.Enabled = true;
-                    textBoxManualInstallPath.Enabled = true;
-                    buttonManualInstallBrowse.Enabled = true;
-                    buttonManualInstallDelete.Enabled = true;
+                    textBoxManualInstallRoute.IsEnabled = true;
+                    textBoxManualInstallPath.IsEnabled = true;
+                    buttonManualInstallBrowse.IsEnabled = true;
+                    buttonManualInstallDelete.IsEnabled = true;
                 }
                 else
                 {
                     // route automatically installed
                     textBoxManualInstallRoute.Text = "";
                     textBoxManualInstallPath.Text = "";
-                    textBoxManualInstallRoute.Enabled = false;
-                    textBoxManualInstallPath.Enabled = false;
-                    buttonManualInstallBrowse.Enabled = false;
-                    buttonManualInstallDelete.Enabled = false;
+                    textBoxManualInstallRoute.IsEnabled = false;
+                    textBoxManualInstallPath.IsEnabled = false;
+                    buttonManualInstallBrowse.IsEnabled = false;
+                    buttonManualInstallDelete.IsEnabled = false;
                 }
             }
             else
@@ -1606,10 +1636,10 @@ namespace Menu
                 // empty form, like after installing OR
                 textBoxManualInstallRoute.Text = "";
                 textBoxManualInstallPath.Text = "";
-                textBoxManualInstallRoute.Enabled = false;
-                textBoxManualInstallPath.Enabled = false;
-                buttonManualInstallBrowse.Enabled = false;
-                buttonManualInstallDelete.Enabled = false;
+                textBoxManualInstallRoute.IsEnabled = false;
+                textBoxManualInstallPath.IsEnabled = false;
+                buttonManualInstallBrowse.IsEnabled = false;
+                buttonManualInstallDelete.IsEnabled = false;
             }
         }
 
@@ -1626,12 +1656,13 @@ namespace Menu
                 route = Route + " (" + seqNr + ")";
             }
 
+            var selected = CurrentManualInstallRow;
             while (!foundUniqueRoute)
             {
                 bool found = false;
-                for (int i = 0; i < dataGridViewManualInstall.Rows.Count; i++)
+                foreach (var row in ManualInstallRows)
                 {
-                    if ((!dataGridViewManualInstall.Rows[i].Selected) && (dataGridViewManualInstall.Rows[i].Cells[0].Value.ToString() == route))
+                    if ((row != selected) && (row.Route == route))
                     {
                         seqNr++;
                         route = Route + " (" + seqNr + ")";
@@ -1652,7 +1683,15 @@ namespace Menu
             Dictionary<string, int> subDirs = new Dictionary<string, int>();
             foreach (var folder in Settings.Folders.Folders)
             {
-                var parentDir = Directory.GetParent(folder.Value);
+                DirectoryInfo parentDir;
+                try
+                {
+                    parentDir = Directory.GetParent(folder.Value);
+                }
+                catch
+                {
+                    continue;
+                }
                 if (parentDir == null) { continue; }  // ignore content in top-level dir
                 string subDir = parentDir.ToString();
                 if (subDirs.ContainsKey(subDir))
@@ -1688,35 +1727,35 @@ namespace Menu
 
         #endregion
 
-        private static bool isWrongPath(string path, GettextResourceManager catalog)
+        private static async System.Threading.Tasks.Task<bool> isWrongPath(Window owner, string path)
         {
-            if (path.ToLower().Contains(Application.StartupPath.ToLower()))
+            var programFolder = ApplicationInfo.ProcessDirectory;
+            // Windows file names are case-insensitive, Linux ones are not.
+            var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            if (path.IndexOf(programFolder, comparison) >= 0)
             {
                 // check added because a succesful Update operation will empty the Open Rails folder and lose any content stored within it.
-                MessageBox.Show(catalog.GetString
-                        ($"Cannot use content from any folder which lies inside the Open Rails program folder {Application.StartupPath}\n\n"),
-                    "Invalid content location",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                await MessageBox.Show(owner, Localization.GetString
+                        ($"Cannot use content from any folder which lies inside the Open Rails program folder {programFolder}\n\n"),
+                    "Invalid content location");
                 return true;
             }
 
             return false;
         }
 
-        private void buttonCancel_Click(object sender, EventArgs e)
+        private async void buttonCancel_Click(object sender, EventArgs e)
         {
-            string message = Catalog.GetString("Cancel: changes made in the 'Manually Installed' tab will not be saved, are you sure?");
-            if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
+            string message = Localization.GetString("Cancel: changes made in the 'Manually Installed' tab will not be saved, are you sure?");
+            if (await ShowMessage(message, MessageBoxButtons.YesNo) == MessageBoxResult.No)
             {
                 // not sure, cancel the cancel
-                this.DialogResult = DialogResult.None;
+                return;
             }
-            else 
-            {
-                // sure to cancel the changes
-                ManualInstallChangesMade = false;
-            }
+            // sure to cancel the changes
+            ManualInstallChangesMade = false;
+            CloseConfirmed = true;
+            Close(DialogResult.Cancel);
         }
 
         private void buttonOK_Click(object sender, EventArgs e)
@@ -1750,12 +1789,12 @@ namespace Menu
 
             // loop datagridview to find new entries
 
-            foreach (DataGridViewRow row in dataGridViewManualInstall.Rows)
+            foreach (var row in ManualInstallRows)
             {
-                string route = row.Cells[0].Value.ToString();
-                string path = row.Cells[1].Value.ToString();
+                string route = row.Route ?? "";
+                string path = row.Path ?? "";
 
-                if (!AutoInstallRoutes.ContainsKey(route))
+                if (!AutoInstallRoutes.ContainsKey(route) && route.Length > 0)
                 {
                     // not part of the "Auto Installed" routes
                     if (!Settings.Folders.Folders.ContainsKey(route))
@@ -1763,9 +1802,8 @@ namespace Menu
                         Settings.Folders.Folders.Add(route, path);
 
                         // set the main form to this added route
-                        MainForm mainForm = ((MainForm)Owner);
-                        mainForm.LoadFolderListWithoutTask();
-                        mainForm.comboBoxFolder.SelectedIndex = determineSelectedIndex(mainForm.comboBoxFolder, route);
+                        MainForm.LoadFolderListWithoutTask();
+                        SelectInComboBox(MainForm.comboBoxFolder, route);
                     }
                 }
             }
@@ -1774,48 +1812,26 @@ namespace Menu
 
             ManualInstallChangesMade = false;
 
-            this.Close();
+            CloseConfirmed = true;
+            Close(DialogResult.OK);
         }
 
         private string findPathInDgvManualInstall(string route)
         {
-            foreach (DataGridViewRow row in dataGridViewManualInstall.Rows)
+            foreach (var row in ManualInstallRows)
             {
-                if (row.Cells[0].Value.ToString().Equals(route))
+                if ((row.Route ?? "").Equals(route))
                 {
                     // return Path found
-                    return row.Cells[1].Value.ToString();
+                    return row.Path;
                 }
             }
 
             return "";
         }
 
-        private int findIndexDgvManualInstall(string route)
+        private async void DownloadContentForm_FormClosing(object sender, WindowClosingEventArgs formClosingEventArgs)
         {
-            for (int i = 0; i < dataGridViewManualInstall.Rows.Count; i++)
-            {
-                if (dataGridViewManualInstall.Rows[i].Cells[0].Value.ToString().Equals(route)) 
-                {
-                    return i;
-                }
-            }
-            return - 1;
-        }
-
-        private void DownloadContentForm_FormClosing(object sender, FormClosingEventArgs formClosingEventArgs)
-        {
-            if (ManualInstallChangesMade)
-            {
-                string message = Catalog.GetString("Cancel: changes made in the 'Manually Installed' tab will not be saved, are you sure?");
-                if (MessageBox.Show(message, Catalog.GetString("Attention"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
-                {
-                    // not sure, cancel the cancel
-                    formClosingEventArgs.Cancel = true;
-                    return;
-                }
-            }
-
             if (AutoInstallClosingBlocked)
             {
                 // cancelled event, so continue
@@ -1823,14 +1839,27 @@ namespace Menu
                 return;
             }
 
+            if (ManualInstallChangesMade && !CloseConfirmed)
+            {
+                // Avalonia can't wait for a message box here, so cancel the close and close again when confirmed.
+                formClosingEventArgs.Cancel = true;
+                string message = Localization.GetString("Cancel: changes made in the 'Manually Installed' tab will not be saved, are you sure?");
+                if (await ShowMessage(message, MessageBoxButtons.YesNo) == MessageBoxResult.Yes)
+                {
+                    CloseConfirmed = true;
+                    Close(DialogResult.Cancel);
+                }
+                return;
+            }
+
+            ImageCancellation?.Cancel();
             try
             {
-                if (pictureBoxAutoInstallRoute.Image != null)
+                if (pictureBoxAutoInstallRoute.Source is Bitmap image)
                 {
-                    pictureBoxAutoInstallRoute.Image.Dispose();
-                    pictureBoxAutoInstallRoute.Image = null;
+                    pictureBoxAutoInstallRoute.Source = null;
+                    image.Dispose();
                 }
-                File.Delete(ImageTempFilename);
                 File.Delete(InfoTempFilename);
             }
             catch

@@ -1,0 +1,58 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Menu.App"
+             RequestedThemeVariant="Default">
+  <Application.Styles>
+    <FluentTheme DensityStyle="Compact" />
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+
+    <!-- A little tighter than the Fluent defaults so that the dense Open Rails dialogs fit. -->
+    <Style Selector="Window">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBlock.bold">
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.wrap">
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Padding" Value="6,0,0,0" />
+    </Style>
+    <Style Selector="RadioButton">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Padding" Value="6,0,0,0" />
+    </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="MinWidth" Value="90" />
+      <Setter Property="FormatString" Value="0" />
+    </Style>
+    <Style Selector="Image.help">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+    </Style>
+    <Style Selector="Button.flat">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="2" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="HeaderedContentControl.group">
+      <Setter Property="Template">
+        <ControlTemplate TargetType="HeaderedContentControl">
+          <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4,8,8" Margin="0,6,0,0">
+            <DockPanel>
+              <ContentPresenter DockPanel.Dock="Top" Content="{TemplateBinding Header}" FontWeight="SemiBold" Margin="0,0,0,4" />
+              <ContentPresenter Content="{TemplateBinding Content}" />
+            </DockPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+  </Application.Styles>
+</Application>

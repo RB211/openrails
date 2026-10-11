@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Menu"
+        x:Class="Menu.ImportExportSaveWindow"
+        Title="{l:Tr 'Import and export saved games'}"
+        Width="560" Height="320" MinWidth="480" MinHeight="240" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="12">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*,*" Margin="0,0,0,8">
+      <Button x:Name="bImportSave" Grid.Column="0" Content="{l:Tr 'Import Save Pack'}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,4,0" />
+      <Button x:Name="bExport" Grid.Column="1" Content="{l:Tr 'Export to Save Pack'}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="4,0" />
+      <Button x:Name="bViewSavePacksFolder" Grid.Column="2" Content="{l:Tr 'Open Save Packs folder'}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="4,0,0,0" />
+    </Grid>
+    <TextBox x:Name="textBoxSavePacks" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" />
+  </DockPanel>
+</Window>
