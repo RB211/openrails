@@ -17,6 +17,7 @@
 
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
 namespace ORTS.Common
 {
@@ -24,7 +25,9 @@ namespace ORTS.Common
     {
         public static string ProcessFile => Process.GetCurrentProcess().MainModule.FileName;
         public static string ProcessDirectory => Path.GetDirectoryName(ProcessFile);
-        static FileVersionInfo VersionInfo => FileVersionInfo.GetVersionInfo(ProcessFile);
+        // Read version info from the managed entry assembly: on Linux/macOS the process file is a native apphost (or
+        // the dotnet host) which carries no version resources.
+        static FileVersionInfo VersionInfo => FileVersionInfo.GetVersionInfo(string.IsNullOrEmpty(Assembly.GetEntryAssembly()?.Location) ? ProcessFile : Assembly.GetEntryAssembly().Location);
         public static string ProductName => VersionInfo.ProductName;
         public static string ApplicationName => VersionInfo.FileDescription;
     }
