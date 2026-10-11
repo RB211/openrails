@@ -343,13 +343,13 @@ namespace Orts.Viewer3D
             ContentPath = Game.ContentPath;
             ENVFile = new EnvironmentFile(Simulator.RoutePath + @"/ENVFILES/" + Simulator.TRK.Tr_RouteFile.Environment.ENVFileName(Simulator.Season, Simulator.WeatherType));
 
-            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"/sigcfg.dat")))
             {
-                SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
+                SIGCFG = new SignalConfigurationFile(ORfilepath + @"/sigcfg.dat", true);
             }
             else
             {
-                SIGCFG = new SignalConfigurationFile(Simulator.RoutePath + @"\sigcfg.dat", false);
+                SIGCFG = new SignalConfigurationFile(Simulator.RoutePath + @"/sigcfg.dat", false);
             }
 
             TrackTypes = new TrackTypesFile(Simulator.RoutePath + @"/TTYPE.DAT");
@@ -377,10 +377,10 @@ namespace Orts.Viewer3D
             // so it is opened only in activity mode
             if (Simulator.ActivityRun != null && Simulator.Activity.Tr_Activity.Tr_Activity_File.ActivityRestrictedSpeedZones != null)
             {
-                var speedpostDatFile = Simulator.RoutePath + @"\speedpost.dat";
+                var speedpostDatFile = Simulator.RoutePath + @"/speedpost.dat";
                 if (File.Exists(ORTS.IO.PathResolver.Resolve(speedpostDatFile)))
                 {
-                    SpeedpostDatFile = new SpeedpostDatFile(Simulator.RoutePath + @"\speedpost.dat", Simulator.RoutePath + @"\shapes\");
+                    SpeedpostDatFile = new SpeedpostDatFile(Simulator.RoutePath + @"/speedpost.dat", Simulator.RoutePath + @"/shapes/");
                 }
             }
 
@@ -753,6 +753,21 @@ namespace Orts.Viewer3D
         internal void UpdateAdapterInformation(GraphicsAdapter graphicsAdapter)
         {
             adapterDescription = graphicsAdapter.Description;
+            if (!OperatingSystem.IsWindows())
+            {
+                // Linux DRM drivers that report it (amdgpu) expose dedicated VRAM in sysfs; take the largest card.
+                try
+                {
+                    foreach (var card in Directory.EnumerateDirectories("/sys/class/drm", "card*"))
+                        if (File.Exists(Path.Combine(card, "device", "mem_info_vram_total")) && ulong.TryParse(File.ReadAllText(Path.Combine(card, "device", "mem_info_vram_total")).Trim(), out var bytes))
+                            adapterMemory = (uint)Math.Min(uint.MaxValue, Math.Max(adapterMemory, bytes));
+                }
+                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+                {
+                    Trace.WriteLine(error);
+                }
+                return;
+            }
             try
             {
                 // Note that we might find multiple adapters with the same
@@ -932,7 +947,7 @@ namespace Orts.Viewer3D
 
         private void LoadDefectCarSound(TrainCar car, string filename)
         {
-            var smsFilePath = Simulator.BasePath + @"\sound\" + filename;
+            var smsFilePath = Simulator.BasePath + @"/sound/" + filename;
             if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
             {
                 Trace.TraceWarning("Cannot find defect car sound file {0}", filename);

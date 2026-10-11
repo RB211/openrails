@@ -33,9 +33,9 @@ float3   Light1Col;     // Light 1 color
 float3   Light2Col;     // Light 2 color
 float2   TexPos;        // Texture bounding rectangle
 float2   TexSize;       // Texture bounding rectangle
-Texture2D  ImageTexture;
+Texture2D  ImageTexture : register(t0);
 
-SamplerState ImageSampler = sampler_state
+SamplerState ImageSampler : register(s0) = sampler_state
 {
 	Texture = (ImageTexture);
 };

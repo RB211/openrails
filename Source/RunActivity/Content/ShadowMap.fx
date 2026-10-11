@@ -28,9 +28,12 @@
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float3   SideVector;
 float    ImageBlurStep;  // = 1 / shadow map texture width and height
-Texture2D  ImageTexture;
+Texture2D  ImageTexture : register(t0);
+// The blur passes read the shadow map through a different sampler. Vulkan (via MonoGame) needs each
+// sampler paired with its own texture, so the shadow map has its own parameter.
+Texture2D  BlurTexture : register(t1);
 
-SamplerState ImageSampler = sampler_state
+SamplerState ImageSampler : register(s0) = sampler_state
 {
 	Texture = (ImageTexture);
 	MagFilter = Linear;
@@ -39,9 +42,9 @@ SamplerState ImageSampler = sampler_state
 	MaxAnisotropy = 16;
 };
 
-SamplerState ShadowMapSampler = sampler_state
+SamplerState ShadowMapSampler : register(s1) = sampler_state
 {
-	Texture = (ImageTexture);
+	Texture = (BlurTexture);
 	MagFilter = Linear;
 	MinFilter = Linear;
 	MipFilter = Point;
@@ -54,7 +57,12 @@ struct VERTEX_INPUT
 	float4 Position : POSITION;
 	float2 TexCoord : TEXCOORD0;
 	float3 Normal   : NORMAL;
-	float4x4 Instance : TEXCOORD1;
+	// Instance transform rows, declared separately (not as one float4x4 input) so that every row is
+	// reflected as its own vertex attribute; MonoGame's Vulkan backend binds one location per attribute.
+	float4 Instance0 : TEXCOORD1;
+	float4 Instance1 : TEXCOORD2;
+	float4 Instance2 : TEXCOORD3;
+	float4 Instance3 : TEXCOORD4;
 };
 
 struct VERTEX_INPUT_FOREST
@@ -92,9 +100,9 @@ VERTEX_OUTPUT VSShadowMap(in VERTEX_INPUT In)
 {
 	VERTEX_OUTPUT Out = (VERTEX_OUTPUT)0;
 
-	if (determinant(In.Instance) != 0) {
-		In.Position = mul(In.Position, transpose(In.Instance));
-		In.Normal = mul(In.Normal, (float3x3)transpose(In.Instance));
+	if (determinant(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)) != 0) {
+		In.Position = mul(In.Position, transpose(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)));
+		In.Normal = mul(In.Normal, (float3x3)transpose(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)));
 	}
 
 	Out.Position = mul(In.Position, WorldViewProjection);
@@ -172,9 +180,9 @@ float4 PSShadowMapBlocker() : SV_TARGET0
 
 float4 PSShadowMapBlur(in VERTEX_OUTPUT_BLUR In) : SV_TARGET0
 {
-	float2 centreTap =	ImageTexture.Sample(ShadowMapSampler, In.SampleCentre).rg	* 0.4430448;
-	float2 tap01 =		ImageTexture.Sample(ShadowMapSampler, In.Sample_01).rg * 0.2784776;
-	float2 tap23 =		ImageTexture.Sample(ShadowMapSampler, In.Sample_23).rg * 0.2784776;
+	float2 centreTap =	BlurTexture.Sample(ShadowMapSampler, In.SampleCentre).rg	* 0.4430448;
+	float2 tap01 =		BlurTexture.Sample(ShadowMapSampler, In.Sample_01).rg * 0.2784776;
+	float2 tap23 =		BlurTexture.Sample(ShadowMapSampler, In.Sample_23).rg * 0.2784776;
 		
 	return float4(tap01 + centreTap + tap23, 0, 0);
 }

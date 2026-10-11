@@ -400,7 +400,7 @@ namespace Orts.Simulation.Signalling
         {
             // get all filesnames in World directory
 
-            var WFilePath = simulator.RoutePath + @"\WORLD\";
+            var WFilePath = simulator.RoutePath + @"/WORLD/";
 
             var Tokens = new List<TokenID>
             {

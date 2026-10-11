@@ -269,7 +269,7 @@ namespace Orts.Formats.OR
 
             // get all filesnames in World directory
 
-            var WFilePath = data.RoutePath + @"\WORLD\";
+            var WFilePath = data.RoutePath + @"/WORLD/";
 
             var Tokens = new List<TokenID>();
             Tokens.Add(TokenID.Signal);

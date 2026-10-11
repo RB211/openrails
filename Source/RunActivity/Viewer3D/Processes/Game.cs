@@ -133,11 +133,19 @@ namespace Orts.Viewer3D.Processes
             base.Update(gameTime);
         }
 
+        /// <summary>
+        /// Serialises the loader's GPU resource creation with the render thread's frames (BeginDraw to EndDraw).
+        /// KNOWN ISSUE: MonoGame 3.8.6's Vulkan backend deadlocks when resources are created during a frame, unlike
+        /// Direct3D 11. Holding this for a whole load can briefly stall rendering; it should become finer-grained.
+        /// </summary>
+        public readonly object GpuLock = new object();
+
         [ThreadName("Render")]
         protected override bool BeginDraw()
         {
             if (!base.BeginDraw())
                 return false;
+            System.Threading.Monitor.Enter(GpuLock);
             RenderProcess.BeginDraw();
             return true;
         }
@@ -153,7 +161,14 @@ namespace Orts.Viewer3D.Processes
         protected override void EndDraw()
         {
             RenderProcess.EndDraw();
-            base.EndDraw();
+            try
+            {
+                base.EndDraw();
+            }
+            finally
+            {
+                System.Threading.Monitor.Exit(GpuLock);
+            }
         }
 
         [ThreadName("Render")]

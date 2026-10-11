@@ -240,7 +240,7 @@ namespace Orts.Simulation.RollingStocks.SubSystems
 
                 if (Locomotive.Train.TcsParametersFileName != null)
                 {
-                    TrainParametersFileName = Path.Combine(Simulator.BasePath, @"TRAINS\CONSISTS\SCRIPT\", Locomotive.Train.TcsParametersFileName);
+                    TrainParametersFileName = Path.Combine(Simulator.BasePath, @"TRAINS/CONSISTS/SCRIPT/", Locomotive.Train.TcsParametersFileName);
                 }
 
                 if (Script == null)

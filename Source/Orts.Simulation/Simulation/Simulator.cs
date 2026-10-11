@@ -308,13 +308,13 @@ namespace Orts.Simulation
 
             TDB = new TrackDatabaseFile(RoutePath + @"/" + TRK.Tr_RouteFile.FileName + ".tdb");
 
-            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"/sigcfg.dat")))
             {
-                SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
+                SIGCFG = new SignalConfigurationFile(ORfilepath + @"/sigcfg.dat", true);
             }
             else
             {
-                SIGCFG = new SignalConfigurationFile(RoutePath + @"\sigcfg.dat", false);
+                SIGCFG = new SignalConfigurationFile(RoutePath + @"/sigcfg.dat", false);
             }
 
             if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails/TSECTION.DAT")))
@@ -342,7 +342,7 @@ namespace Orts.Simulation
             if (File.Exists(ORTS.IO.PathResolver.Resolve(carSpawnFile)))
             {
                 CarSpawnerLists = new List<CarSpawnerList>();
-                CarSpawnerFile = new CarSpawnerFile(carSpawnFile, RoutePath + @"\shapes\", CarSpawnerLists);
+                CarSpawnerFile = new CarSpawnerFile(carSpawnFile, RoutePath + @"/shapes/", CarSpawnerLists);
             }
 
             // Extended car spawner file
@@ -350,14 +350,14 @@ namespace Orts.Simulation
             if (File.Exists(ORTS.IO.PathResolver.Resolve(extCarSpawnFile)))
             {
                 if (CarSpawnerLists == null) CarSpawnerLists = new List<CarSpawnerList>();
-                ExtCarSpawnerFile = new ExtCarSpawnerFile(extCarSpawnFile, RoutePath + @"\shapes\", CarSpawnerLists);
+                ExtCarSpawnerFile = new ExtCarSpawnerFile(extCarSpawnFile, RoutePath + @"/shapes/", CarSpawnerLists);
             }
 
             // Load animated clocks if file "animated.clocks-or" exists --------------------------------------------------------
             var clockFile = RoutePath + @"/animated.clocks-or";
             if (File.Exists(ORTS.IO.PathResolver.Resolve(clockFile)))
             {
-                new ClocksFile(clockFile, ClockShapeList, RoutePath + @"\shapes\");
+                new ClocksFile(clockFile, ClockShapeList, RoutePath + @"/shapes/");
             }
 
             // Generate a list of EOTs that may be used to attach at end of train
@@ -448,7 +448,7 @@ namespace Orts.Simulation
             }
             Signals = new Signals(this, SIGCFG, cancellation);
             SuperElevation = new SuperElevation(this);
-            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"/shapes/", MovingTables, this);
             LevelCrossings = new LevelCrossings(this);
             FuelManager = new FuelManager(this);
             Trains = new TrainList(this);
@@ -486,7 +486,7 @@ namespace Orts.Simulation
             TimetableMode = true;
             Signals = new Signals(this, SIGCFG, cancellation);
             SuperElevation = new SuperElevation(this);
-            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"/shapes/", MovingTables, this);
             LevelCrossings = new LevelCrossings(this);
             FuelManager = new FuelManager(this);
             ContainerManager = new ContainerManager(this);
@@ -550,7 +550,7 @@ namespace Orts.Simulation
 
             // initialization of turntables
             ActiveMovingTableIndex = inf.ReadInt32();
-            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"\shapes\", MovingTables, this);
+            TurntableFile = new TurntableFile(RoutePath + @"/openrails/turntables.dat", RoutePath + @"/shapes/", MovingTables, this);
             if (MovingTables.Count >= 0)
             {
                 foreach (var movingTable in MovingTables) movingTable.Restore(inf, this);
@@ -799,7 +799,7 @@ namespace Orts.Simulation
         public void GetPathAndConsist()
         {
             var PlayerServiceFileName = Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Name;
-            var srvFile = new ServiceFile(RoutePath + @"\SERVICES\" + PlayerServiceFileName + ".SRV");
+            var srvFile = new ServiceFile(RoutePath + @"/SERVICES/" + PlayerServiceFileName + ".SRV");
             conFileName = BasePath + @"/TRAINS/CONSISTS/" + srvFile.Train_Config + ".CON";
             patFileName = RoutePath + @"/PATHS/" + srvFile.PathID + ".PAT";
         }
@@ -1426,7 +1426,7 @@ namespace Orts.Simulation
             if (Activity != null && Activity.Tr_Activity.Serial != -1)
             {
                 playerServiceFileName = Activity.Tr_Activity.Tr_Activity_File.Player_Service_Definition.Name;
-                srvFile = new ServiceFile(RoutePath + @"\SERVICES\" + playerServiceFileName + ".SRV");
+                srvFile = new ServiceFile(RoutePath + @"/SERVICES/" + playerServiceFileName + ".SRV");
             }
             else
             {

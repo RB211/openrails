@@ -146,7 +146,7 @@ namespace Orts.Viewer3D
         {
             int trpIndex;
             if (shapePath == "" && viewer.Simulator.TSectionDat.TrackShapes.ContainsKey(trSection.ShapeIndex))
-                shapePath = String.Concat(viewer.Simulator.BasePath, @"\Global\Shapes\", viewer.Simulator.TSectionDat.TrackShapes.Get(trSection.ShapeIndex).FileName);
+                shapePath = String.Concat(viewer.Simulator.BasePath, @"/Global/Shapes/", viewer.Simulator.TSectionDat.TrackShapes.Get(trSection.ShapeIndex).FileName);
 
             if (viewer.TrackProfileIndicies.ContainsKey(shapePath))
                 viewer.TrackProfileIndicies.TryGetValue(shapePath, out trpIndex);

@@ -38,9 +38,9 @@ float currentTime;
 static float2 texCoords[4] = { float2(0, 0), float2(1, 0), float2(1, 1), float2(0, 1) };
 static float2 offsets[4] = { float2(-0.5f, 0.5f), float2(0.5f, 0.5f), float2(0.5f, -0.5f), float2(-0.5f, -0.5f) };
 
-Texture2D precipitation_Tex;
+Texture2D precipitation_Tex : register(t0);
 
-SamplerState PrecipitationSamp = sampler_state
+SamplerState PrecipitationSamp : register(s0) = sampler_state
 {
 	texture = (precipitation_Tex);
 	MagFilter = Linear;

@@ -32,10 +32,10 @@ float4x4 LightViewProjectionShadowProjection0;  // world -> light view -> light 
 float4x4 LightViewProjectionShadowProjection1;
 float4x4 LightViewProjectionShadowProjection2;
 float4x4 LightViewProjectionShadowProjection3;
-Texture2D  ShadowMapTexture0;
-Texture2D  ShadowMapTexture1;
-Texture2D  ShadowMapTexture2;
-Texture2D  ShadowMapTexture3;
+Texture2D  ShadowMapTexture0 : register(t2);
+Texture2D  ShadowMapTexture1 : register(t3);
+Texture2D  ShadowMapTexture2 : register(t4);
+Texture2D  ShadowMapTexture3 : register(t5);
 float4   ShadowMapLimit;
 float4   ZBias_Lighting;  // x = z-bias, y = diffuse, z = specular, w = step(1, z)
 float4   Fog;  // rgb = color of fog; a = reciprocal of distance from camera, everything is
@@ -55,11 +55,11 @@ float    SignalLightIntensity;
 float4   EyeVector;
 float3   SideVector;
 float    ReferenceAlpha;
-Texture2D  ImageTexture;
-Texture2D  OverlayTexture;
+Texture2D  ImageTexture : register(t0);
+Texture2D  OverlayTexture : register(t1);
 float	 OverlayScale;
 
-SamplerState Image = sampler_state
+SamplerState Image : register(s0) = sampler_state
 {
 	Texture = (ImageTexture);
 	MagFilter = Linear;
@@ -68,7 +68,7 @@ SamplerState Image = sampler_state
 	MaxAnisotropy = 16;
 };
 
-SamplerState Overlay = sampler_state
+SamplerState Overlay : register(s1) = sampler_state
 {
 	Texture = (OverlayTexture);
 	MagFilter = Linear;
@@ -79,7 +79,7 @@ SamplerState Overlay = sampler_state
 	AddressV = Wrap;
 };
 
-SamplerState ShadowMap0 = sampler_state
+SamplerState ShadowMap0 : register(s2) = sampler_state
 {
 	Texture = (ShadowMapTexture0);
 	MagFilter = Linear;
@@ -87,7 +87,7 @@ SamplerState ShadowMap0 = sampler_state
 	MipFilter = Linear;
 };
 
-SamplerState ShadowMap1 = sampler_state
+SamplerState ShadowMap1 : register(s3) = sampler_state
 {
 	Texture = (ShadowMapTexture1);
 	MagFilter = Linear;
@@ -95,7 +95,7 @@ SamplerState ShadowMap1 = sampler_state
 	MipFilter = Linear;
 };
 
-SamplerState ShadowMap2 = sampler_state
+SamplerState ShadowMap2 : register(s4) = sampler_state
 {
 	Texture = (ShadowMapTexture2);
 	MagFilter = Linear;
@@ -103,7 +103,7 @@ SamplerState ShadowMap2 = sampler_state
 	MipFilter = Linear;
 };
 
-SamplerState ShadowMap3 = sampler_state
+SamplerState ShadowMap3 : register(s5) = sampler_state
 {
 	Texture = (ShadowMapTexture3);
 	MagFilter = Linear;
@@ -118,7 +118,12 @@ struct VERTEX_INPUT
 	float4 Position  : POSITION;
 	float2 TexCoords : TEXCOORD0;
 	float3 Normal    : NORMAL;
-	float4x4 Instance : TEXCOORD1;
+	// Instance transform rows, declared separately (not as one float4x4 input) so that every row is
+	// reflected as its own vertex attribute; MonoGame's Vulkan backend binds one location per attribute.
+	float4 Instance0 : TEXCOORD1;
+	float4 Instance1 : TEXCOORD2;
+	float4 Instance2 : TEXCOORD3;
+	float4 Instance3 : TEXCOORD4;
 };
 
 struct VERTEX_INPUT_FOREST
@@ -225,9 +230,9 @@ VERTEX_OUTPUT VSGeneral(uniform bool ShaderModel3, in VERTEX_INPUT In)
 	VERTEX_OUTPUT Out = (VERTEX_OUTPUT)0;
 	
 	if (ShaderModel3) {
-		if (determinant(In.Instance) != 0) {
-			In.Position = mul(In.Position, transpose(In.Instance));
-			In.Normal = mul(In.Normal, (float3x3)transpose(In.Instance));
+		if (determinant(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)) != 0) {
+			In.Position = mul(In.Position, transpose(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)));
+			In.Normal = mul(In.Normal, (float3x3)transpose(float4x4(In.Instance0, In.Instance1, In.Instance2, In.Instance3)));
 		}
 	}
 

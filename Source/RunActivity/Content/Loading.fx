@@ -29,9 +29,9 @@ float4x4 WorldViewProjection;  // model -> world -> view -> projection
 
 float LoadingPercent;
 
-Texture2D LoadingTexture;
+Texture2D LoadingTexture : register(t0);
 
-SamplerState LoadingSampler = sampler_state
+SamplerState LoadingSampler : register(s0) = sampler_state
 {
 	Texture = (LoadingTexture);
 	MagFilter = Linear;

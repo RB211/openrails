@@ -115,8 +115,8 @@ namespace Orts.Viewer3D.RollingStock
             : base(viewer, car)
         {
             
-            string steamTexture = viewer.Simulator.BasePath + @"\GLOBAL\TEXTURES\smokemain.ace";
-            string dieselTexture = viewer.Simulator.BasePath + @"\GLOBAL\TEXTURES\dieselsmoke.ace";
+            string steamTexture = viewer.Simulator.BasePath + @"/GLOBAL/TEXTURES/smokemain.ace";
+            string dieselTexture = viewer.Simulator.BasePath + @"/GLOBAL/TEXTURES/dieselsmoke.ace";
 
             // Particle Drawers called in Wagon so that wagons can also have steam effects.
             ParticleDrawers = (
@@ -1464,7 +1464,7 @@ namespace Orts.Viewer3D.RollingStock
                 return;
             string smsFilePath = wagonFolderSlash + @"sound/" + filename;
             if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
-                smsFilePath = Viewer.Simulator.BasePath + @"\sound\" + filename;
+                smsFilePath = Viewer.Simulator.BasePath + @"/sound/" + filename;
             if (!File.Exists(ORTS.IO.PathResolver.Resolve(smsFilePath)))
             {
                 Trace.TraceWarning("Cannot find {1} car sound file {0}", filename, wagonFolderSlash);
@@ -1531,9 +1531,9 @@ namespace Orts.Viewer3D.RollingStock
         {
             if (filename == null)
                 return;
-            string path = Viewer.Simulator.RoutePath + @"\SOUND\" + filename;
+            string path = Viewer.Simulator.RoutePath + @"/SOUND/" + filename;
             if (!File.Exists(ORTS.IO.PathResolver.Resolve(path)))
-                path = Viewer.Simulator.BasePath + @"\SOUND\" + filename;
+                path = Viewer.Simulator.BasePath + @"/SOUND/" + filename;
             if (!File.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
                 Trace.TraceWarning("Cannot find track sound file {0}", filename);

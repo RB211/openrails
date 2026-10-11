@@ -166,7 +166,7 @@ namespace Orts.Viewer3D.Processes
             var action = "";
             var actions = new[] { "start", "resume", "replay", "replay_from_save", "test"};
             foreach (var possibleAction in actions)
-                if (args.Contains("-" + possibleAction) || args.Contains("/" + possibleAction, StringComparer.OrdinalIgnoreCase))
+                if (args.Contains("-" + possibleAction) || (OperatingSystem.IsWindows() && args.Contains("/" + possibleAction, StringComparer.OrdinalIgnoreCase)))
                 {
                     action = possibleAction;
                     Game.Settings.MultiplayerServer = false;
@@ -177,16 +177,16 @@ namespace Orts.Viewer3D.Processes
             var acttype = "";
             var acttypes = new[] { "activity", "explorer", "exploreactivity", "timetable" };
             foreach (var possibleActType in acttypes)
-                if (args.Contains("-" + possibleActType) || args.Contains("/" + possibleActType, StringComparer.OrdinalIgnoreCase))
+                if (args.Contains("-" + possibleActType) || (OperatingSystem.IsWindows() && args.Contains("/" + possibleActType, StringComparer.OrdinalIgnoreCase)))
                     acttype = possibleActType;
 
             Acttype = acttype;
 
             // Collect all non-action options.
-            var options = args.Where(a => (a.StartsWith("-") || a.StartsWith("/")) && !actions.Contains(a.Substring(1)) && !acttype.Contains(a.Substring(1))).Select(a => a.Substring(1)).ToArray();
+            var options = args.Where(a => Program.IsOption(a) && !actions.Contains(a.Substring(1)) && !acttype.Contains(a.Substring(1))).Select(a => a.Substring(1)).ToArray();
 
             // Collect all non-options as data.
-            var data = args.Where(a => !a.StartsWith("-") && !a.StartsWith("/")).ToArray();
+            var data = args.Where(a => !Program.IsOption(a)).ToArray();
 
             // No action, check for data; for now assume any data is good data.
             if (action.Length == 0 && data.Length > 0)
@@ -919,7 +919,7 @@ namespace Orts.Viewer3D.Processes
             // We hash together all the appropriate arguments to the program as the key for the loading cache file.
             // Arguments without a '.' in them and those starting '/' are ignored, since they are explore activity
             // configuration (time, season, etc.) or flags like /test which we don't want to change on.
-            LoadingDataKey = String.Join(" ", args.Where(a => a.Contains('.') && !a.StartsWith("-") && !a.StartsWith("/"))).ToLowerInvariant();
+            LoadingDataKey = String.Join(" ", args.Where(a => a.Contains('.') && !Program.IsOption(a))).ToLowerInvariant();
             LoadingDataFilePath = settings.GetCacheFilePath("Load", LoadingDataKey);
 
             var loadingTime = 0;
@@ -1340,6 +1340,19 @@ namespace Orts.Viewer3D.Processes
 
         long GetProcessBytesLoaded()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                // "rchar" counts all bytes read, including from the page cache, like Windows' ReadTransferCount.
+                try
+                {
+                    foreach (var line in File.ReadLines("/proc/self/io"))
+                        if (line.StartsWith("rchar:") && long.TryParse(line.Substring(6).Trim(), out var bytes))
+                            return bytes;
+                }
+                catch (IOException) { }
+                return 0;
+            }
+
             NativeMathods.IO_COUNTERS counters;
             if (NativeMathods.GetProcessIoCounters(Process.GetCurrentProcess().Handle, out counters))
                 return (long)counters.ReadTransferCount;

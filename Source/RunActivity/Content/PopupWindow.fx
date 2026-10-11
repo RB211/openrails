@@ -29,10 +29,10 @@ float4x4 World;         // model -> world
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float3   GlassColor;
 float2   ScreenSize;
-Texture2D  ScreenTexture;
-Texture2D  WindowTexture;
+Texture2D  ScreenTexture : register(t0);
+Texture2D  WindowTexture : register(t1);
 
-SamplerState ScreenSampler = sampler_state
+SamplerState ScreenSampler : register(s0) = sampler_state
 {
 	Texture = (ScreenTexture);
 	MagFilter = Point;
@@ -42,7 +42,7 @@ SamplerState ScreenSampler = sampler_state
 	AddressV = Clamp;
 };
 
-SamplerState WindowSampler = sampler_state
+SamplerState WindowSampler : register(s1) = sampler_state
 {
 	Texture = (WindowTexture);
 	MagFilter = Point;

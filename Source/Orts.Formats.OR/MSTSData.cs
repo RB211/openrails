@@ -40,13 +40,13 @@ namespace Orts.Formats.OR
 
             string ORfilepath = System.IO.Path.Combine(RoutePath, "OpenRails");
 
-            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"\sigcfg.dat")))
+            if (File.Exists(ORTS.IO.PathResolver.Resolve(ORfilepath + @"/sigcfg.dat")))
             {
-                SIGCFG = new SignalConfigurationFile(ORfilepath + @"\sigcfg.dat", true);
+                SIGCFG = new SignalConfigurationFile(ORfilepath + @"/sigcfg.dat", true);
             }
             else
             {
-                SIGCFG = new SignalConfigurationFile(RoutePath + @"\sigcfg.dat", false);
+                SIGCFG = new SignalConfigurationFile(RoutePath + @"/sigcfg.dat", false);
             }
 
             if (Directory.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails")) && File.Exists(ORTS.IO.PathResolver.Resolve(RoutePath + @"/Openrails/TSECTION.DAT")))

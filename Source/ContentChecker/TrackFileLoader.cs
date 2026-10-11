@@ -104,7 +104,7 @@ namespace ContentChecker
             AddAdditionalFileAction.Invoke(Path.Combine(routePath, TRK.Tr_RouteFile.FileName + ".rdb"), new RoadDataBaseLoader());
             AddAdditionalFileAction.Invoke(Path.Combine(routePath, "carspawn.dat"), new CarSpawnLoader());
             string ORfilepath = System.IO.Path.Combine(routePath, "OpenRails");
-            if (File.Exists(ORfilepath + @"\sigcfg.dat"))
+            if (File.Exists(ORfilepath + @"/sigcfg.dat"))
             {
                 AddAdditionalFileAction.Invoke(Path.Combine(ORfilepath, "sigcfg.dat"), new SignalConfigLoader());
             }

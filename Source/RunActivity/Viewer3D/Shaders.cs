@@ -66,6 +66,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter eyeVector;
         readonly EffectParameter sideVector;
         readonly EffectParameter imageTexture;
+        readonly EffectParameter blurTexture;
         readonly EffectParameter overlayTexture;
         readonly EffectParameter referenceAlpha;
         readonly EffectParameter overlayScale;
@@ -220,6 +221,7 @@ namespace Orts.Viewer3D
             eyeVector = Parameters["EyeVector"];
             sideVector = Parameters["SideVector"];
             imageTexture = Parameters["ImageTexture"];
+            blurTexture = Parameters["BlurTexture"];
             overlayTexture = Parameters["OverlayTexture"];
             referenceAlpha = Parameters["ReferenceAlpha"];
             overlayScale = Parameters["OverlayScale"];
@@ -233,6 +235,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter sideVector;
         readonly EffectParameter imageBlurStep;
         readonly EffectParameter imageTexture;
+        readonly EffectParameter blurTexture;
 
         public void SetData(ref Matrix v)
         {
@@ -253,6 +256,7 @@ namespace Orts.Viewer3D
 
         public void SetBlurData(Texture2D texture)
         {
+            blurTexture.SetValue(texture);
             imageTexture.SetValue(texture);
             imageBlurStep.SetValue(texture != null ? 1f / texture.Width : 0);
         }
@@ -264,6 +268,7 @@ namespace Orts.Viewer3D
             sideVector = Parameters["SideVector"];
             imageBlurStep = Parameters["ImageBlurStep"];
             imageTexture = Parameters["ImageTexture"];
+            blurTexture = Parameters["BlurTexture"];
         }
     }
 
@@ -592,6 +597,7 @@ namespace Orts.Viewer3D
         readonly EffectParameter texPos;
         readonly EffectParameter texSize;
         readonly EffectParameter imageTexture;
+        readonly EffectParameter blurTexture;
 
         public void SetTextureData(float x, float y, float width, float height)
         {
@@ -623,6 +629,7 @@ namespace Orts.Viewer3D
             texPos = Parameters["TexPos"];
             texSize = Parameters["TexSize"];
             imageTexture = Parameters["ImageTexture"];
+            blurTexture = Parameters["BlurTexture"];
 
             light1Pos.SetValue(light1Position);
             light2Pos.SetValue(light2Position);

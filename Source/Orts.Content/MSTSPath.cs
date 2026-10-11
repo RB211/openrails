@@ -111,7 +111,7 @@ namespace MSTS
         /// <returns></returns>
         public static string TrainSoundPath(string wagfilename, string soundfile)
         {
-            string trainsetSoundPath = Path.GetDirectoryName(wagfilename) + @"\SOUND\" + soundfile;
+            string trainsetSoundPath = Path.GetDirectoryName(wagfilename) + @"/SOUND/" + soundfile;
             string globalSoundPath = MSTSPath.GlobalSoundFolder() + @"/" + soundfile;
 
             return File.Exists(ORTS.IO.PathResolver.Resolve(trainsetSoundPath)) ? trainsetSoundPath : globalSoundPath;
@@ -141,7 +141,7 @@ namespace MSTS
 
         public static string GetSrvPath(string srvName, string routeFolderPath)
         {
-            return routeFolderPath + @"\SERVICES\" + srvName + ".srv";
+            return routeFolderPath + @"/SERVICES/" + srvName + ".srv";
         }
 
         public static string GetTrfPath(string trfName, string routeFolderPath)

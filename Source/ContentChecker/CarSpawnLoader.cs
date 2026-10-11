@@ -43,12 +43,12 @@ namespace ContentChecker
             if (subdirname == "openrails")
             {
                 string RoutePath = Path.GetDirectoryName(Path.GetDirectoryName(file));
-                var ExtCarSpawnerFile = new ExtCarSpawnerFile(file, RoutePath + @"\shapes\", CarSpawnerLists);
+                var ExtCarSpawnerFile = new ExtCarSpawnerFile(file, RoutePath + @"/shapes/", CarSpawnerLists);
             }
             else
             {
                 string RoutePath = Path.GetDirectoryName(file);
-                var CarSpawnerFile = new CarSpawnerFile(file, RoutePath + @"\shapes\", CarSpawnerLists);
+                var CarSpawnerFile = new CarSpawnerFile(file, RoutePath + @"/shapes/", CarSpawnerLists);
             }
         }
     }

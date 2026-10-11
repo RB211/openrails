@@ -474,7 +474,9 @@ namespace ORTS.Settings
         public UserSettings(IEnumerable<string> options)
             : base(SettingsStore.GetSettingStore(SettingsBase.SettingsFilePath, SettingsBase.RegistryKey, null))
         {
-            CustomDefaultValues["LoggingPath"] = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            // Desktop folders are optional on Linux; log next to the saves when there is none.
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            CustomDefaultValues["LoggingPath"] = !String.IsNullOrEmpty(desktop) && Directory.Exists(desktop) ? desktop : UserDataFolder;
             CustomDefaultValues["ScreenshotPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), ApplicationInfo.ProductName);
             CustomDefaultValues["Multiplayer_User"] = Environment.UserName;
             Load(options);

@@ -31,7 +31,7 @@ float4   LimitColor;   // dark grey, white or yellow
 float4   PointerColor; // medium grey, white, yellow or red
 float4	 InterventionColor; // yellow or red
 
-Texture2D  ImageTexture;
+Texture2D  ImageTexture : register(t0);
 
 // Color RGB values are from ETCS specification
 static const float4 DarkGreyColor = float4(0.333333, 0.333333, 0.333333, 1); // Dark grey gauge between -149 and -144 deg.
@@ -48,7 +48,7 @@ static const float radiusLimitPointer = 117 * 117;
 static const float radiusNeedleCenter = 26 * 26; // Radius in ETCS is 25
 static const float2 center = float2(140, 150); // ETCS display size is 280x300
 
-SamplerState ImageSampler = sampler_state
+SamplerState ImageSampler : register(s0) = sampler_state
 {
 	Texture = (ImageTexture);
 };

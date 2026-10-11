@@ -799,7 +799,7 @@ namespace Orts.Simulation.AIs
                     break;
                 }
             }
-            ServiceFile srvFile = new ServiceFile(Simulator.RoutePath + @"\SERVICES\" + sd.Name + ".SRV"); // Read service file
+            ServiceFile srvFile = new ServiceFile(Simulator.RoutePath + @"/SERVICES/" + sd.Name + ".SRV"); // Read service file
             AITrain train = CreateAITrainDetail(sd, trfDef, srvFile, isTimetableMode, false);
             if (train != null)
             {

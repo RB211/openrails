@@ -27,9 +27,9 @@
 
 float4x4 WorldViewProjection;  // model -> world -> view -> projection
 float2   Fade;          // overall fade (0 = off, 1 = on); transition fade (0 = original, 1 = transition)
-Texture2D  LightGlowTexture;
+Texture2D  LightGlowTexture : register(t0);
 
-SamplerState LightGlowSampler = sampler_state
+SamplerState LightGlowSampler : register(s0) = sampler_state
 {
 	Texture = (LightGlowTexture);
 	MagFilter = Linear;

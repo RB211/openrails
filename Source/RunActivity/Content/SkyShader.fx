@@ -38,13 +38,13 @@ float2   MoonTexCoord;
 float    CloudColor;
 float3   RightVector;
 float3   UpVector;
-Texture2D  SkyMapTexture;
-Texture2D  StarMapTexture;
-Texture2D  MoonMapTexture;
-Texture2D  MoonMaskTexture;
-Texture2D  CloudMapTexture;
+Texture2D  SkyMapTexture : register(t0);
+Texture2D  StarMapTexture : register(t1);
+Texture2D  MoonMapTexture : register(t2);
+Texture2D  MoonMaskTexture : register(t3);
+Texture2D  CloudMapTexture : register(t4);
 
-SamplerState SkyMapSampler = sampler_state
+SamplerState SkyMapSampler : register(s0) = sampler_state
 {
 	Texture = (SkyMapTexture);
 	MAGFILTER = LINEAR;
@@ -55,7 +55,7 @@ SamplerState SkyMapSampler = sampler_state
 	AddressV = Wrap;
 };
 
-SamplerState StarMapSampler = sampler_state
+SamplerState StarMapSampler : register(s1) = sampler_state
 {
 	Texture = (StarMapTexture);
 	MAGFILTER = LINEAR;
@@ -66,7 +66,7 @@ SamplerState StarMapSampler = sampler_state
 	AddressV = wrap;
 };
 
-SamplerState MoonMapSampler = sampler_state
+SamplerState MoonMapSampler : register(s2) = sampler_state
 {
 	Texture = (MoonMapTexture);
 	MAGFILTER = LINEAR;
@@ -77,7 +77,7 @@ SamplerState MoonMapSampler = sampler_state
 	AddressV = wrap;
 };
 
-SamplerState MoonMaskSampler = sampler_state
+SamplerState MoonMaskSampler : register(s3) = sampler_state
 {
 	Texture = (MoonMaskTexture);
 	MAGFILTER = LINEAR;
@@ -88,7 +88,7 @@ SamplerState MoonMaskSampler = sampler_state
 	AddressV = wrap;
 };
 
-SamplerState CloudMapSampler = sampler_state
+SamplerState CloudMapSampler : register(s4) = sampler_state
 {
 	Texture = (CloudMapTexture);
 	MAGFILTER = LINEAR;

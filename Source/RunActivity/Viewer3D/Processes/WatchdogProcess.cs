@@ -335,6 +335,13 @@ namespace Orts.Viewer3D.Processes
         internal ThreadWatchdogException(string message, List<StackTrace> stacks)
             : base(message)
         {
+            // .NET (Core) cannot capture another thread's stack, so there may be none to report.
+            if (stacks.Count == 0)
+            {
+                _stackTrace = "    (stack traces of other threads are not available on this runtime)";
+                return;
+            }
+
             // Figure out the common base of the stacks.
             var maximumDepth = stacks.Max(stack => stack.FrameCount);
             var commonStack = new List<string>(maximumDepth);

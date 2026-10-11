@@ -175,6 +175,7 @@ namespace Orts.Parsers.Msts
         /// <para>false - if Tree is not used which signicantly reduces GC</para></param>
         public STFReader(string filename, bool useTree)
         {
+            filename = ORTS.IO.PathResolver.Resolve(filename);
             var path = Path.GetDirectoryName(filename);
             if (Directory.Exists(ORTS.IO.PathResolver.Resolve(path)))
             {
@@ -1928,8 +1929,9 @@ namespace Orts.Parsers.Msts
                         var purefilename = Path.GetFileName(filename).ToLower();
                         if (purefilename == "[[samename]]")
                             filename = Path.GetDirectoryName(filename) + @"\" + Path.GetFileName(FileName);
-                        var includeFileName = Path.GetDirectoryName(FileName) + @"\" + filename;
-                        if (!File.Exists(ORTS.IO.PathResolver.Resolve(includeFileName)))
+                        // Resolve to the real path so that nested relative includes work on case-sensitive filesystems.
+                        var includeFileName = ORTS.IO.PathResolver.Resolve(Path.GetDirectoryName(FileName) + @"\" + filename);
+                        if (!File.Exists(includeFileName))
                             STFException.TraceWarning(this, string.Format("'{0}' not found", includeFileName));
                         includeReader = new STFReader(includeFileName, false);
                         return ReadItem(skip_mode, string_mode); // Which will recurse down when includeReader is tested

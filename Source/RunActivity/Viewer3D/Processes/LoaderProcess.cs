@@ -158,7 +158,8 @@ namespace Orts.Viewer3D.Processes
             try
             {
                 WatchdogToken.Ping();
-                Game.State.Load();
+                lock (Game.GpuLock)
+                    Game.State.Load();
             }
             finally
             {

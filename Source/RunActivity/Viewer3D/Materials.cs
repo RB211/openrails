@@ -301,9 +301,9 @@ namespace Orts.Viewer3D
             MissingTexture = SharedTextureManager.GetInternalMissingTexture(viewer.RenderProcess.GraphicsDevice);
 
             // Managing default snow textures
-            var defaultSnowTexturePath = viewer.Simulator.RoutePath + @"\TERRTEX\SNOW\ORTSDefaultSnow.ace";
+            var defaultSnowTexturePath = viewer.Simulator.RoutePath + @"/TERRTEX/SNOW/ORTSDefaultSnow.ace";
             DefaultSnowTexture = Viewer.TextureManager.Get(defaultSnowTexturePath);
-            var defaultDMSnowTexturePath = viewer.Simulator.RoutePath + @"\TERRTEX\SNOW\ORTSDefaultDMSnow.ace";
+            var defaultDMSnowTexturePath = viewer.Simulator.RoutePath + @"/TERRTEX/SNOW/ORTSDefaultDMSnow.ace";
             DefaultDMSnowTexture = Viewer.TextureManager.Get(defaultDMSnowTexturePath);
 
         }

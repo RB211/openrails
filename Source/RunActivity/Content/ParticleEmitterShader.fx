@@ -41,10 +41,10 @@ static float3 offsets[4] = { float3(-0.5f, 0.5f, 0), float3(0.5f, 0.5f, 0), floa
 float4 Fog;
 
 // Textures
-Texture2D particle_Tex;
+Texture2D particle_Tex : register(t0);
 
 // Texture settings
-SamplerState ParticleSamp = sampler_state
+SamplerState ParticleSamp : register(s0) = sampler_state
 {
 	texture = (particle_Tex);
 	MagFilter = Linear;
