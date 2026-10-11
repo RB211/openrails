@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -18,11 +18,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Windows.Media.Imaging;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Orts.Viewer3D;
-using Orts.Viewer3D.Popups;
 
 namespace ORTS.TrackViewer.Drawing
 {
@@ -89,7 +86,13 @@ namespace ORTS.TrackViewer.Drawing
             LoadAndHighlightTexture(graphicsDevice, contentPath, "pickup", "Pickup");
             LoadAndHighlightTexture(graphicsDevice, contentPath, "platform", "Platform", 31, 37);
             LoadAndHighlightTexture(graphicsDevice, contentPath, "sound", "Sound");
-            LoadAndHighlightTexture(graphicsDevice, contentPath, "playerTrain", "steamTrain",31,31);
+            LoadAndHighlightTexture(graphicsDevice, contentPath, "playerTrain", "Steamtrain",31,31);
+
+            // icons for the (in-window) context menus
+            LoadAndHighlightTexture(graphicsDevice, contentPath, "activeBroken", "activeBroken");
+            LoadAndHighlightTexture(graphicsDevice, contentPath, "activeNode", "activeNode");
+            LoadAndHighlightTexture(graphicsDevice, contentPath, "activeNormal", "activeNormal");
+            LoadAndHighlightTexture(graphicsDevice, contentPath, "activeTrack", "activeTrack");
 
             PrepareArcDrawing();
             fontManager = FontManager.Instance;
@@ -113,7 +116,7 @@ namespace ORTS.TrackViewer.Drawing
             Texture2D tempTexture;
             try
             {
-                tempTexture = SharedTextureManager.LoadInternal(graphicsDevice, fullFileName);
+                tempTexture = Texture2D.FromFile(graphicsDevice, fullFileName);
             }
             catch
             {
@@ -306,7 +309,7 @@ namespace ORTS.TrackViewer.Drawing
             foreach (string filename in filenames)
             {
                 string textureName = filename;
-                string path = directory + filename;
+                string path = CaseInsensitivePath.Resolve(directory + filename);
                 oldAceFiles = new List<string>();
                 if (File.Exists(path))
                 {
@@ -314,7 +317,7 @@ namespace ORTS.TrackViewer.Drawing
                     try
                     {
                         if (Path.GetExtension(path) == ".dds")
-                            DDSLib.DDSFromFile(path, graphicsDevice, true, out texture);
+                            Orts.Viewer3D.DDSLib.DDSFromFile(path, graphicsDevice, true, out texture);
                         else if (Path.GetExtension(path) == ".ace")
                             texture = Orts.Formats.Msts.AceFile.Texture2DFromFile(graphicsDevice, path);
                         else
@@ -517,6 +520,44 @@ namespace ORTS.TrackViewer.Drawing
         }
 
         /// <summary>
+        /// Fill a screen rectangle with a solid color
+        /// </summary>
+        public static void FillRectangle(Rectangle rectangle, Color color)
+        {
+            spriteBatch.Draw(textures["blankPixel"], rectangle, color);
+        }
+
+        /// <summary>
+        /// Draw the outline of a screen rectangle
+        /// </summary>
+        public static void DrawRectangleOutline(Rectangle rectangle, Color color)
+        {
+            FillRectangle(new Rectangle(rectangle.X, rectangle.Y, rectangle.Width, 1), color);
+            FillRectangle(new Rectangle(rectangle.X, rectangle.Bottom - 1, rectangle.Width, 1), color);
+            FillRectangle(new Rectangle(rectangle.X, rectangle.Y, 1, rectangle.Height), color);
+            FillRectangle(new Rectangle(rectangle.Right - 1, rectangle.Y, 1, rectangle.Height), color);
+        }
+
+        /// <summary>
+        /// Draw one of the (predefined) textures stretched into a screen rectangle
+        /// </summary>
+        public static void DrawTextureInRectangle(string textureName, Rectangle rectangle)
+        {
+            if (textureName != null && textures.TryGetValue(textureName, out Texture2D texture))
+            {
+                spriteBatch.Draw(texture, rectangle, Color.White);
+            }
+        }
+
+        /// <summary>
+        /// Draw a text with a given font at an integer location
+        /// </summary>
+        public static void DrawString(TextFont font, Point location, Color color, string message)
+        {
+            font.Draw(spriteBatch, new Rectangle(), location, message, LabelAlignment.Left, color);
+        }
+
+        /// <summary>
         /// Some preparation to be able to draw arcs more efficiently
         /// </summary>
         private static void PrepareArcDrawing()
@@ -561,10 +602,9 @@ namespace ORTS.TrackViewer.Drawing
         private int expandingFontSize;
         
         /// <summary>The text manager that supports the font(s)</summary>
-        private WindowTextManager textManager;
-
+        
         /// <summary>List of fonts</summary>
-        private Dictionary<int, WindowTextFont> fonts;
+        private Dictionary<int, TextFont> fonts;
         
         /// <summary>
         /// Constructor, private so only called during class initialization
@@ -575,9 +615,9 @@ namespace ORTS.TrackViewer.Drawing
             defaultFontSize = 10;
             expandingFontSize = defaultFontSize;
 
-            fonts = new Dictionary<int, WindowTextFont>();
-            textManager = new WindowTextManager();
+            fonts = new Dictionary<int, TextFont>();
             DefaultFont = InitFont(defaultFontSize);
+            UIFont = InitFont(11);
             RequestFontSize(expandingFontSize);
         }
 
@@ -585,11 +625,11 @@ namespace ORTS.TrackViewer.Drawing
         /// Initialize a font and put it in the lists of fonts
         /// </summary>
         /// <param name="fontSize">Requested font size. There is no check on the fontsize</param>
-        private WindowTextFont InitFont(int fontSize)
+        private TextFont InitFont(int fontSize)
         {
             if (!fonts.ContainsKey(fontSize))
             {
-                fonts[fontSize] = textManager.GetScaled("Segoe UI", fontSize, System.Drawing.FontStyle.Regular, 0);
+                fonts[fontSize] = new TextFont(fontSize);
             }
             return fonts[fontSize];
         }
@@ -599,9 +639,11 @@ namespace ORTS.TrackViewer.Drawing
         /// </summary>
         public static FontManager Instance { get { return instance; } }
         /// <summary>his is the default font that can be used for drawing</summary>
-        public WindowTextFont DefaultFont { get; private set; }
+        public TextFont DefaultFont { get; private set; }
+        /// <summary>Font used for the in-window menu and status bar</summary>
+        public TextFont UIFont { get; private set; }
         /// <summary>This is the expanding font that can be used for drawing</summary>
-        public WindowTextFont ExpandingFont { get; private set; }
+        public TextFont ExpandingFont { get; private set; }
 
         /// <summary>
         /// Request a certain font size. This font size will then be used for drawing when using the expanding font.
@@ -637,22 +679,20 @@ namespace ORTS.TrackViewer.Drawing
         /// </summary>
         public void Update(GraphicsDevice graphicsDevice)
         {
-            textManager.Load(graphicsDevice);
+            foreach (TextFont font in fonts.Values) font.Load(graphicsDevice);
         }
 
     }
 
     /// <summary>
-    /// Load and store images in bitmap format (needed for WPF-parts)
+    /// Load and store images in bitmap format (needed for the Avalonia parts). Only use on the Avalonia UI thread.
     /// </summary>
     class BitmapImageManager
     {
-        //Singleton class
-
         /// <summary>Singleton instance of the class</summary>
         private static readonly BitmapImageManager instance = new BitmapImageManager();
 
-        private Dictionary<string, BitmapImage> images;
+        private readonly Dictionary<string, Avalonia.Media.Imaging.Bitmap> images = new Dictionary<string, Avalonia.Media.Imaging.Bitmap>();
 
         /// <summary>
         /// Return the singleton instance of the bitmap manager
@@ -660,29 +700,31 @@ namespace ORTS.TrackViewer.Drawing
         public static BitmapImageManager Instance { get { return instance; } }
 
         /// <summary>
-        /// Constructor, private so only called during class initialization
-        /// </summary>
-        private BitmapImageManager()
-        {
-            this.images = new Dictionary<string, BitmapImage>();
-        }
-
-        /// <summary>
         /// Return an image defined by its name (should be in the Content directory)
         /// </summary>
         /// <param name="pngFileName">Name of the file, without extension</param>
-        public BitmapImage GetImage(string pngFileName)
+        public Avalonia.Media.Imaging.Bitmap GetImage(string pngFileName)
         {
-            if (images.ContainsKey(pngFileName))
+            lock (images)
             {
-                return images[pngFileName];
-            }
+                if (images.ContainsKey(pngFileName))
+                {
+                    return images[pngFileName];
+                }
 
-            string contentPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath), "Content");
-            string fullFileName = System.IO.Path.Combine(contentPath, pngFileName + ".png");
-            BitmapImage newImage = new BitmapImage(new Uri(fullFileName, UriKind.Relative));
-            images[pngFileName] = newImage;
-            return newImage;
+                string fullFileName = System.IO.Path.Combine(TrackViewer.ContentDirectory, pngFileName + ".png");
+                Avalonia.Media.Imaging.Bitmap newImage = null;
+                try
+                {
+                    newImage = new Avalonia.Media.Imaging.Bitmap(fullFileName);
+                }
+                catch (Exception error)
+                {
+                    Console.Error.WriteLine("TrackViewer: could not load image " + fullFileName + ": " + error.Message);
+                }
+                images[pngFileName] = newImage;
+                return newImage;
+            }
         }
     }
 }

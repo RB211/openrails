@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -25,8 +25,7 @@ using ORTS.TrackViewer.Drawing;
 
 using Orts.Formats.Msts;
 using ORTS.Common;
-using System.Windows.Controls;
-using System.Windows;
+using ORTS.TrackViewer.UserInterface;
 
 namespace ORTS.TrackViewer.Editing
 {
@@ -98,18 +97,15 @@ namespace ORTS.TrackViewer.Editing
         List<EditorAction> editorActionsActiveTrack;
         List<EditorAction> editorActionsBroken;
         List<EditorAction> editorActionsOthers;
-        Separator separatorActiveNode;
-        Separator separatorActiveTrack;
-        Separator separatorBroken;
 
         const int practicalInfinityInt = int.MaxValue/2; // large, but not close to overflow
         int numberToDraw = practicalInfinityInt; // number of nodes to draw, start with all
         int maxNodesToAdd;  // if at end of path, how many nodes do we allow to be added
 
-        ContextMenu contextMenu;
         /// <summary>If context menu is open, updating active node and track is disabled</summary>
         bool enableMouseUpdate;
-        MenuItem noActionPossibleMenuItem;
+        /// <summary>Is the (shared, in-window) context menu currently showing our items</summary>
+        bool contextMenuIsOurs;
 
         // Editor actions that are not via the menu
         EditorActionNonInteractive nonInteractiveAction;
@@ -149,7 +145,6 @@ namespace ORTS.TrackViewer.Editing
             CreateNonMenuActions();
             CreateDirectActions();
             CreateContextMenuEntries();
-            CreateContextMenu();
         }
 
         void CreateNonMenuActions()
@@ -182,13 +177,19 @@ namespace ORTS.TrackViewer.Editing
         public PathEditor(RouteData routeData, DrawTrackDB drawTrackDB, ORTS.Menu.Path path)
             :this(routeData, drawTrackDB)
         {
-            FileName = path.FilePath.Split('\\').Last();
+            FileName = FileNameOf(path.FilePath);
             CurrentTrainPath = new Trainpath(trackDB, tsectionDat, path.FilePath);
             EditingIsActive = false;
             OnPathChanged();
         }
 
         #endregion
+
+        /// <summary>Return the file name of a path that might use Windows directory separators</summary>
+        private static string FileNameOf(string filePath)
+        {
+            return System.IO.Path.GetFileName(filePath.Replace('\\', System.IO.Path.DirectorySeparatorChar));
+        }
 
         #region Context menu and its callbacks
         /// <summary>
@@ -272,98 +273,67 @@ namespace ORTS.TrackViewer.Editing
         }
 
         /// <summary>
-        /// Create the context menu from previously defined items.
-        /// </summary>
-        private void CreateContextMenu() {
-
-            contextMenu = new ContextMenu();
-            separatorActiveNode = new Separator();
-            separatorActiveTrack = new Separator();
-            separatorBroken = new Separator();
-
-            noActionPossibleMenuItem = new MenuItem
-            {
-                Header = "No action possible\nPerhaps paths are not drawn."
-            };
-            contextMenu.Items.Add(noActionPossibleMenuItem);
-
-            foreach (EditorAction action in editorActionsActiveNode)
-            {
-                contextMenu.Items.Add(action.ActionMenuItem);
-            }
-            contextMenu.Items.Add(separatorActiveNode);
-            
-
-            foreach (EditorAction action in editorActionsActiveTrack)
-            {
-                contextMenu.Items.Add(action.ActionMenuItem);
-            }
-            contextMenu.Items.Add(separatorActiveTrack);
-
-            foreach (EditorAction action in editorActionsBroken)
-            {
-                contextMenu.Items.Add(action.ActionMenuItem);
-            }
-            contextMenu.Items.Add(separatorBroken);
-            
-            foreach (EditorAction action in editorActionsOthers)
-            {
-                contextMenu.Items.Add(action.ActionMenuItem);
-            }
-
-            contextMenu.Closed += new RoutedEventHandler(ContextMenu_Closed);
-        }
-       
-        /// <summary>
         /// Popup the context menu at the given location. Also disable updates related to mouse movement while menu is open.
         /// </summary>
+        /// <param name="windowX">The x-location of the mouse in the window, where the menu will be shown</param>
+        /// <param name="windowY">The y-location of the mouse in the window, where the menu will be shown</param>
         /// <param name="mouseX">The absolute x-location of the mouse on the screen so we can place a dialog properly</param>
         /// <param name="mouseY">The absolute y-location of the mouse on the screen so we can place a dialog properly</param>
-        public void PopupContextMenu(int mouseX, int mouseY)
+        public void PopupContextMenu(int windowX, int windowY, int mouseX, int mouseY)
         {
-            bool someNodeActionIsPossible = false;
-            bool someTrackActionIsPossible = false;
-            bool someBrokenActionIsPossible = false;
-            bool someOtherActionIsPossible = false;
+            var items = new List<GameMenuItem>();
+            bool anyActionIsPossible = false;
 
-            foreach (EditorAction action in editorActionsActiveNode)
+            void AddGroup(List<EditorAction> actions, bool countsAsPossible)
             {
-                bool actionCanBeExecuted = action.MenuState(CurrentTrainPath, activeNode, activeTrackLocation, UpdateAfterEdits,
-                    mouseX, mouseY);
-                someNodeActionIsPossible = someNodeActionIsPossible || actionCanBeExecuted;
-            }
-            separatorActiveNode.Visibility = someNodeActionIsPossible ? Visibility.Visible : Visibility.Collapsed;
-
-            foreach (EditorAction action in editorActionsActiveTrack)
-            {
-                bool actionCanBeExecuted = action.MenuState(CurrentTrainPath, activeNode, activeTrackLocation, UpdateAfterEdits,
-                    mouseX, mouseY);
-                someTrackActionIsPossible = someTrackActionIsPossible || actionCanBeExecuted;
-            }
-            separatorActiveTrack.Visibility = someTrackActionIsPossible ? Visibility.Visible : Visibility.Collapsed;
-
-            foreach (EditorAction action in editorActionsBroken)
-            {
-                bool actionCanBeExecuted = action.MenuState(CurrentTrainPath, activeNode, activeTrackLocation, UpdateAfterEdits,
-                    mouseX, mouseY);
-                someBrokenActionIsPossible = someBrokenActionIsPossible || actionCanBeExecuted;
-            }
-            separatorBroken.Visibility = someBrokenActionIsPossible ? Visibility.Visible : Visibility.Collapsed;
-
-            foreach (EditorAction action in editorActionsOthers)
-            {
-                bool actionCanBeExecuted = action.MenuState(CurrentTrainPath, activeNode, activeTrackLocation, UpdateAfterEdits,
-                    mouseX, mouseY);
-                someOtherActionIsPossible = someOtherActionIsPossible || actionCanBeExecuted;
+                bool someActionIsPossible = false;
+                foreach (EditorAction action in actions)
+                {
+                    bool actionCanBeExecuted = action.MenuState(CurrentTrainPath, activeNode, activeTrackLocation, UpdateAfterEdits,
+                        mouseX, mouseY);
+                    if (actionCanBeExecuted)
+                    {
+                        EditorAction thisAction = action;
+                        items.Add(new GameMenuItem(action.Header, _ => thisAction.DoAction()) { Icon = action.IconName });
+                    }
+                    someActionIsPossible = someActionIsPossible || actionCanBeExecuted;
+                }
+                if (someActionIsPossible)
+                {
+                    items.Add(GameMenuItem.Separator());
+                }
+                if (countsAsPossible)
+                {
+                    anyActionIsPossible = anyActionIsPossible || someActionIsPossible;
+                }
             }
 
-            noActionPossibleMenuItem.Visibility = 
-                (someNodeActionIsPossible || someTrackActionIsPossible || someOtherActionIsPossible)
-                ? Visibility.Collapsed : Visibility.Visible;
+            AddGroup(editorActionsActiveNode, true);
+            AddGroup(editorActionsActiveTrack, true);
+            AddGroup(editorActionsBroken, false);
+            AddGroup(editorActionsOthers, true);
 
-            contextMenu.PlacementRectangle = new Rect((double)mouseX, (double)mouseY, 20, 20);
-            contextMenu.IsOpen = true;
-            enableMouseUpdate = false;
+            if (!anyActionIsPossible)
+            {
+                items.Insert(0, new GameMenuItem(TrackViewer.catalog.GetString("No action possible")) { IsEnabled = false });
+                items.Insert(1, new GameMenuItem(TrackViewer.catalog.GetString("Perhaps paths are not drawn.")) { IsEnabled = false });
+                items.Insert(2, GameMenuItem.Separator());
+            }
+
+            GameMenu menu = TrackViewer.ContextMenu;
+            void onClosed()
+            {
+                menu.Closed -= onClosed;
+                contextMenuIsOurs = false;
+                enableMouseUpdate = true;
+            }
+            menu.OpenContextMenu(items, windowX, windowY);
+            if (menu.IsOpen)
+            {
+                contextMenuIsOurs = true;
+                enableMouseUpdate = false;
+                menu.Closed += onClosed;
+            }
         }
 
         /// <summary>
@@ -469,16 +439,8 @@ namespace ORTS.TrackViewer.Editing
         /// </summary>
         void CloseContextMenu()
         {
-            if (contextMenu == null) { return; }
-            contextMenu.IsOpen = false;
-        }
-
-        /// <summary>
-        /// When the context menu closes, enable updates based on mouse movement again.
-        /// </summary>
-        void ContextMenu_Closed(object sender, RoutedEventArgs e)
-        {
-            enableMouseUpdate = true;
+            if (!contextMenuIsOurs) { return; }
+            TrackViewer.ContextMenu.CloseAll();
         }
 
         /// <summary>
@@ -712,29 +674,37 @@ namespace ORTS.TrackViewer.Editing
         {
             string[] metadata = { CurrentTrainPath.PathId, CurrentTrainPath.PathName, CurrentTrainPath.PathStart, CurrentTrainPath.PathEnd };
             bool isPlayerPath = (CurrentTrainPath.PathFlags & PathFlags.NotPlayerPath) == 0;
-            PathMetadataDialog metadataDialog = new PathMetadataDialog(metadata, isPlayerPath)
+            Trainpath trainPath = CurrentTrainPath;
+            Dialogs.ShowModal(() =>
             {
-                Left = popupX,
-                Top = popupY
-            };
-            TrackViewer.Localize(metadataDialog);
-            if (metadataDialog.ShowDialog() == true)
+                var metadataDialog = new PathMetadataDialog(metadata, isPlayerPath);
+                Dialogs.PlaceNear(metadataDialog, popupX, popupY);
+                TrackViewer.Localize(metadataDialog);
+                return metadataDialog;
+            }, (window) =>
             {
-                metadata = metadataDialog.GetMetadata();
-                CurrentTrainPath.PathId = metadata[0];
-                CurrentTrainPath.PathName = metadata[1];
-                CurrentTrainPath.PathStart = metadata[2];
-                CurrentTrainPath.PathEnd = metadata[3];
+                var metadataDialog = (PathMetadataDialog)window;
+                if (!metadataDialog.DialogResult) return;
+                string[] newMetadata = metadataDialog.GetMetadata();
+                GameThread.Post(() => SetMetadata(trainPath, newMetadata));
+            });
+        }
 
-                isPlayerPath = (metadata[4] == true.ToString());
-                if (isPlayerPath)
-                {
-                    CurrentTrainPath.PathFlags &= ~PathFlags.NotPlayerPath; // unset the nonplayerpath flag
-                }
-                else
-                {
-                    CurrentTrainPath.PathFlags |= PathFlags.NotPlayerPath; // set the nonplayerpath flag
-                }
+        private static void SetMetadata(Trainpath trainPath, string[] metadata)
+        {
+            trainPath.PathId = metadata[0];
+            trainPath.PathName = metadata[1];
+            trainPath.PathStart = metadata[2];
+            trainPath.PathEnd = metadata[3];
+
+            bool isPlayerPath = (metadata[4] == true.ToString());
+            if (isPlayerPath)
+            {
+                trainPath.PathFlags &= ~PathFlags.NotPlayerPath; // unset the nonplayerpath flag
+            }
+            else
+            {
+                trainPath.PathFlags |= PathFlags.NotPlayerPath; // set the nonplayerpath flag
             }
         }
 
@@ -750,14 +720,14 @@ namespace ORTS.TrackViewer.Editing
             // * Add tail
             // * Reconnect tail
 
-            FileName = path.FilePath.Split('\\').Last();
+            FileName = FileNameOf(path.FilePath);
             Trainpath newPath = new Trainpath(trackDB, tsectionDat, path.FilePath);
 
             // We have a current path and a new path.
             // First check if the new path is usable
             TrainpathNode newStart = newPath.FirstNode;
             if (newPath.FirstNode == null || newPath.FirstNode.NextMainNode == null) {
-                MessageBox.Show(TrackViewer.catalog.GetString("The selected path contains no or only 1 node. The current path was not extended."));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("The selected path contains no or only 1 node. The current path was not extended."));
                 return;
             }
 
@@ -797,11 +767,11 @@ namespace ORTS.TrackViewer.Editing
             if (actionCanBeExecuted)
             {
                 action.DoAction();
-                MessageBox.Show(TrackViewer.catalog.GetString("The selected path has been added as tail and then reconnected."));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("The selected path has been added as tail and then reconnected."));
             }
             else
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("The selected path has been added as tail. It was not possible to reconnect automatically."));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("The selected path has been added as tail. It was not possible to reconnect automatically."));
             }
 
             //Make sure all of the path is drawn, so that also the tail is visible
@@ -844,17 +814,17 @@ namespace ORTS.TrackViewer.Editing
         {
             if (CurrentTrainPath.IsBroken)
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("Reversing broken paths is not supported"));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("Reversing broken paths is not supported"));
                 return false;
             }
             if (CurrentTrainPath.FirstNode == null)
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("Reversing a path without start node is not supported"));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("Reversing a path without start node is not supported"));
                 return false;
             }
             if (!CurrentTrainPath.HasEnd)
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("Reversing a path without end node is not supported"));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("Reversing a path without end node is not supported"));
                 return false;
             }
 

@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -19,7 +19,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
-using System.Windows.Forms;
 using System.Globalization;
 
 namespace ORTS.TrackViewer.UserInterface
@@ -54,7 +53,7 @@ namespace ORTS.TrackViewer.UserInterface
             // Collect all the available language codes by searching for
             // localisation files, but always include English (base language).
             List<string> languageCodes = new List<string> { "en" };
-            foreach (var path in Directory.GetDirectories(Path.GetDirectoryName(Application.ExecutablePath)))
+            foreach (var path in Directory.GetDirectories(AppContext.BaseDirectory))
                 if (Directory.GetFiles(path, "*.Messages.resources.dll").Length > 0)
                     languageCodes.Add(Path.GetFileName(path));
 
@@ -88,9 +87,9 @@ namespace ORTS.TrackViewer.UserInterface
         {
             if (languageCode != CurrentLanguageCode)
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("Please restart TrackViewer in order to load the new language."));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("Please restart TrackViewer in order to load the new language."));
                 ORTS.TrackViewer.Properties.Settings.Default.language = languageCode;
-                ORTS.TrackViewer.Properties.Settings.Default.Save();
+                TrackViewer.SaveSettings();
             }
         }
 
@@ -104,7 +103,10 @@ namespace ORTS.TrackViewer.UserInterface
             {
                 try
                 {
-                    System.Threading.Thread.CurrentThread.CurrentUICulture = new CultureInfo(preferenceLanguageCode);
+                    var culture = new CultureInfo(preferenceLanguageCode);
+                    System.Threading.Thread.CurrentThread.CurrentUICulture = culture;
+                    // also for the Avalonia UI thread (dialogs)
+                    CultureInfo.DefaultThreadCurrentUICulture = culture;
                 }
                 catch { }
             }

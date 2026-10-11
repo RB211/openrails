@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014, 2018 by the Open Rails project.
+// COPYRIGHT 2014, 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -59,7 +59,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 using Orts.Formats.Msts;
-using Orts.Viewer3D;
+
 using ORTS.Common;
 
 namespace ORTS.TrackViewer.Drawing
@@ -118,9 +118,9 @@ namespace ORTS.TrackViewer.Drawing
         public DrawTerrain(string routePath, MessageDelegate messageDelegate, DrawWorldTiles drawWorldTiles)
         {
             this.messageDelegate = messageDelegate;
-            this.tilesPath = routePath + @"\TILES\";
-            this.lotilesPath = routePath + @"\LO_TILES\";
-            this.terrtexPath = routePath + @"\TERRTEX\";
+            this.tilesPath = CaseInsensitivePath.Resolve(Path.Combine(routePath, "TILES")) + Path.DirectorySeparatorChar;
+            this.lotilesPath = CaseInsensitivePath.Resolve(Path.Combine(routePath, "LO_TILES")) + Path.DirectorySeparatorChar;
+            this.terrtexPath = CaseInsensitivePath.Resolve(Path.Combine(routePath, "TERRTEX")) + Path.DirectorySeparatorChar;
 
             locationTranslator = new Translate3Dto2D(drawWorldTiles);
             terrainTiles = new Dictionary<uint, TerrainTile2D>();
@@ -622,7 +622,7 @@ namespace ORTS.TrackViewer.Drawing
                 return false;
             }
 
-            string path = terrtexPath + filename;
+            string path = CaseInsensitivePath.Resolve(terrtexPath + filename);
             if (File.Exists(path))
             {
                 //The message delegate has quite some overhead, so print it only so often to keep the user informed
@@ -636,7 +636,7 @@ namespace ORTS.TrackViewer.Drawing
                 try
                 {
                     if (Path.GetExtension(path) == ".dds")
-                        DDSLib.DDSFromFile(path, device, true, out originalTexture);
+                        Orts.Viewer3D.DDSLib.DDSFromFile(path, device, true, out originalTexture);
                     else if (Path.GetExtension(path) == ".ace")
                         originalTexture = AceFile.Texture2DFromFile(device, path);
                     else

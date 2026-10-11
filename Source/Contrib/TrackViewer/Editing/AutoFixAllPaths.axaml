@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.Editing.AutoFixAllPaths"
+        Title="Result of auto correcting all paths" Width="560" SizeToContent="Height">
+    <StackPanel Orientation="Vertical" Margin="6">
+        <ScrollViewer Height="300">
+            <StackPanel>
+                <TextBlock Name="ModifiedBrokenLabel" IsVisible="False" TextWrapping="Wrap" FontWeight="Bold">Paths that are modified but still broken (these could not be fixed completely, apparently</TextBlock>
+                <ListBox Name="ModifiedBrokenList" Margin="10" IsVisible="False"/>
+                <TextBlock Name="ModifiedFineLabel" IsVisible="False" TextWrapping="Wrap" FontWeight="Bold">Paths that are modified and are fine now</TextBlock>
+                <ListBox Name="ModifiedFineList" Margin="10" IsVisible="False"/>
+                <TextBlock Name="UnmodifiedBrokenLabel" IsVisible="False" TextWrapping="Wrap" FontWeight="Bold">Paths that are unmodified but still broken (these could not be fixed apparently)</TextBlock>
+                <ListBox Name="UnmodifiedBrokenList" Margin="10" IsVisible="False"/>
+                <TextBlock Name="UnmodifiedFineLabel" IsVisible="False" TextWrapping="Wrap" FontWeight="Bold">Paths that are unmodified and fine</TextBlock>
+                <ListBox Name="UnmodifiedFineList" Margin="10" IsVisible="False"/>
+            </StackPanel>
+        </ScrollViewer>
+        <Button Name="SaveOverview" HorizontalAlignment="Left" Margin="10 10 0 2" Click="SaveOverview_Click">Save the above overview</Button>
+        <StackPanel Orientation="Horizontal">
+            <Label Margin="7 0 0 0" VerticalAlignment="Center">Save all modified paths:</Label>
+            <Button Name="SaveDirect" HorizontalAlignment="Left" Margin="10 2 0 2" IsEnabled="False" Click="SaveDirect_Click">directly</Button>
+            <Button Name="SaveAndConfirm" HorizontalAlignment="Left" Margin="10 2 0 2" IsEnabled="False" Click="SaveAndConfirm_Click">individually with confirmation</Button>
+        </StackPanel>
+        <Button Name="Cancel" HorizontalAlignment="Left" Margin="10 2 0 5" Click="Cancel_Click">Cancel</Button>
+    </StackPanel>
+</Window>

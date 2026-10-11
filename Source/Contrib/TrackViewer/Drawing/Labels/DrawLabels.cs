@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2018 by the Open Rails project.
+// COPYRIGHT 2018 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -19,9 +19,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
 using Newtonsoft.Json;
+using ORTS.TrackViewer.UserInterface;
 
 using ORTS.Common;
 
@@ -120,11 +119,16 @@ namespace ORTS.TrackViewer.Drawing.Labels
         /// <param name="mouseY">Current Y-location of the mouse to determine popu location</param>
         internal void AddLabel(int mouseX, int mouseY)
         {
-            var labelInputPopup = new EditLabel("<label>", mouseX, mouseY, 
-                (newLabelText) => labels.Add(drawArea.MouseLocation, newLabelText),
-                allowDelete: false);
-            TrackViewer.Localize(labelInputPopup);
-            labelInputPopup.ShowDialog();
+            if (drawArea == null) return;
+            WorldLocation location = drawArea.MouseLocation;
+            Dialogs.ShowModal(() =>
+            {
+                var labelInputPopup = new EditLabel("<label>", mouseX, mouseY,
+                    (newLabelText) => labels.Add(location, newLabelText),
+                    allowDelete: false);
+                TrackViewer.Localize(labelInputPopup);
+                return labelInputPopup;
+            }, null);
         }
 
         /// <summary>
@@ -132,24 +136,14 @@ namespace ORTS.TrackViewer.Drawing.Labels
         /// </summary>
         /// <param name="mouseX">Current X-location of the mouse to determine popup location</param>
         /// <param name="mouseY">Current Y-location of the mouse to determine popu location</param>
-        internal void PopupContextMenu(int mouseX, int mouseY)
+        internal void PopupContextMenu(int windowX, int windowY, int mouseX, int mouseY)
         {
             if (!Properties.Settings.Default.showLabels) return;
             if (labels.Labels.Count() == 0) return;
             var editingLabel = closestToMouseLabel;
 
-            var contextMenu = new ContextMenu();
-
-            var editLabelMenuItem = new MenuItem
-            {
-                Header = "Edit label",
-                IsCheckable = false
-            };
-            editLabelMenuItem.Click += new RoutedEventHandler((sender, e) => ModifyLabel(closestToMouseLabel, mouseX, mouseY));
-
-            contextMenu.Items.Add(editLabelMenuItem);
-            contextMenu.PlacementRectangle = new Rect((double)mouseX, (double)mouseY, 20, 20);
-            contextMenu.IsOpen = true;
+            var editLabelMenuItem = new GameMenuItem(TrackViewer.catalog.GetString("Edit label"), _ => ModifyLabel(editingLabel, mouseX, mouseY));
+            TrackViewer.ContextMenu.OpenContextMenu(new[] { editLabelMenuItem }, windowX, windowY);
         }
 
         /// <summary>
@@ -160,21 +154,24 @@ namespace ORTS.TrackViewer.Drawing.Labels
         /// <param name="mouseY">Current Y-location of the mouse to determine popu location</param>
         private void ModifyLabel(StorableLabel oldLabel, int mouseX, int mouseY)
         {
-            var labelInputPopup = new EditLabel(oldLabel.LabelText, mouseX, mouseY,
-                (newLabelText) =>
-                {
-                    if (newLabelText == null)
+            Dialogs.ShowModal(() =>
+            {
+                var labelInputPopup = new EditLabel(oldLabel.LabelText, mouseX, mouseY,
+                    (newLabelText) =>
                     {
-                        labels.Delete(oldLabel);
-                    }
-                    else
-                    {
-                        var newLabel = new StorableLabel(oldLabel.WorldLocation, newLabelText);
-                        labels.Replace(oldLabel, newLabel);
-                    }
-                }, allowDelete: true);
-            TrackViewer.Localize(labelInputPopup);
-            labelInputPopup.ShowDialog();
+                        if (newLabelText == null)
+                        {
+                            labels.Delete(oldLabel);
+                        }
+                        else
+                        {
+                            var newLabel = new StorableLabel(oldLabel.WorldLocation, newLabelText);
+                            labels.Replace(oldLabel, newLabel);
+                        }
+                    }, allowDelete: true);
+                TrackViewer.Localize(labelInputPopup);
+                return labelInputPopup;
+            }, null);
         }
 
         #endregion
@@ -185,24 +182,11 @@ namespace ORTS.TrackViewer.Drawing.Labels
         /// </summary>
         internal void SaveLabels()
         {
-            string filename = GetSaveFileName();
-            if (filename == string.Empty) return;
-            WriteJson(filename);
-        }
-
-        /// <summary>
-        /// Ask the user for a filename to be used for saving
-        /// </summary>
-        /// <returns>Either the filename or empty when cancelled by the user</returns>
-        private string GetSaveFileName() {
-            var dialog = new Microsoft.Win32.SaveFileDialog
+            Dialogs.SaveFile(TrackViewer.catalog.GetString("Save labels"), "labels.json", ".json", "JSON Files (.json)", null, (filename) =>
             {
-                OverwritePrompt = true,
-                FileName = "labels.json",
-                DefaultExt = ".json",
-                Filter = "JSON Files (.json)|*.json"
-            };
-            return (dialog.ShowDialog() == true) ? dialog.FileName : string.Empty;
+                if (filename == string.Empty) return;
+                WriteJson(filename);
+            });
         }
 
         /// <summary>
@@ -231,23 +215,11 @@ namespace ORTS.TrackViewer.Drawing.Labels
         /// </summary>
         internal void LoadLabels()
         {
-            string filename = GetLoadFileName();
-            if (filename == string.Empty) return;
-            LoadJson(filename);
-        }
-
-        /// <summary>
-        /// Ask the user for a filename to be used for loading
-        /// </summary>
-        /// <returns>Either the filename or empty when cancelled by the user</returns>
-        private string GetLoadFileName() {
-            var dialog = new Microsoft.Win32.OpenFileDialog
+            Dialogs.OpenFile(TrackViewer.catalog.GetString("Load labels"), ".json", "JSON Files (.json)", null, (filename) =>
             {
-                FileName = "labels.json",
-                DefaultExt = ".json",
-                Filter = "JSON Files (.json)|*.json"
-            };
-            return (dialog.ShowDialog() == true) ? dialog.FileName : string.Empty;
+                if (filename == string.Empty) return;
+                LoadJson(filename);
+            });
         }
 
         /// <summary>
@@ -263,7 +235,7 @@ namespace ORTS.TrackViewer.Drawing.Labels
             }
             catch
             {
-                MessageBox.Show(TrackViewer.catalog.GetString("The .json file could not be read properly."));
+                Dialogs.ShowMessage(TrackViewer.catalog.GetString("The .json file could not be read properly."));
                 return;
             }
             
@@ -292,7 +264,7 @@ namespace ORTS.TrackViewer.Drawing.Labels
 
             if (message != string.Empty)
             {
-                MessageBox.Show(message);
+                Dialogs.ShowMessage(message);
             }
 
         }

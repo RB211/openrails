@@ -1,0 +1,14 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ORTS.TrackViewer.UserInterface.OtherPathsWindow"
+        Height="400" Width="420" Title="Select paths to draw">
+    <DockPanel>
+        <DockPanel DockPanel.Dock="Bottom" Margin="4">
+            <Button DockPanel.Dock="Left" Name="ClearOtherPathsButton" Margin="1,3,30,3" Click="ClearOtherPathsButton_Click">Clear all</Button>
+            <CheckBox DockPanel.Dock="Right" HorizontalAlignment="Right" Name="AlwaysOnTop" Margin="30,3,0,3" Click="AlwaysOnTop_Click">Window always on top</CheckBox>
+        </DockPanel>
+        <ScrollViewer>
+            <StackPanel Name="listOfPaths" Margin="6,2"/>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,4 +1,4 @@
-﻿// COPYRIGHT 2014 by the Open Rails project.
+// COPYRIGHT 2014 by the Open Rails project.
 // 
 // This file is part of Open Rails.
 // 
@@ -59,16 +59,18 @@ namespace ORTS.TrackViewer.Drawing
             Dictionary<int, List<int>> worldTiles = new Dictionary<int, List<int>>();
 
             // First find all world tiles
-            string WFilePath = routePath + @"\WORLD\";
-            foreach (string fileName in Directory.GetFiles(WFilePath, "*.w"))
+            string WFilePath = CaseInsensitivePath.Resolve(Path.Combine(routePath, "WORLD"));
+            if (!Directory.Exists(WFilePath)) return;
+            foreach (string fileName in Directory.GetFiles(WFilePath, "*.w", CaseInsensitivePath.IgnoreCase))
             {
                 try
                 {
                     // Parse the tile location out of the filename
                     // if this goes wrong, well, pity
-                    int p = fileName.ToUpper(System.Globalization.CultureInfo.InvariantCulture).LastIndexOf("\\WORLD\\W", StringComparison.OrdinalIgnoreCase);
-                    int TileX = int.Parse(fileName.Substring(p + 8, 7), System.Globalization.CultureInfo.InvariantCulture);
-                    int TileZ = int.Parse(fileName.Substring(p + 15, 7), System.Globalization.CultureInfo.InvariantCulture);
+                    // file names are like w-012345+012345.w
+                    string name = Path.GetFileName(fileName);
+                    int TileX = int.Parse(name.Substring(1, 7), System.Globalization.CultureInfo.InvariantCulture);
+                    int TileZ = int.Parse(name.Substring(8, 7), System.Globalization.CultureInfo.InvariantCulture);
 
                     if (!worldTiles.ContainsKey(TileX)) worldTiles[TileX] = new List<int>();
 
