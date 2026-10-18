@@ -52,6 +52,8 @@ namespace Orts.Viewer3D.Processes
         public VRSession VR { get; private set; }
         readonly bool VRRequested;
         VRSessionStarter VRStarter; // the session being created in the background, until it arrives or fails
+        /// <summary>What happened to the VR request so far, for the log; the runtime may answer before the log file is open.</summary>
+        public string VRStatus { get; private set; }
 
         RenderFrame CurrentFrame;   // a frame contains a list of primitives to draw at a specified time
         RenderFrame NextFrame;      // we prepare the next frame in the background while the current one is rendering,
@@ -215,7 +217,8 @@ namespace Orts.Viewer3D.Processes
 
             if (VRRequested)
             {
-                Trace.TraceInformation("VR: asking the OpenXR runtime for a headset; the game runs flat until it answers");
+                VRStatus = "VR: asking the OpenXR runtime for a headset; the game runs flat until it answers";
+                Trace.TraceInformation(VRStatus);
                 VRStarter = VRSession.StartInBackground(GraphicsDevice);
             }
         }
@@ -329,6 +332,9 @@ namespace Orts.Viewer3D.Processes
             {
                 // The cameras notice the headset (Viewer.VR) on their next PrepareFrame and widen their culling.
                 VR = VRStarter.Session;
+                VRStatus = VR != null
+                    ? String.Format("VR: {0} on {1}, {2}x{3} per eye", VR.RuntimeName, VR.SystemName, VR.EyeWidth, VR.EyeHeight)
+                    : "VR: could not start an OpenXR session; running without VR. " + VRStarter.Failure;
                 VRStarter = null;
             }
 

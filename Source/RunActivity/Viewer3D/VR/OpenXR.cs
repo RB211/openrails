@@ -100,9 +100,9 @@ namespace Orts.Viewer3D.VR
         SwapchainImageAcquireInfo = 55,
         SwapchainImageWaitInfo = 56,
         SwapchainImageReleaseInfo = 57,
-        GraphicsRequirementsD3D11KHR = 1000027000,
-        GraphicsBindingD3D11KHR = 1000027001,
-        SwapchainImageD3D11KHR = 1000027002,
+        GraphicsRequirementsD3D11KHR = 1000027002,
+        GraphicsBindingD3D11KHR = 1000027000,
+        SwapchainImageD3D11KHR = 1000027001,
     }
 
     enum XrFormFactor { HeadMountedDisplay = 1, HandheldDisplay = 2 }

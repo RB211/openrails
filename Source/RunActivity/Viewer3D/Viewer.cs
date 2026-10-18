@@ -473,6 +473,8 @@ namespace Orts.Viewer3D
         internal void Initialize()
         {
             GraphicsDevice = RenderProcess.GraphicsDevice;
+            if (RenderProcess.VRStatus != null)
+                Trace.TraceInformation("{0} (as of building the world)", RenderProcess.VRStatus);
             UpdateAdapterInformation(GraphicsDevice.Adapter);
             DefaultViewport = GraphicsDevice.Viewport;
 
