@@ -20,6 +20,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Orts.Processes;
+using Orts.Viewer3D.VR;
 using ORTS.Common;
 using System;
 using System.Diagnostics;
@@ -46,6 +47,11 @@ namespace Orts.Viewer3D.Processes
         readonly WatchdogToken WatchdogToken;
 
         public GraphicsDeviceManager GraphicsDeviceManager { get; private set; }
+
+        /// <summary>The headset session when VR is on and a runtime accepted us; null means draw flat.</summary>
+        public VRSession VR { get; private set; }
+        readonly bool VRRequested;
+        VRSessionStarter VRStarter; // the session being created in the background, until it arrives or fails
 
         RenderFrame CurrentFrame;   // a frame contains a list of primitives to draw at a specified time
         RenderFrame NextFrame;      // we prepare the next frame in the background while the current one is rendering,
@@ -95,8 +101,10 @@ namespace Orts.Viewer3D.Processes
             Game.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
             Game.InactiveSleepTime = TimeSpan.FromMilliseconds(100);
 
-            // Set up the rest of the graphics according to the settings.
-            GraphicsDeviceManager.SynchronizeWithVerticalRetrace = Game.Settings.VerticalSync;
+            // Set up the rest of the graphics according to the settings. A headset paces the frames
+            // itself (xrWaitFrame), so the monitor's vsync must not throttle it too.
+            VRRequested = Game.Settings.VR || Environment.GetEnvironmentVariable("OPENRAILS_VR") == "1";
+            GraphicsDeviceManager.SynchronizeWithVerticalRetrace = Game.Settings.VerticalSync && !VRRequested;
             GraphicsDeviceManager.PreferredBackBufferFormat = SurfaceFormat.Color;
             GraphicsDeviceManager.PreferredDepthStencilFormat = DepthFormat.Depth24Stencil8;
             GraphicsDeviceManager.IsFullScreen = Game.Settings.FullScreen;
@@ -204,6 +212,12 @@ namespace Orts.Viewer3D.Processes
 
             CurrentFrame = new RenderFrame(Game);
             NextFrame = new RenderFrame(Game);
+
+            if (VRRequested)
+            {
+                Trace.TraceInformation("VR: asking the OpenXR runtime for a headset; the game runs flat until it answers");
+                VRStarter = VRSession.StartInBackground(GraphicsDevice);
+            }
         }
 
         void InitializeShadowMapLocations()
@@ -310,6 +324,26 @@ namespace Orts.Viewer3D.Processes
             }
 
             Game.State.BeginRender(CurrentFrame);
+
+            if (VRStarter != null && VRStarter.Done)
+            {
+                // The cameras notice the headset (Viewer.VR) on their next PrepareFrame and widen their culling.
+                VR = VRStarter.Session;
+                VRStarter = null;
+            }
+
+            if (VR != null)
+            {
+                if (VR.Dead)
+                {
+                    VR.Dispose();
+                    VR = null;
+                    if (Viewer != null && Viewer.Camera != null)
+                        Viewer.Camera.ScreenChanged();
+                }
+                else
+                    VR.BeginFrame();
+            }
         }
 
         [ThreadName("Render")]
@@ -337,6 +371,9 @@ namespace Orts.Viewer3D.Processes
             if (Game.State == null)
                 return;
 
+            if (VR != null)
+                VR.EndFrame();
+
             Game.State.EndRender(CurrentFrame);
 
             for (var i = 0; i < (int)RenderPrimitiveSequence.Sentinel; i++)
@@ -359,6 +396,17 @@ namespace Orts.Viewer3D.Processes
         internal void Stop()
         {
             Game.WatchdogProcess.Unregister(WatchdogToken);
+
+            if (VRStarter != null)
+            {
+                VRStarter.Abandon();
+                VRStarter = null;
+            }
+            if (VR != null)
+            {
+                VR.Dispose();
+                VR = null;
+            }
 
             // these run in the Renderer thread, and thus cannot be disposed in GameStateViewer3D
             if (Program.MapForm != null)
