@@ -13,8 +13,9 @@ as a mirror with the usual 2D overlays (HUD, popup windows, labels) on top of it
   connected; with others the answer is immediate. If there is no runtime or no headset, a
   warning naming the reason goes to the log and the game stays flat.
 * Vertical sync is turned off while VR is requested: the headset paces the frames.
-* `Alt+V` (`GameVRRecenter`) makes the current head position and yaw the seat. The seat is
-  where the camera is: in the 3D cab, the cab view's head position.
+* The seat is where the camera is: in the 3D cab, the cab view's head position
+  (`ORTS3DCabHeadPos`). The head is put there automatically on the first frame the headset
+  shows, and `Alt+V` (`GameVRRecenter`) does it again from the current head position and yaw.
 * The 3D cab is preferred over the 2D cab whenever a headset is in use.
 
 ## What it needs

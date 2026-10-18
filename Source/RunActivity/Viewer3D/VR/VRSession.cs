@@ -375,6 +375,9 @@ namespace Orts.Viewer3D.VR
             {
                 RenderedOnce = true;
                 Trace.TraceInformation("VR: the runtime is showing our frames (session state {0})", SessionState);
+                // The runtime's origin is wherever the headset was at session start, often still on the desk.
+                // Make the seat where the driver's head is when the picture first appears; Alt+V redoes it.
+                RecenterRequested = true;
             }
         }
 
