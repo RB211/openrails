@@ -85,6 +85,7 @@ namespace Orts.Viewer3D.VR
         bool FrameBegun;
         bool SessionRunning;
         XrSessionState SessionState = XrSessionState.Unknown;
+        bool RenderedOnce;
         long SwapchainFormat;
         readonly bool[] EyeSubmitted = new bool[EyeCount];
 
@@ -370,6 +371,11 @@ namespace Orts.Viewer3D.VR
             VerticalFovRadians = vertical;
 
             FrameActive = FrameState.ShouldRender != 0;
+            if (FrameActive && !RenderedOnce)
+            {
+                RenderedOnce = true;
+                Trace.TraceInformation("VR: the runtime is showing our frames (session state {0})", SessionState);
+            }
         }
 
         /// <summary>The eye's pose in the seat frame; the eye view matrix is seatView * Invert(EyePose).</summary>
@@ -525,6 +531,7 @@ namespace Orts.Viewer3D.VR
 
         void OnSessionStateChanged(XrSessionState state)
         {
+            Trace.TraceInformation("VR: session state {0} -> {1}", SessionState, state);
             SessionState = state;
             switch (state)
             {
