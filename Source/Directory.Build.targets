@@ -1,0 +1,10 @@
+<Project>
+  <!-- Building with the .NET SDK on non-Windows hosts (dotnet build) needs the
+       preserialized-resource path for the non-string .resx entries. -->
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
+  </ItemGroup>
+</Project>
