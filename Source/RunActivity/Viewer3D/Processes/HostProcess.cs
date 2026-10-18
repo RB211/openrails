@@ -82,10 +82,37 @@ namespace Orts.Viewer3D.Processes
             State.SignalTerminate();
         }
 
+        /// <summary>
+        /// True when running under Wine, where Windows performance counters are not available and
+        /// reading them can take down the process (the exception cannot unwind through Wine's
+        /// in-process performance DLL callbacks).
+        /// </summary>
+        public static bool IsWine
+        {
+            get
+            {
+                try
+                {
+                    var ntdll = GetModuleHandle("ntdll.dll");
+                    return ntdll != IntPtr.Zero && GetProcAddress(ntdll, "wine_get_version") != IntPtr.Zero;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
         [ThreadName("Host")]
         void HostThread()
         {
             Profiler.SetThread();
+
+            if (IsWine)
+            {
+                Trace.TraceInformation("Host process monitoring disabled: performance counters are not available under Wine");
+                return;
+            }
 
             var memoryStatus = new MEMORYSTATUSEX { Size = 64 };
             GlobalMemoryStatusEx(memoryStatus);
@@ -116,9 +143,10 @@ namespace Orts.Viewer3D.Processes
                 }
                 catch (Exception error)
                 {
-                    // We ignore all errors because the data is non-critical
-                    // Trace.WriteLine(error);
-                    Game.ProcessReportError(error);
+                    // We ignore all errors because the data is non-critical, but stop
+                    // collecting since the counters are evidently unavailable (e.g. under Wine).
+                    Trace.TraceWarning("Host process monitoring stopped: {0}", error.Message);
+                    return false;
                 }
             }
             return true;
@@ -228,6 +256,12 @@ namespace Orts.Viewer3D.Processes
             public ulong AvailableVirtual;
             public ulong AvailableExtendedVirtual;
         }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr GetModuleHandle(string moduleName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
+        static extern IntPtr GetProcAddress(IntPtr module, string procName);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX buffer);
