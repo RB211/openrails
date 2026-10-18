@@ -120,6 +120,7 @@ namespace Orts.Viewer3D.Processes
 
         internal override void Update(RenderFrame frame, double totalRealSeconds)
         {
+            frame.ResetView(); // in case the in-game menu left its view on this frame
             UpdateLoading();
 
             if (Loading != null)

@@ -18,6 +18,17 @@ as a mirror with the usual 2D overlays (HUD, popup windows, labels) on top of it
   shows, and `Alt+V` (`GameVRRecenter`) does it again from the current head position and yaw.
 * The 3D cab is preferred over the 2D cab whenever a headset is in use.
 
+## The in-game start menu
+
+`RunActivity.exe -menu` starts with a menu drawn inside the game (`GameStateVRMenu`): a panel
+floating 1.7 m in front of the driver, so a run can be chosen from the headset where the desktop
+menu window cannot be seen. It works flat too. Route, activity (or explore), path, consist, then
+start time, season and weather; Up/Down move, Enter chooses, Backspace goes back, Left/Right
+change a value, Escape quits. It reads the same content folders as the desktop menu (the
+`Orts.Menu` library) and starts the run in the same process with the command line the desktop
+menu would have used. The headset's desktop view (WayVR or similar) is only needed for the
+desktop menu's other features (options, saves, timetables).
+
 ## What it needs
 
 * The WindowsDX (SharpDX / Direct3D 11) build of MonoGame, which is what Open Rails ships.

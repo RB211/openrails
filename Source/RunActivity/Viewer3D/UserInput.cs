@@ -176,6 +176,9 @@ namespace Orts.Viewer3D
             return setting.IsKeyDown(KeyboardState);
         }
 
+        /// <summary>True on the update in which <paramref name="key"/> went down (for menus that take raw keys).</summary>
+        public static bool IsKeyPressed(Keys key) { return KeyboardState.IsKeyDown(key) && !LastKeyboardState.IsKeyDown(key); }
+        public static bool IsKeyDown(Keys key) { return KeyboardState.IsKeyDown(key); }
         public static Keys[] GetPressedKeys() { return KeyboardState.GetPressedKeys(); }
         public static Keys[] GetPreviousPressedKeys() { return LastKeyboardState.GetPressedKeys(); }
 

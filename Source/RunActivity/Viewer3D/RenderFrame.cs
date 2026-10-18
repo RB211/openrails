@@ -517,8 +517,39 @@ namespace Orts.Viewer3D
                 SceneryShader = viewer.MaterialManager.SceneryShader;
         }
 
+        /// <summary>True when a view was given by <see cref="SetView"/> rather than a <see cref="Camera"/> (e.g. the menu).</summary>
+        bool HasView;
+
+        /// <summary>
+        /// Sets the view for a frame that has no <see cref="Camera"/>: the seat view (in VR each eye is placed relative to it,
+        /// and the window shows it from the tracked head) and the projection used when drawing flat.
+        /// </summary>
+        public void SetView(Matrix seatView, Matrix projection)
+        {
+            Camera = null;
+            HasView = true;
+            XNASeatView = seatView;
+            var vr = Game.RenderProcess.VR;
+            XNACameraView = vr != null ? seatView * Matrix.Invert(vr.HeadPose) : seatView;
+            XNACameraProjection = projection;
+            XNACameraLocation = Matrix.Invert(seatView).Translation;
+            XNACameraLocation.Z *= -1;
+        }
+
+        /// <summary>Back to the camera-less defaults (identity view, orthographic projection) used by the loading screen.</summary>
+        public void ResetView()
+        {
+            if (!HasView)
+                return;
+            HasView = false;
+            Camera = null;
+            XNACameraView = XNASeatView = Matrix.Identity;
+            XNACameraProjection = Matrix.CreateOrthographic(Game.RenderProcess.DisplaySize.X, Game.RenderProcess.DisplaySize.Y, 1, 100);
+        }
+
         public void SetCamera(Camera camera)
         {
+            HasView = false;
             Camera = camera;
             XNACameraLocation = CameraLocation = Camera.Location;
             XNACameraLocation.Z *= -1;
@@ -887,7 +918,8 @@ namespace Orts.Viewer3D
 
             var savedView = XNACameraView;
             var savedProjection = XNACameraProjection;
-            var nearPlane = Camera != null ? Camera.NearPlane : 1f;
+            var hasView = Camera != null || HasView;
+            var nearPlane = Camera != null ? Camera.NearPlane : 0.1f;
             var farPlane = (float)Game.Settings.ViewingDistance;
             var skyFarPlane = SkyPrimitive.RadiusM + 100;
             var distantMountainNearPlane = MathHelper.Clamp(Game.Settings.ViewingDistance - 500, 500, 1500);
@@ -896,7 +928,7 @@ namespace Orts.Viewer3D
             for (var eye = 0; eye < EyeSurface.Length; eye++)
             {
                 if (logging) Console.WriteLine("  Eye {0} {{", eye);
-                if (Camera != null)
+                if (hasView)
                 {
                     XNACameraView = XNASeatView * Matrix.Invert(vr.EyePose(eye));
                     XNACameraProjection = vr.EyeProjection(eye, nearPlane, farPlane);
@@ -904,7 +936,7 @@ namespace Orts.Viewer3D
                 }
                 graphicsDevice.SetRenderTarget(EyeSurface[eye]);
                 // Before the world exists (loading screen) the eye gets everything, so the headset is not left black.
-                DrawScene(graphicsDevice, logging, Camera != null ? SequenceFilter.Scene : SequenceFilter.All);
+                DrawScene(graphicsDevice, logging, hasView ? SequenceFilter.Scene : SequenceFilter.All);
                 graphicsDevice.SetRenderTarget(null); // also resolves multisampling into the texture we copy
                 vr.SubmitEye(eye, EyeSurface[eye]);
                 if (logging) Console.WriteLine("  }");
@@ -926,7 +958,7 @@ namespace Orts.Viewer3D
                 RenderSurfaceMaterial.SpriteBatch.Draw(EyeSurface[0], mirror, Color.White);
                 RenderSurfaceMaterial.ResetState(graphicsDevice);
             }
-            if (Camera != null)
+            if (hasView)
             {
                 if (logging) Console.WriteLine("  Mirror overlay {");
                 DrawSequences(graphicsDevice, logging, SequenceFilter.Overlay);
