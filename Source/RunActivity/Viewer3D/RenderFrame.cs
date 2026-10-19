@@ -420,9 +420,21 @@ namespace Orts.Viewer3D
         static RenderTarget2D OverlaySurface;
         static Orts.Viewer3D.VR.VRTexturedMaterial OverlayPanelMaterial;
         static Orts.Viewer3D.VR.VRQuadPrimitive OverlayPanelQuad;
-        static readonly Vector3 OverlayPanelCentre = new Vector3(0, -0.32f, -1.0f);
-        const float OverlayPanelWidthM = 1.3f;
-        const float OverlayPanelTiltDeg = -25f; // top toward the driver: the panel sits below eye level
+        // Defaults put it at reading distance; OPENRAILS_VR_PANEL=distance,width,drop,tilt (metres and degrees) overrides them.
+        static readonly float OverlayPanelDistanceM = EnvFloat(0, 0.6f);
+        static readonly float OverlayPanelWidthM = EnvFloat(1, 0.8f);
+        static readonly float OverlayPanelDropM = EnvFloat(2, 0.22f);
+        static readonly float OverlayPanelTiltDeg = EnvFloat(3, -30f); // negative: top toward the driver, since the panel sits below eye level
+        static readonly Vector3 OverlayPanelCentre = new Vector3(0, -OverlayPanelDropM, -OverlayPanelDistanceM);
+
+        static float EnvFloat(int index, float fallback)
+        {
+            var value = Environment.GetEnvironmentVariable("OPENRAILS_VR_PANEL");
+            if (String.IsNullOrEmpty(value)) return fallback;
+            var parts = value.Split(',');
+            float result;
+            return index < parts.Length && float.TryParse(parts[index], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out result) ? result : fallback;
+        }
 
         public RenderFrame(Game game)
         {
