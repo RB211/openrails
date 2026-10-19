@@ -50,7 +50,11 @@ controller's aim pose in the seat frame and its inputs. A beam is drawn from eac
   left button. The beam turns green on a control, the controller buzzes when one is grabbed, and the
   menu button recentres the view.
 * A controller that is put down goes idle after three seconds without movement or a press (its beam
-  disappears and it drives nothing) until it is picked up again. `Alt+F` (`GameVRControllers`)
+  disappears and it drives nothing) until it is picked up again. A Quest switches to hand tracking whenever
+  it decides the controllers are at rest, even while they are held still, and WiVRn then presents the
+  hands as the simple controller; they are accepted as a pointer (pinch to click), or ignored with
+  `OPENRAILS_VR_HAND_TRACKING=0`. Turning hand tracking off in the headset's settings avoids the
+  switching altogether. `Alt+F` (`GameVRControllers`)
   switches the controllers off and on altogether, and `OPENRAILS_VR_CONTROLLERS=0` starts with them off.
 * Before the world exists (the loading screen) the 2D picture is drawn at window size and shown on a
   panel 2.2 m in front of the driver, fixed in space, instead of being pasted onto each eye.

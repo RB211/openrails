@@ -93,11 +93,12 @@ namespace Orts.Viewer3D.VR
         /// </summary>
         public bool ControllersEnabled = Environment.GetEnvironmentVariable("OPENRAILS_VR_CONTROLLERS") != "0";
         /// <summary>
-        /// Runtimes that track bare hands (WiVRn on a Quest) present them as the Khronos simple controller the
-        /// moment the real controllers are put down, so the beams would carry on following the hands. Those
-        /// are ignored unless OPENRAILS_VR_HAND_TRACKING=1.
+        /// Runtimes that track bare hands (WiVRn on a Quest) present them as the Khronos simple controller, and a
+        /// Quest switches to them whenever it decides the controllers are at rest, even in the driver's hands.
+        /// So hands are accepted as a pointer (pinch to click) unless OPENRAILS_VR_HAND_TRACKING=0; the idle rule
+        /// still silences a hand that lies still. Turning hand tracking off on the headset avoids the switching.
         /// </summary>
-        public readonly bool HandTrackingAllowed = Environment.GetEnvironmentVariable("OPENRAILS_VR_HAND_TRACKING") == "1";
+        public readonly bool HandTrackingAllowed = Environment.GetEnvironmentVariable("OPENRAILS_VR_HAND_TRACKING") != "0";
         const string SimpleControllerProfile = "/interaction_profiles/khr/simple_controller";
         readonly string[] HandProfiles = new string[HandCount];
         bool ProfilesLogged;
@@ -684,7 +685,7 @@ namespace Orts.Viewer3D.VR
                 var profile = result < 0 ? null : state.InteractionProfile == 0 ? null : PathToString(state.InteractionProfile);
                 HandProfiles[hand] = profile;
                 Trace.TraceInformation("VR: {0} controller profile: {1}{2}", hand == LeftHand ? "left" : "right", profile ?? (result < 0 ? result.ToString() : "none"),
-                    profile == SimpleControllerProfile && !HandTrackingAllowed ? " (hand tracking; ignored)" : "");
+                    profile == SimpleControllerProfile ? (HandTrackingAllowed ? " (hand tracking)" : " (hand tracking; ignored)") : "");
             }
         }
 
