@@ -92,6 +92,15 @@ namespace Orts.Viewer3D.VR
         /// <see cref="VRHand.Active"/> is false until it is picked up again.
         /// </summary>
         public bool ControllersEnabled = Environment.GetEnvironmentVariable("OPENRAILS_VR_CONTROLLERS") != "0";
+        /// <summary>
+        /// Runtimes that track bare hands (WiVRn on a Quest) present them as the Khronos simple controller the
+        /// moment the real controllers are put down, so the beams would carry on following the hands. Those
+        /// are ignored unless OPENRAILS_VR_HAND_TRACKING=1.
+        /// </summary>
+        public readonly bool HandTrackingAllowed = Environment.GetEnvironmentVariable("OPENRAILS_VR_HAND_TRACKING") == "1";
+        const string SimpleControllerProfile = "/interaction_profiles/khr/simple_controller";
+        readonly string[] HandProfiles = new string[HandCount];
+        bool ProfilesLogged;
         public const float IdleAfterSeconds = 3;
         const float IdleMoveMetres = 0.015f;
         const float IdleTurnRadians = 0.035f;
@@ -672,7 +681,10 @@ namespace Orts.Viewer3D.VR
             {
                 var state = new XrInteractionProfileState { Type = XrStructureType.InteractionProfileState };
                 var result = OpenXR.xrGetCurrentInteractionProfile(Session, HandPaths[hand], &state);
-                Trace.TraceInformation("VR: {0} controller profile: {1}", hand == LeftHand ? "left" : "right", result < 0 ? result.ToString() : state.InteractionProfile == 0 ? "none" : PathToString(state.InteractionProfile));
+                var profile = result < 0 ? null : state.InteractionProfile == 0 ? null : PathToString(state.InteractionProfile);
+                HandProfiles[hand] = profile;
+                Trace.TraceInformation("VR: {0} controller profile: {1}{2}", hand == LeftHand ? "left" : "right", profile ?? (result < 0 ? result.ToString() : "none"),
+                    profile == SimpleControllerProfile && !HandTrackingAllowed ? " (hand tracking; ignored)" : "");
             }
         }
 
@@ -688,6 +700,11 @@ namespace Orts.Viewer3D.VR
                 Trace.TraceWarning("VR: xrSyncActions failed: {0}; the controllers will not work.", result);
                 ActionsAvailable = false;
                 return;
+            }
+            if (result == XrResult.Success && !ProfilesLogged)
+            {
+                ProfilesLogged = true;
+                LogInteractionProfiles();
             }
             if (result != XrResult.Success && !SyncWarned)
             {
@@ -724,7 +741,8 @@ namespace Orts.Viewer3D.VR
                 state.SecondaryButton = GetBoolean(SecondaryAction, hand);
                 state.MenuButton = GetBoolean(MenuAction, hand);
                 state.Idle = IsIdle(hand, state);
-                state.Enabled = ControllersEnabled;
+                state.Profile = HandProfiles[hand];
+                state.Enabled = ControllersEnabled && (HandTrackingAllowed || state.Profile != SimpleControllerProfile);
                 lock (PoseLock)
                     hands[hand] = state;
                 if (state.Tracked && !HandSeen[hand])
@@ -965,8 +983,10 @@ namespace Orts.Viewer3D.VR
         public bool MenuButton;
         /// <summary>Put down: not moved and nothing pressed for <see cref="VRSession.IdleAfterSeconds"/>.</summary>
         public bool Idle;
-        /// <summary>The controllers are switched on (see <see cref="VRSession.ControllersEnabled"/>).</summary>
+        /// <summary>The controllers are switched on (see <see cref="VRSession.ControllersEnabled"/>) and this is a real controller, not tracked hands.</summary>
         public bool Enabled;
+        /// <summary>The interaction profile the runtime is using for this hand, or null.</summary>
+        public string Profile;
 
         /// <summary>Tracked, in use and switched on: the only state in which a controller does anything.</summary>
         public bool Active { get { return Tracked && Enabled && !Idle; } }
