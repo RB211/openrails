@@ -420,6 +420,7 @@ namespace Orts.Viewer3D
         static RenderTarget2D OverlaySurface;
         static Orts.Viewer3D.VR.VRTexturedMaterial OverlayPanelMaterial;
         static Orts.Viewer3D.VR.VRQuadPrimitive OverlayPanelQuad;
+        static Rectangle OverlayPanelCrop = new Rectangle(-1, -1, 0, 0);
         // Defaults put it at reading distance; OPENRAILS_VR_PANEL=distance,width,drop,tilt (metres and degrees) overrides them.
         static readonly float OverlayPanelDistanceM = EnvFloat(0, 0.6f);
         static readonly float OverlayPanelWidthM = EnvFloat(1, 0.8f);
@@ -978,7 +979,22 @@ namespace Orts.Viewer3D
                     if (OverlaySurface != null) OverlaySurface.Dispose();
                     OverlaySurface = new RenderTarget2D(graphicsDevice, window.BackBufferWidth, window.BackBufferHeight, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
                     OverlayPanelMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(graphicsDevice, OverlaySurface, true) { AlwaysOnTop = true };
-                    OverlayPanelQuad = new Orts.Viewer3D.VR.VRQuadPrimitive(graphicsDevice, OverlayPanelWidthM, OverlayPanelWidthM * window.BackBufferHeight / window.BackBufferWidth);
+                    OverlayPanelCrop = new Rectangle(-1, -1, 0, 0);
+                }
+                // The panel shows the part of the window the viewer asked for (the open windows), filling its width.
+                var crop = Game.RenderProcess.VROverlayCrop;
+                if (crop.IsEmpty || crop.Width <= 0 || crop.Height <= 0)
+                    crop = new Rectangle(0, 0, window.BackBufferWidth, window.BackBufferHeight);
+                crop = Rectangle.Intersect(crop, new Rectangle(0, 0, window.BackBufferWidth, window.BackBufferHeight));
+                if (crop != OverlayPanelCrop && crop.Width > 0 && crop.Height > 0)
+                {
+                    OverlayPanelCrop = crop;
+                    var height = OverlayPanelWidthM * crop.Height / crop.Width;
+                    if (height > OverlayPanelWidthM * 0.75f)
+                        height = OverlayPanelWidthM * 0.75f;
+                    var widthM = height * crop.Width / crop.Height;
+                    OverlayPanelQuad = new Orts.Viewer3D.VR.VRQuadPrimitive(graphicsDevice, widthM, height,
+                        (float)crop.Left / window.BackBufferWidth, (float)crop.Top / window.BackBufferHeight, (float)crop.Right / window.BackBufferWidth, (float)crop.Bottom / window.BackBufferHeight);
                 }
                 graphicsDevice.SetRenderTarget(OverlaySurface);
                 graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);

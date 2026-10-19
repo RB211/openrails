@@ -90,14 +90,20 @@ namespace Orts.Viewer3D.VR
         readonly VertexBuffer VertexBuffer;
 
         public VRQuadPrimitive(GraphicsDevice graphicsDevice, float width, float height)
+            : this(graphicsDevice, width, height, 0, 0, 1, 1)
+        {
+        }
+
+        /// <summary>A quad showing only the part of the texture between (u0, v0) and (u1, v1).</summary>
+        public VRQuadPrimitive(GraphicsDevice graphicsDevice, float width, float height, float u0, float v0, float u1, float v1)
         {
             var w = width / 2;
             var h = height / 2;
             var vertices = new[] {
-                new VertexPositionTexture(new Vector3(-w, +h, 0), new Vector2(0, 0)),
-                new VertexPositionTexture(new Vector3(+w, +h, 0), new Vector2(1, 0)),
-                new VertexPositionTexture(new Vector3(-w, -h, 0), new Vector2(0, 1)),
-                new VertexPositionTexture(new Vector3(+w, -h, 0), new Vector2(1, 1)),
+                new VertexPositionTexture(new Vector3(-w, +h, 0), new Vector2(u0, v0)),
+                new VertexPositionTexture(new Vector3(+w, +h, 0), new Vector2(u1, v0)),
+                new VertexPositionTexture(new Vector3(-w, -h, 0), new Vector2(u0, v1)),
+                new VertexPositionTexture(new Vector3(+w, -h, 0), new Vector2(u1, v1)),
             };
             VertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionTexture), vertices.Length, BufferUsage.WriteOnly);
             VertexBuffer.SetData(vertices);

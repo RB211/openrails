@@ -917,6 +917,7 @@ namespace Orts.Viewer3D
             frame.PrepareFrame(elapsedTime);
             World.PrepareFrame(frame, elapsedTime);
             PrepareHandPointers(frame);
+            UpdateVROverlayCrop();
             InfoDisplay.PrepareFrame(frame, elapsedTime);
             // TODO: This is not correct. The ActivityWindow's PrepareFrame is already called by the WindowManager!
             if (Simulator.ActivityRun != null) ActivityWindow.PrepareFrame(elapsedTime, true);
@@ -1012,6 +1013,24 @@ namespace Orts.Viewer3D
             if (RenderProcess.VROverlayVisible && HUDWindow != null && !HUDWindow.Visible && !WindowManager.VisibleWindows.Any(w => !(w is Popups.LayeredWindow)))
                 HUDWindow.Visible = true;
             Trace.TraceInformation("VR: overlay panel {0}", RenderProcess.VROverlayVisible ? "shown" : "hidden");
+        }
+
+        /// <summary>The headset's overlay panel shows just the open popup windows, so their text is legible; with the HUD up it shows the whole window.</summary>
+        void UpdateVROverlayCrop()
+        {
+            if (VR == null || !RenderProcess.VROverlayVisible)
+                return;
+            var crop = Rectangle.Empty;
+            if (HUDWindow == null || !HUDWindow.Visible)
+                foreach (var window in WindowManager.VisibleWindows)
+                {
+                    if (window is Popups.LayeredWindow)
+                        continue;
+                    var location = window.Location;
+                    location.Inflate(6, 6);
+                    crop = crop.IsEmpty ? location : Rectangle.Union(crop, location);
+                }
+            RenderProcess.VROverlayCrop = crop;
         }
 
         /// <summary>Draws each tracked controller's beam, green from the pointing hand when it is on a cab control.</summary>
