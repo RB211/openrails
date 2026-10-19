@@ -61,6 +61,10 @@ namespace Orts.Viewer3D.VR
             return new Vector2(u, v);
         }
 
+        /// <summary>The controller body drawn at each hand: a block the size of a grip, behind and below the aim point.</summary>
+        public static readonly Vector3 ControllerSize = new Vector3(0.035f, 0.045f, 0.10f);
+        public static readonly Vector3 ControllerOffset = new Vector3(0, -0.02f, 0.06f);
+
         static readonly Dictionary<Color, Texture2D> SolidTextures = new Dictionary<Color, Texture2D>();
 
         /// <summary>A 1x1 texture of one colour, for drawing solid things with a textured shader.</summary>
@@ -103,6 +107,40 @@ namespace Orts.Viewer3D.VR
         {
             graphicsDevice.SetVertexBuffer(VertexBuffer);
             graphicsDevice.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
+        }
+    }
+
+    /// <summary>A box of the given size centred on the origin, to stand in for a controller; place it with the render item's matrix.</summary>
+    public class VRBoxPrimitive : RenderPrimitive
+    {
+        readonly VertexBuffer VertexBuffer;
+        readonly IndexBuffer IndexBuffer;
+
+        public VRBoxPrimitive(GraphicsDevice graphicsDevice, Vector3 size, Vector3 centre)
+        {
+            var h = size / 2;
+            var vertices = new VertexPositionTexture[8];
+            for (var i = 0; i < 8; i++)
+                vertices[i] = new VertexPositionTexture(centre + new Vector3((i & 1) == 0 ? -h.X : h.X, (i & 2) == 0 ? -h.Y : h.Y, (i & 4) == 0 ? -h.Z : h.Z), new Vector2((i & 1), (i & 2) >> 1));
+            var indices = new short[] {
+                0, 2, 1, 1, 2, 3,  // -Z
+                4, 5, 6, 5, 7, 6,  // +Z
+                0, 1, 4, 1, 5, 4,  // -Y
+                2, 6, 3, 3, 6, 7,  // +Y
+                0, 4, 2, 2, 4, 6,  // -X
+                1, 3, 5, 3, 7, 5,  // +X
+            };
+            VertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionTexture), vertices.Length, BufferUsage.WriteOnly);
+            VertexBuffer.SetData(vertices);
+            IndexBuffer = new IndexBuffer(graphicsDevice, typeof(short), indices.Length, BufferUsage.WriteOnly);
+            IndexBuffer.SetData(indices);
+        }
+
+        public override void Draw(GraphicsDevice graphicsDevice)
+        {
+            graphicsDevice.SetVertexBuffer(VertexBuffer);
+            graphicsDevice.Indices = IndexBuffer;
+            graphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, 12);
         }
     }
 

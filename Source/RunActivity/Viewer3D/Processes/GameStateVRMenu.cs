@@ -79,7 +79,10 @@ namespace Orts.Viewer3D.Processes
         VRTexturedMaterial PanelMaterial;
         VRTexturedMaterial LaserMaterial, LaserHitMaterial, CursorMaterial;
         VRQuadPrimitive CursorQuad;
+        VRBoxPrimitive ControllerBox;
+        VRTexturedMaterial ControllerMaterial;
         Matrix PanelMatrix;
+        bool PacingSet;
         float PanelHeightM;
 
         // Pointing, on the updater thread.
@@ -92,7 +95,11 @@ namespace Orts.Viewer3D.Processes
         internal override void Update(RenderFrame frame, double totalRealSeconds)
         {
             if (FormThread == null)
+            {
+                GameStateRunActivity.StartLogFile(Game.Settings, false);
+                Trace.TraceInformation("Menu: the desktop menu is hosted in the game");
                 StartFormThread();
+            }
 
             string[] args;
             lock (Lock)
@@ -155,6 +162,11 @@ namespace Orts.Viewer3D.Processes
                     continue;
                 // In the menu the seat frame is the world, so the hand's pose needs no conversion.
                 var ray = VRPointer.RayFrom(hand.Pose);
+                if (ControllerBox != null)
+                {
+                    var body = hand.Pose;
+                    frame.AddPrimitive(ControllerMaterial, ControllerBox, RenderPrimitiveGroup.World, ref body);
+                }
                 var hit = Vector3.Zero;
                 var uv = PanelQuad != null ? VRPointer.HitPanel(ray, panelCentre, PanelWidthM, PanelHeightM, out hit) : null;
                 var end = uv != null ? hit : ray.Position + ray.Direction * 2;
@@ -367,6 +379,14 @@ namespace Orts.Viewer3D.Processes
         internal override void BeginRender(RenderFrame frame)
         {
             var graphicsDevice = Game.RenderProcess.GraphicsDevice;
+            if (!PacingSet)
+            {
+                // The game starts at a fixed 10 FPS (for loading) and sleeps when its window is not focused, which
+                // the menu window takes; a headset needs every frame, so run free until the run starts.
+                PacingSet = true;
+                Game.IsFixedTimeStep = false;
+                Game.InactiveSleepTime = TimeSpan.Zero;
+            }
             lock (Lock)
             {
                 if (Pixels != null && PixelsVersion != UploadedVersion)
@@ -389,6 +409,8 @@ namespace Orts.Viewer3D.Processes
                 LaserHitMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, Color.LightGreen), false);
                 CursorMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, Color.Red), false);
                 CursorQuad = new VRQuadPrimitive(graphicsDevice, CursorSizeM, CursorSizeM);
+                ControllerMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, new Color(60, 60, 70)), false);
+                ControllerBox = new VRBoxPrimitive(graphicsDevice, VRPointer.ControllerSize, VRPointer.ControllerOffset);
             }
             base.BeginRender(frame);
         }
@@ -400,6 +422,11 @@ namespace Orts.Viewer3D.Processes
             // The menu may have changed the options (its own Options dialog); the run must see them as saved.
             var options = Environment.GetCommandLineArgs().Skip(1).Where(a => a.StartsWith("-") || a.StartsWith("/")).Select(a => a.Substring(1));
             Game.ReplaceSettings(new UserSettings(options));
+            // Back to the loading-time pacing the run expects (see RenderProcess.Start), except that a headset
+            // must not be starved while the game window is unfocused.
+            Game.IsFixedTimeStep = true;
+            Game.TargetElapsedTime = TimeSpan.FromMilliseconds(100);
+            Game.InactiveSleepTime = Game.RenderProcess.VR != null ? TimeSpan.Zero : TimeSpan.FromMilliseconds(100);
             Game.ReplaceState(new GameStateRunActivity(args));
         }
 

@@ -110,6 +110,7 @@ namespace Orts.Viewer3D.VR
         ActionSpaceCreateInfo = 38,
         InteractionProfileSuggestedBinding = 51,
         EventDataInteractionProfileChanged = 52,
+        InteractionProfileState = 53,
         ActionStateGetInfo = 58,
         HapticActionInfo = 59,
         SessionActionSetAttachInfo = 60,
@@ -638,6 +639,22 @@ namespace Orts.Viewer3D.VR
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    struct XrInteractionProfileState
+    {
+        public XrStructureType Type;
+        public IntPtr Next;
+        public ulong InteractionProfile;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct XrEventDataInteractionProfileChanged
+    {
+        public XrStructureType Type;
+        public IntPtr Next;
+        public IntPtr Session;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     struct XrHapticActionInfo
     {
         public XrStructureType Type;
@@ -662,6 +679,8 @@ namespace Orts.Viewer3D.VR
 
         public const long InfiniteDuration = 0x7fffffffffffffff;
         public const string KhrD3D11Enable = "XR_KHR_D3D11_enable";
+        public const string MetaTouchControllerPlus = "XR_META_touch_controller_plus";
+        public const string FbTouchControllerPro = "XR_FB_touch_controller_pro";
 
         public static ulong MakeVersion(ushort major, ushort minor, uint patch)
         {
@@ -703,6 +722,8 @@ namespace Orts.Viewer3D.VR
         [DllImport(Loader)] public static extern XrResult xrEndFrame(IntPtr session, XrFrameEndInfo* frameEndInfo);
         [DllImport(Loader)] public static extern XrResult xrLocateViews(IntPtr session, XrViewLocateInfo* viewLocateInfo, XrViewState* viewState, uint capacity, out uint count, XrView* views);
         [DllImport(Loader)] public static extern XrResult xrStringToPath(IntPtr instance, byte* pathString, out ulong path);
+        [DllImport(Loader)] public static extern XrResult xrPathToString(IntPtr instance, ulong path, uint capacity, out uint count, byte* buffer);
+        [DllImport(Loader)] public static extern XrResult xrGetCurrentInteractionProfile(IntPtr session, ulong topLevelUserPath, XrInteractionProfileState* state);
         [DllImport(Loader)] public static extern XrResult xrCreateActionSet(IntPtr instance, XrActionSetCreateInfo* createInfo, out IntPtr actionSet);
         [DllImport(Loader)] public static extern XrResult xrDestroyActionSet(IntPtr actionSet);
         [DllImport(Loader)] public static extern XrResult xrCreateAction(IntPtr actionSet, XrActionCreateInfo* createInfo, out IntPtr action);

@@ -198,7 +198,9 @@ namespace Orts.Viewer3D
         Vector3? HandHit;
         int PointerHand = Orts.Viewer3D.VR.VRSession.RightHand;
         readonly bool[] HandMenuWasDown = new bool[Orts.Viewer3D.VR.VRSession.HandCount];
-        Orts.Viewer3D.VR.VRTexturedMaterial LaserMaterial, LaserHitMaterial;
+        Orts.Viewer3D.VR.VRTexturedMaterial LaserMaterial, LaserHitMaterial, ControllerMaterial;
+        Orts.Viewer3D.VR.VRBoxPrimitive ControllerBox;
+        Matrix[] HandWorlds;
         ICabViewMouseControlRenderer MousePickedControl;
         ICabViewMouseControlRenderer OldMousePickedControl;
 
@@ -980,9 +982,14 @@ namespace Orts.Viewer3D
             }
             var seatView = Camera.XnaSeatView;
             var rays = new Ray?[hands.Length];
+            var worlds = new Matrix[hands.Length];
             for (var h = 0; h < hands.Length; h++)
                 if (hands[h].Tracked)
-                    rays[h] = Orts.Viewer3D.VR.VRPointer.RayFrom(Orts.Viewer3D.VR.VRPointer.HandToWorld(hands[h].Pose, seatView));
+                {
+                    worlds[h] = Orts.Viewer3D.VR.VRPointer.HandToWorld(hands[h].Pose, seatView);
+                    rays[h] = Orts.Viewer3D.VR.VRPointer.RayFrom(worlds[h]);
+                }
+            HandWorlds = worlds;
             HandRays = rays;
             HandRay = rays[PointerHand];
             if (HandRay == null)
@@ -1005,12 +1012,20 @@ namespace Orts.Viewer3D
             {
                 LaserMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.SolidTexture(GraphicsDevice, Color.White), false);
                 LaserHitMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.SolidTexture(GraphicsDevice, Color.LightGreen), false);
+                ControllerMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.SolidTexture(GraphicsDevice, new Color(60, 60, 70)), false);
+                ControllerBox = new Orts.Viewer3D.VR.VRBoxPrimitive(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.ControllerSize, Orts.Viewer3D.VR.VRPointer.ControllerOffset);
             }
+            var worlds = HandWorlds;
             for (var h = 0; h < rays.Length; h++)
             {
                 if (rays[h] == null)
                     continue;
                 var ray = rays[h].Value;
+                if (worlds != null)
+                {
+                    var body = worlds[h];
+                    frame.AddPrimitive(ControllerMaterial, ControllerBox, RenderPrimitiveGroup.Interior, ref body);
+                }
                 var onControl = h == PointerHand && HandHit != null;
                 var end = onControl ? HandHit.Value : ray.Position + ray.Direction * 1.5f;
                 var matrix = Matrix.Identity;
