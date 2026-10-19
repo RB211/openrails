@@ -54,6 +54,9 @@ controller's aim pose in the seat frame and its inputs. A beam is drawn from eac
   switches the controllers off and on altogether, and `OPENRAILS_VR_CONTROLLERS=0` starts with them off.
 * Before the world exists (the loading screen) the 2D picture is drawn at window size and shown on a
   panel 2.2 m in front of the driver, fixed in space, instead of being pasted onto each eye.
+* The 2D overlays (HUD pages, popup windows) are not drawn
+  into the eyes; `Alt+O` (`GameVROverlay`) or a controller's B/Y button shows them on a panel 1 m in
+  front of and below the driver (`RenderProcess.VROverlayVisible`), drawn over the cab.
 
 ## What it needs
 

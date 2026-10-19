@@ -198,6 +198,7 @@ namespace Orts.Viewer3D
         Vector3? HandHit;
         int PointerHand = Orts.Viewer3D.VR.VRSession.RightHand;
         readonly bool[] HandMenuWasDown = new bool[Orts.Viewer3D.VR.VRSession.HandCount];
+        readonly bool[] HandSecondaryWasDown = new bool[Orts.Viewer3D.VR.VRSession.HandCount];
         Orts.Viewer3D.VR.VRTexturedMaterial LaserMaterial, LaserHitMaterial, ControllerMaterial;
         Orts.Viewer3D.VR.VRBoxPrimitive ControllerBox;
         Matrix[] HandWorlds;
@@ -979,6 +980,9 @@ namespace Orts.Viewer3D
                 if (hands[h].Enabled && hands[h].MenuButton && !HandMenuWasDown[h])
                     vr.RequestRecenter();
                 HandMenuWasDown[h] = hands[h].MenuButton;
+                if (hands[h].Enabled && hands[h].SecondaryButton && !HandSecondaryWasDown[h])
+                    RenderProcess.VROverlayVisible = !RenderProcess.VROverlayVisible;
+                HandSecondaryWasDown[h] = hands[h].SecondaryButton;
             }
             var seatView = Camera.XnaSeatView;
             var rays = new Ray?[hands.Length];
@@ -1171,6 +1175,7 @@ namespace Orts.Viewer3D
 
             if (UserInput.IsPressed(UserCommand.DisplayNextStationWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) NextStationWindow.TabAction(); else NextStationWindow.Visible = !NextStationWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DisplayCompassWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) CompassWindow.TabAction(); else CompassWindow.Visible = !CompassWindow.Visible;
+            if (UserInput.IsPressed(UserCommand.GameVROverlay)) RenderProcess.VROverlayVisible = !RenderProcess.VROverlayVisible;
             if (UserInput.IsPressed(UserCommand.DisplayTrainForcesWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) TrainForcesWindow.TabAction(); else TrainForcesWindow.Visible = !TrainForcesWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DebugTracks)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) TracksDebugWindow.TabAction(); else TracksDebugWindow.Visible = !TracksDebugWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DebugSignalling)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) SignallingDebugWindow.TabAction(); else SignallingDebugWindow.Visible = !SignallingDebugWindow.Visible;

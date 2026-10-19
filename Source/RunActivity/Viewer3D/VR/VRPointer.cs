@@ -191,6 +191,8 @@ namespace Orts.Viewer3D.VR
         readonly VRPanelShader Shader;
         public Texture2D Texture { get; set; }
         readonly bool Blended;
+        /// <summary>Draw over everything (no depth test), for panels that must not sink into the cab.</summary>
+        public bool AlwaysOnTop;
 
         public VRTexturedMaterial(GraphicsDevice graphicsDevice, Texture2D texture, bool blended)
             : base(null, null)
@@ -211,7 +213,7 @@ namespace Orts.Viewer3D.VR
             Shader.Texture = Texture;
             graphicsDevice.BlendState = Blended ? BlendState.NonPremultiplied : BlendState.Opaque;
             graphicsDevice.RasterizerState = RasterizerState.CullNone;
-            graphicsDevice.DepthStencilState = DepthStencilState.Default;
+            graphicsDevice.DepthStencilState = AlwaysOnTop ? DepthStencilState.None : DepthStencilState.Default;
         }
 
         public override void Render(GraphicsDevice graphicsDevice, IEnumerable<RenderItem> renderItems, ref Matrix XNAViewMatrix, ref Matrix XNAProjectionMatrix)
@@ -228,6 +230,7 @@ namespace Orts.Viewer3D.VR
         {
             graphicsDevice.BlendState = BlendState.Opaque;
             graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
+            graphicsDevice.DepthStencilState = DepthStencilState.Default;
         }
     }
 

@@ -416,6 +416,13 @@ namespace Orts.Viewer3D
         static Orts.Viewer3D.VR.VRQuadPrimitive FlatPanelQuad;
         const float FlatPanelDistanceM = 2.2f;
         const float FlatPanelWidthM = 2.6f;
+        // In the cab the 2D overlays (HUD, popups) can be shown on a panel low in front of the driver.
+        static RenderTarget2D OverlaySurface;
+        static Orts.Viewer3D.VR.VRTexturedMaterial OverlayPanelMaterial;
+        static Orts.Viewer3D.VR.VRQuadPrimitive OverlayPanelQuad;
+        static readonly Vector3 OverlayPanelCentre = new Vector3(0, -0.32f, -1.0f);
+        const float OverlayPanelWidthM = 1.3f;
+        const float OverlayPanelTiltDeg = 25f;
 
         public RenderFrame(Game game)
         {
@@ -949,6 +956,24 @@ namespace Orts.Viewer3D
                 graphicsDevice.SetRenderTarget(null);
             }
 
+            var overlayPanel = hasView && Game.RenderProcess.VROverlayVisible;
+            if (overlayPanel)
+            {
+                // The overlays drawn once at window size, shown on a panel in the seat frame in every eye.
+                var window = graphicsDevice.PresentationParameters;
+                if (OverlaySurface == null || OverlaySurface.IsDisposed || OverlaySurface.Width != window.BackBufferWidth || OverlaySurface.Height != window.BackBufferHeight || OverlaySurface.GraphicsDevice != graphicsDevice)
+                {
+                    if (OverlaySurface != null) OverlaySurface.Dispose();
+                    OverlaySurface = new RenderTarget2D(graphicsDevice, window.BackBufferWidth, window.BackBufferHeight, false, SurfaceFormat.Color, DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.PreserveContents);
+                    OverlayPanelMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(graphicsDevice, OverlaySurface, true) { AlwaysOnTop = true };
+                    OverlayPanelQuad = new Orts.Viewer3D.VR.VRQuadPrimitive(graphicsDevice, OverlayPanelWidthM, OverlayPanelWidthM * window.BackBufferHeight / window.BackBufferWidth);
+                }
+                graphicsDevice.SetRenderTarget(OverlaySurface);
+                graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Transparent, 1, 0);
+                DrawSequences(graphicsDevice, logging, SequenceFilter.Overlay);
+                graphicsDevice.SetRenderTarget(null);
+            }
+
             for (var eye = 0; eye < EyeSurface.Length; eye++)
             {
                 if (logging) Console.WriteLine("  Eye {0} {{", eye);
@@ -960,7 +985,18 @@ namespace Orts.Viewer3D
                 }
                 graphicsDevice.SetRenderTarget(EyeSurface[eye]);
                 if (hasView)
+                {
                     DrawScene(graphicsDevice, logging, SequenceFilter.Scene);
+                    if (overlayPanel)
+                    {
+                        var view = Matrix.Invert(vr.EyePose(eye));
+                        var projection = vr.EyeProjection(eye, 0.1f, 100f);
+                        var panel = Matrix.CreateRotationX(MathHelper.ToRadians(OverlayPanelTiltDeg)) * Matrix.CreateTranslation(OverlayPanelCentre);
+                        OverlayPanelMaterial.SetState(graphicsDevice, null);
+                        OverlayPanelMaterial.Render(graphicsDevice, new[] { new RenderItem(OverlayPanelMaterial, OverlayPanelQuad, ref panel, ShapeFlags.None) }, ref view, ref projection);
+                        OverlayPanelMaterial.ResetState(graphicsDevice);
+                    }
+                }
                 else
                 {
                     graphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer | ClearOptions.Stencil, Color.Black, 1, 0);
