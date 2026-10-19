@@ -972,11 +972,11 @@ namespace Orts.Viewer3D
             for (var h = 0; h < hands.Length; h++)
                 hands[h] = vr.Hand(h);
             for (var h = 0; h < hands.Length; h++)
-                if (hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
+                if (hands[h].Active && hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
                     PointerHand = h;
             for (var h = 0; h < hands.Length; h++)
             {
-                if (hands[h].MenuButton && !HandMenuWasDown[h])
+                if (hands[h].Enabled && hands[h].MenuButton && !HandMenuWasDown[h])
                     vr.RequestRecenter();
                 HandMenuWasDown[h] = hands[h].MenuButton;
             }
@@ -984,7 +984,7 @@ namespace Orts.Viewer3D
             var rays = new Ray?[hands.Length];
             var worlds = new Matrix[hands.Length];
             for (var h = 0; h < hands.Length; h++)
-                if (hands[h].Tracked)
+                if (hands[h].Active)
                 {
                     worlds[h] = Orts.Viewer3D.VR.VRPointer.HandToWorld(hands[h].Pose, seatView);
                     rays[h] = Orts.Viewer3D.VR.VRPointer.RayFrom(worlds[h]);
@@ -1058,6 +1058,11 @@ namespace Orts.Viewer3D
 
             if (UserInput.IsPressed(UserCommand.GameVRRecenter) && VR != null)
                 VR.RequestRecenter();
+            if (UserInput.IsPressed(UserCommand.GameVRControllers) && VR != null)
+            {
+                VR.ControllersEnabled = !VR.ControllersEnabled;
+                Simulator.Confirmer.Message(ConfirmLevel.Information, VR.ControllersEnabled ? Catalog.GetString("VR controllers on") : Catalog.GetString("VR controllers off"));
+            }
 
             Camera.HandleUserInput(elapsedTime);
 

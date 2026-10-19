@@ -86,6 +86,19 @@ namespace Orts.Viewer3D.VR
         /// <summary>True when the runtime accepted our controller actions (it may still have no controllers to drive them).</summary>
         public bool HasControllers { get { return ActionsAvailable; } }
 
+        /// <summary>
+        /// Whether the controllers are listened to at all (Alt+F in the cab, or OPENRAILS_VR_CONTROLLERS=0).
+        /// Independently of this, a controller that has not moved for a few seconds (put down) goes idle:
+        /// <see cref="VRHand.Active"/> is false until it is picked up again.
+        /// </summary>
+        public bool ControllersEnabled = Environment.GetEnvironmentVariable("OPENRAILS_VR_CONTROLLERS") != "0";
+        public const float IdleAfterSeconds = 3;
+        const float IdleMoveMetres = 0.015f;
+        const float IdleTurnRadians = 0.035f;
+        readonly Matrix[] RestPose = new Matrix[HandCount];
+        readonly DateTime[] LastMoved = new DateTime[HandCount];
+        readonly bool[] WasPressed = new bool[HandCount];
+
         readonly VRHand[] hands = { new VRHand(), new VRHand() };
         IntPtr ActionSet;
         IntPtr AimAction, TriggerAction, GripAction, StickAction, PrimaryAction, SecondaryAction, MenuAction, HapticAction;
@@ -710,6 +723,8 @@ namespace Orts.Viewer3D.VR
                 state.PrimaryButton = GetBoolean(PrimaryAction, hand);
                 state.SecondaryButton = GetBoolean(SecondaryAction, hand);
                 state.MenuButton = GetBoolean(MenuAction, hand);
+                state.Idle = IsIdle(hand, state);
+                state.Enabled = ControllersEnabled;
                 lock (PoseLock)
                     hands[hand] = state;
                 if (state.Tracked && !HandSeen[hand])
@@ -726,6 +741,24 @@ namespace Orts.Viewer3D.VR
                     OpenXR.xrApplyHapticFeedback(Session, &hapticInfo, &vibration);
                 }
             }
+        }
+
+        /// <summary>A controller counts as put down when it has stayed within a couple of centimetres and degrees of its resting pose with nothing pressed for a few seconds.</summary>
+        bool IsIdle(int hand, VRHand state)
+        {
+            var now = DateTime.UtcNow;
+            var pressed = state.TriggerDown || state.Grip > 0.5f || state.PrimaryButton || state.SecondaryButton || state.MenuButton || state.Stick.LengthSquared() > 0.25f;
+            if (!state.Tracked)
+                return true;
+            var moved = (state.Pose.Translation - RestPose[hand].Translation).Length() > IdleMoveMetres
+                || Vector3.Dot(Vector3.TransformNormal(Vector3.Forward, state.Pose), Vector3.TransformNormal(Vector3.Forward, RestPose[hand])) < Math.Cos(IdleTurnRadians);
+            if (moved || pressed || (!pressed && WasPressed[hand]))
+            {
+                RestPose[hand] = state.Pose;
+                LastMoved[hand] = now;
+            }
+            WasPressed[hand] = pressed;
+            return (now - LastMoved[hand]).TotalSeconds > IdleAfterSeconds;
         }
 
         float GetFloat(IntPtr action, int hand)
@@ -930,6 +963,13 @@ namespace Orts.Viewer3D.VR
         public bool SecondaryButton;
         /// <summary>The menu button (left controller on Touch controllers).</summary>
         public bool MenuButton;
+        /// <summary>Put down: not moved and nothing pressed for <see cref="VRSession.IdleAfterSeconds"/>.</summary>
+        public bool Idle;
+        /// <summary>The controllers are switched on (see <see cref="VRSession.ControllersEnabled"/>).</summary>
+        public bool Enabled;
+
+        /// <summary>Tracked, in use and switched on: the only state in which a controller does anything.</summary>
+        public bool Active { get { return Tracked && Enabled && !Idle; } }
 
         public bool TriggerDown { get { return Trigger > 0.6f; } }
 

@@ -145,11 +145,11 @@ namespace Orts.Viewer3D.Processes
 
             // The hand that last pulled its trigger does the pointing; the other one just shows its beam.
             for (var h = 0; h < hands.Length; h++)
-                if (hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
+                if (hands[h].Active && hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
                     PointerHand = h;
             for (var h = 0; h < hands.Length; h++)
             {
-                if (hands[h].MenuButton && !MenuWasDown[h])
+                if (hands[h].Enabled && hands[h].MenuButton && !MenuWasDown[h])
                     vr.RequestRecenter();
                 MenuWasDown[h] = hands[h].MenuButton;
             }
@@ -158,7 +158,7 @@ namespace Orts.Viewer3D.Processes
             for (var h = 0; h < hands.Length; h++)
             {
                 var hand = hands[h];
-                if (!hand.Tracked)
+                if (!hand.Active)
                     continue;
                 // In the menu the seat frame is the world, so the hand's pose needs no conversion.
                 var ray = VRPointer.RayFrom(hand.Pose);

@@ -49,6 +49,11 @@ controller's aim pose in the seat frame and its inputs. A beam is drawn from eac
   follows it (levers follow mouse movement, so moving the hand moves the lever) and the trigger is the
   left button. The beam turns green on a control, the controller buzzes when one is grabbed, and the
   menu button recentres the view.
+* A controller that is put down goes idle after three seconds without movement or a press (its beam
+  disappears and it drives nothing) until it is picked up again. `Alt+F` (`GameVRControllers`)
+  switches the controllers off and on altogether, and `OPENRAILS_VR_CONTROLLERS=0` starts with them off.
+* Before the world exists (the loading screen) the 2D picture is drawn at window size and shown on a
+  panel 2.2 m in front of the driver, fixed in space, instead of being pasted onto each eye.
 
 ## What it needs
 
