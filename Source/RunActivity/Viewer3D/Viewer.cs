@@ -191,6 +191,14 @@ namespace Orts.Viewer3D
         public static Viewport DefaultViewport;
 
         ICabViewMouseControlRenderer MouseChangingControl;
+        // A headset controller pointing into the cab: its beam replaces the mouse's pick ray and its
+        // trigger the left button, so the cab's mouse-operated controls work from the hand.
+        Ray?[] HandRays;
+        Ray? HandRay;
+        Vector3? HandHit;
+        int PointerHand = Orts.Viewer3D.VR.VRSession.RightHand;
+        readonly bool[] HandMenuWasDown = new bool[Orts.Viewer3D.VR.VRSession.HandCount];
+        Orts.Viewer3D.VR.VRTexturedMaterial LaserMaterial, LaserHitMaterial;
         ICabViewMouseControlRenderer MousePickedControl;
         ICabViewMouseControlRenderer OldMousePickedControl;
 
@@ -477,6 +485,7 @@ namespace Orts.Viewer3D
                 Trace.TraceInformation("{0} (as of building the world)", RenderProcess.VRStatus);
             UpdateAdapterInformation(GraphicsDevice.Adapter);
             DefaultViewport = GraphicsDevice.Viewport;
+            UserInput.VirtualMouse = VirtualMouseFromHand;
 
             if (PlayerLocomotive == null) PlayerLocomotive = Simulator.InitialPlayerLocomotive();
             SelectedTrain = PlayerTrain;
@@ -904,6 +913,7 @@ namespace Orts.Viewer3D
             Camera.PrepareFrame(frame, elapsedTime);
             frame.PrepareFrame(elapsedTime);
             World.PrepareFrame(frame, elapsedTime);
+            PrepareHandPointers(frame);
             InfoDisplay.PrepareFrame(frame, elapsedTime);
             // TODO: This is not correct. The ActivityWindow's PrepareFrame is already called by the WindowManager!
             if (Simulator.ActivityRun != null) ActivityWindow.PrepareFrame(elapsedTime, true);
@@ -942,12 +952,84 @@ namespace Orts.Viewer3D
             }
         }
 
+        /// <summary>
+        /// The headset controllers as a mouse, asked by <see cref="UserInput"/> once per update: the pointing
+        /// hand's beam is projected onto the window so the mouse position moves with it (the cab's levers
+        /// follow mouse movement) and the trigger is the left button. Null when no controller is tracked.
+        /// </summary>
+        MouseState? VirtualMouseFromHand(MouseState lastMouse)
+        {
+            var vr = VR;
+            if (vr == null || Camera == null)
+            {
+                HandRays = null;
+                HandRay = null;
+                return null;
+            }
+            var hands = new Orts.Viewer3D.VR.VRHand[Orts.Viewer3D.VR.VRSession.HandCount];
+            for (var h = 0; h < hands.Length; h++)
+                hands[h] = vr.Hand(h);
+            for (var h = 0; h < hands.Length; h++)
+                if (hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
+                    PointerHand = h;
+            for (var h = 0; h < hands.Length; h++)
+            {
+                if (hands[h].MenuButton && !HandMenuWasDown[h])
+                    vr.RequestRecenter();
+                HandMenuWasDown[h] = hands[h].MenuButton;
+            }
+            var seatView = Camera.XnaSeatView;
+            var rays = new Ray?[hands.Length];
+            for (var h = 0; h < hands.Length; h++)
+                if (hands[h].Tracked)
+                    rays[h] = Orts.Viewer3D.VR.VRPointer.RayFrom(Orts.Viewer3D.VR.VRPointer.HandToWorld(hands[h].Pose, seatView));
+            HandRays = rays;
+            HandRay = rays[PointerHand];
+            if (HandRay == null)
+                return null;
+            var ahead = HandRay.Value.Position + HandRay.Value.Direction;
+            var screen = DefaultViewport.Project(ahead, Camera.XnaProjection, Camera.XnaView, Matrix.Identity);
+            var up = Microsoft.Xna.Framework.Input.ButtonState.Released;
+            var trigger = hands[PointerHand].TriggerDown ? Microsoft.Xna.Framework.Input.ButtonState.Pressed : up;
+            return new MouseState((int)screen.X, (int)screen.Y, lastMouse.ScrollWheelValue, trigger, up, up, up, up);
+        }
+
+        /// <summary>Draws each tracked controller's beam, green from the pointing hand when it is on a cab control.</summary>
+        [CallOnThread("Updater")]
+        void PrepareHandPointers(RenderFrame frame)
+        {
+            var rays = HandRays;
+            if (VR == null || rays == null)
+                return;
+            if (LaserMaterial == null)
+            {
+                LaserMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.SolidTexture(GraphicsDevice, Color.White), false);
+                LaserHitMaterial = new Orts.Viewer3D.VR.VRTexturedMaterial(GraphicsDevice, Orts.Viewer3D.VR.VRPointer.SolidTexture(GraphicsDevice, Color.LightGreen), false);
+            }
+            for (var h = 0; h < rays.Length; h++)
+            {
+                if (rays[h] == null)
+                    continue;
+                var ray = rays[h].Value;
+                var onControl = h == PointerHand && HandHit != null;
+                var end = onControl ? HandHit.Value : ray.Position + ray.Direction * 1.5f;
+                var matrix = Matrix.Identity;
+                frame.AddPrimitive(onControl ? LaserHitMaterial : LaserMaterial, new Orts.Viewer3D.VR.VRLinePrimitive(ray.Position, end, 0.003f), RenderPrimitiveGroup.Interior, ref matrix);
+            }
+        }
+
         [CallOnThread("Updater")]
         void HandleUserInput(ElapsedTime elapsedTime)
         {
             var train = Program.Viewer.PlayerLocomotive.Train;//DebriefEval
 
-            if (UserInput.IsMouseLeftButtonDown || (Camera is ThreeDimCabCamera && RenderProcess.IsMouseVisible))
+            if (HandRay != null)
+            {
+                // A controller is pointing: its beam is the pick ray instead of the mouse's.
+                NearPoint = HandRay.Value.Position;
+                FarPoint = HandRay.Value.Position + HandRay.Value.Direction * 20;
+            }
+            else if (UserInput.IsMouseLeftButtonDown || (Camera is ThreeDimCabCamera && RenderProcess.IsMouseVisible))
             {
                 Vector3 nearsource = new Vector3((float)UserInput.MouseX, (float)UserInput.MouseY, 0f);
                 Vector3 farsource = new Vector3((float)UserInput.MouseX, (float)UserInput.MouseY, 1f);
@@ -1455,7 +1537,8 @@ namespace Orts.Viewer3D
                 ForceMouseVisible = false;
             }
 
-            if (UserInput.IsMouseLeftButtonPressed || RenderProcess.IsMouseVisible)
+            HandHit = null;
+            if (UserInput.IsMouseLeftButtonPressed || RenderProcess.IsMouseVisible || HandRay != null)
             {
                 var locoViewer = PlayerLocomotiveViewer as MSTSLocomotiveViewer;
 
@@ -1500,6 +1583,7 @@ namespace Orts.Viewer3D
                                 if (bestD > d)
                                 {
                                     bestD = d;
+                                    HandHit = xnaCenter;
                                     if (UserInput.IsMouseLeftButtonPressed)
                                         MouseChangingControl = mouseRenderer;
                                     else if (MouseChangingControl == null && RenderProcess.IsMouseVisible)
@@ -1514,6 +1598,9 @@ namespace Orts.Viewer3D
                     ActualCursor = Cursors.Default;
                 }
             }
+
+            if (UserInput.IsMouseLeftButtonPressed && MouseChangingControl != null && HandRay != null && VR != null)
+                VR.Vibrate(PointerHand, 0.03f);
 
             if (MousePickedControl != null & MousePickedControl != OldMousePickedControl)
                 Simulator.Confirmer.Message(ConfirmLevel.None, String.IsNullOrEmpty(MousePickedControl.ControlLabel) ? MousePickedControl.GetControlName() : MousePickedControl.ControlLabel);

@@ -611,6 +611,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orts.Menu\Orts.Menu.csproj" />
+    <ProjectReference Include="..\Menu\Menu.csproj" />
     <ProjectReference Include="..\Orts.Common\Orts.Common.csproj">
       <Project>{da94d876-7d35-46c3-aece-aface72c686c}</Project>
       <Name>Orts.Common</Name>

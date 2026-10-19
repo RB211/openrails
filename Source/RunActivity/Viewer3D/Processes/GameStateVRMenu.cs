@@ -19,482 +19,421 @@
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
-using Orts.Formats.Msts;
-using Orts.Viewer3D.Popups;
-using ORTS.Common;
-using ORTS.Menu;
+using Orts.Viewer3D.VR;
+using ORTS.Settings;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing.Imaging;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+using MenuForm = Menu.MainForm;
 
 namespace Orts.Viewer3D.Processes
 {
     /// <summary>
-    /// A start menu drawn inside the game itself, as a panel floating in front of the driver, so a run
-    /// can be chosen from a headset where the desktop menu cannot be seen. It also works flat.
+    /// The desktop start menu (the Menu program's main window, with all its drop-downs, buttons and
+    /// dialogs) hosted inside the game and shown as a panel floating in front of the driver, so a run
+    /// can be chosen from a headset where the desktop cannot be seen.
     ///
-    /// Route -> activity (or explore) -> path -> consist -> time, season and weather -> start. Keys:
-    /// up/down (and page up/down) move, Enter chooses, Backspace goes back, left/right change a value,
-    /// Escape leaves. The run then starts in this process exactly as the desktop menu would start it.
+    /// The window itself is real: it opens on the desktop as usual and is captured into a texture
+    /// thirty times a second, together with any pop-ups it has open (drop-down lists, the options
+    /// dialog). A controller points at the panel like a mouse: the trigger clicks, the thumbstick
+    /// scrolls, and the menu button recentres the view. Clicks are fed to the window as mouse input,
+    /// so the real mouse works on it too. Starting a run carries on in this process, with the command
+    /// line the menu would have given RunActivity.
     /// </summary>
     public class GameStateVRMenu : GameState
     {
-        enum Screen { Routes, Activities, Paths, Consists, Options }
+        // The panel in the seat frame: metres in front of and below the eyes, and its width.
+        const float PanelDistanceM = 1.6f;
+        const float PanelDropM = 0.10f;
+        const float PanelWidthM = 1.8f;
+        // Room below the window for drop-down lists that hang out of its bottom.
+        const int DropdownMarginPx = 240;
+        const float LaserWidthM = 0.004f;
+        const float CursorSizeM = 0.025f;
+        const int CaptureIntervalMs = 33;
 
-        // Panel in the seat frame: metres in front of and below the eyes, and its size.
-        const float PanelDistanceM = 1.7f;
-        const float PanelDropM = 0.08f;
-        const float PanelWidthM = 1.5f;
-        const int PanelWidthPx = 1400;
-        const int PanelHeightPx = 900;
-        const int VisibleRows = 18;
-
-        Screen CurrentScreen = Screen.Routes;
-        readonly int[] Selection = new int[5];
-        readonly int[] Scroll = new int[5];
-
-        // Content, filled on the loader thread.
-        readonly object ContentLock = new object();
-        List<KeyValuePair<Folder, Route>> Routes;
-        List<Activity> Activities;
-        List<Path> Paths;
-        List<Consist> Consists;
-        Route LoadedRoute;      // the route Activities and Paths belong to
-        Folder LoadedFolder;    // the folder Consists belong to
-        volatile string Status = "Reading the content folders...";
-        volatile bool Busy = true;
-        Screen? PendingLoad = Screen.Routes;
-
-        // Choices.
-        Activity ChosenActivity;
-        Path ChosenPath;
-        Consist ChosenConsist;
-        int StartHour = 10;
-        int StartMinute = 0;
-        SeasonType Season = SeasonType.Summer;
-        WeatherType Weather = WeatherType.Clear;
-        int OptionRow;
-        const int OptionRows = 5; // hour, minute, season, weather, start
-
-        // Drawing (render thread).
-        RenderTarget2D Panel;
-        SpriteBatch SpriteBatch;
-        WindowTextManager TextManager;
-        WindowTextFont TitleFont, ItemFont, SmallFont;
-        PanelPrimitive Primitive;
-        Matrix PanelMatrix = Matrix.Identity;
+        Thread FormThread;
+        volatile MenuForm Form;
+        readonly object Lock = new object();
+        string[] PendingArguments;
+        volatile bool FormClosed;
         bool Launched;
 
-        internal override void Load()
+        // Capturing the window(s), on the window's own thread.
+        System.Drawing.Size CaptureSize;
+        System.Drawing.Point CaptureOrigin;   // of the window's client area, in the (Windows) screen; moves with the window
+        System.Drawing.Bitmap CaptureBitmap;
+        byte[] Pixels;                        // BGRA, CaptureSize, guarded by Lock
+        int PixelsVersion;
+        int UploadedVersion;
+        System.Windows.Forms.Timer CaptureTimer;
+
+        // Drawing, on the render thread.
+        Texture2D PanelTexture;
+        VRQuadPrimitive PanelQuad;
+        VRTexturedMaterial PanelMaterial;
+        VRTexturedMaterial LaserMaterial, LaserHitMaterial, CursorMaterial;
+        VRQuadPrimitive CursorQuad;
+        Matrix PanelMatrix;
+        float PanelHeightM;
+
+        // Pointing, on the updater thread.
+        int PointerHand = VRSession.RightHand;
+        bool TriggerWasDown;
+        readonly bool[] MenuWasDown = new bool[VRSession.HandCount];
+        double NextWheelTime;
+        Vector2 LastPointerUV;
+
+        internal override void Update(RenderFrame frame, double totalRealSeconds)
         {
-            Screen? load;
-            lock (ContentLock)
+            if (FormThread == null)
+                StartFormThread();
+
+            string[] args;
+            lock (Lock)
             {
-                load = PendingLoad;
-                PendingLoad = null;
+                args = PendingArguments;
+                PendingArguments = null;
             }
-            if (load == null)
+            if (args != null)
+            {
+                Start(args);
                 return;
+            }
+            if (FormClosed && !Launched)
+            {
+                Game.Exit();
+                return;
+            }
+
+            if (UserInput.IsKeyPressed(Microsoft.Xna.Framework.Input.Keys.Escape))
+                CloseForm();
+
+            var display = Game.RenderProcess.DisplaySize;
+            var projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(50), (float)display.X / display.Y, 0.1f, 100);
+            frame.SetView(Matrix.Identity, projection);
+
+            var vr = Game.RenderProcess.VR;
+            if (vr != null)
+                PointWithHands(frame, vr, totalRealSeconds);
+
+            var panelQuad = PanelQuad;
+            if (panelQuad != null)
+                frame.AddPrimitive(PanelMaterial, panelQuad, RenderPrimitiveGroup.World, ref PanelMatrix);
+
+            base.Update(frame, totalRealSeconds);
+        }
+
+        #region Controllers
+        void PointWithHands(RenderFrame frame, VRSession vr, double time)
+        {
+            var hands = new VRHand[VRSession.HandCount];
+            for (var h = 0; h < hands.Length; h++)
+                hands[h] = vr.Hand(h);
+
+            // The hand that last pulled its trigger does the pointing; the other one just shows its beam.
+            for (var h = 0; h < hands.Length; h++)
+                if (hands[h].TriggerDown && !hands[PointerHand].TriggerDown)
+                    PointerHand = h;
+            for (var h = 0; h < hands.Length; h++)
+            {
+                if (hands[h].MenuButton && !MenuWasDown[h])
+                    vr.RequestRecenter();
+                MenuWasDown[h] = hands[h].MenuButton;
+            }
+
+            var panelCentre = new Vector3(0, -PanelDropM, -PanelDistanceM);
+            for (var h = 0; h < hands.Length; h++)
+            {
+                var hand = hands[h];
+                if (!hand.Tracked)
+                    continue;
+                // In the menu the seat frame is the world, so the hand's pose needs no conversion.
+                var ray = VRPointer.RayFrom(hand.Pose);
+                var hit = Vector3.Zero;
+                var uv = PanelQuad != null ? VRPointer.HitPanel(ray, panelCentre, PanelWidthM, PanelHeightM, out hit) : null;
+                var end = uv != null ? hit : ray.Position + ray.Direction * 2;
+                AddLaser(frame, ray.Position, end, uv != null && h == PointerHand);
+                if (h != PointerHand)
+                    continue;
+
+                if (uv != null)
+                {
+                    AddCursor(frame, hit);
+                    LastPointerUV = uv.Value;
+                    SendMouse(uv.Value, 0);
+                    if (Math.Abs(hand.Stick.Y) > 0.5f && time >= NextWheelTime)
+                    {
+                        SendMouse(uv.Value, Native.MouseWheel, hand.Stick.Y > 0 ? 120 : -120);
+                        NextWheelTime = time + 0.15;
+                    }
+                }
+                var down = hand.TriggerDown;
+                if (down && !TriggerWasDown && uv != null)
+                {
+                    SendMouse(uv.Value, Native.MouseLeftDown);
+                    vr.Vibrate(h, 0.03f);
+                }
+                else if (!down && TriggerWasDown)
+                    SendMouse(LastPointerUV, Native.MouseLeftUp);
+                TriggerWasDown = down;
+            }
+        }
+
+        void AddLaser(RenderFrame frame, Vector3 from, Vector3 to, bool onPanel)
+        {
+            var material = onPanel ? LaserHitMaterial : LaserMaterial;
+            if (material == null)
+                return;
+            var matrix = Matrix.Identity;
+            frame.AddPrimitive(material, new VRLinePrimitive(from, to, LaserWidthM), RenderPrimitiveGroup.World, ref matrix);
+        }
+
+        void AddCursor(RenderFrame frame, Vector3 hit)
+        {
+            if (CursorQuad == null)
+                return;
+            var matrix = Matrix.CreateTranslation(hit + new Vector3(0, 0, 0.003f));
+            frame.AddPrimitive(CursorMaterial, CursorQuad, RenderPrimitiveGroup.World, ref matrix);
+        }
+
+        /// <summary>Moves the (Windows) mouse to the point of the captured window the panel's (u, v) shows, with optional button or wheel flags.</summary>
+        void SendMouse(Vector2 uv, uint flags, int wheel = 0)
+        {
+            System.Drawing.Point origin;
+            lock (Lock)
+                origin = CaptureOrigin;
+            var x = origin.X + (int)(uv.X * CaptureSize.Width);
+            var y = origin.Y + (int)(uv.Y * CaptureSize.Height);
+            var screenX = Native.GetSystemMetrics(Native.SM_XVIRTUALSCREEN);
+            var screenY = Native.GetSystemMetrics(Native.SM_YVIRTUALSCREEN);
+            var screenWidth = Math.Max(1, Native.GetSystemMetrics(Native.SM_CXVIRTUALSCREEN));
+            var screenHeight = Math.Max(1, Native.GetSystemMetrics(Native.SM_CYVIRTUALSCREEN));
+            var input = new Native.INPUT
+            {
+                Type = Native.InputMouse,
+                Mouse = new Native.MOUSEINPUT
+                {
+                    X = (int)((x - screenX) * 65535L / screenWidth),
+                    Y = (int)((y - screenY) * 65535L / screenHeight),
+                    Data = (uint)wheel,
+                    Flags = Native.MouseMove | Native.MouseAbsolute | Native.MouseVirtualDesk | flags,
+                },
+            };
+            Native.SendInput(1, new[] { input }, Marshal.SizeOf(typeof(Native.INPUT)));
+        }
+        #endregion
+
+        #region The window
+        void StartFormThread()
+        {
+            FormThread = new Thread(RunForm) { Name = "Menu Window", IsBackground = true };
+            FormThread.SetApartmentState(ApartmentState.STA);
+            FormThread.Start();
+        }
+
+        void RunForm()
+        {
             try
             {
-                switch (load.Value)
+                using (var form = new MenuForm())
                 {
-                    case Screen.Routes:
-                        var routes = new List<KeyValuePair<Folder, Route>>();
-                        foreach (var folder in Folder.GetFolders(Game.Settings))
-                            foreach (var route in Route.GetRoutes(folder))
-                                routes.Add(new KeyValuePair<Folder, Route>(folder, route));
-                        routes.Sort((a, b) => String.Compare(a.Value.Name, b.Value.Name, StringComparison.CurrentCultureIgnoreCase));
-                        lock (ContentLock) Routes = routes;
-                        Status = routes.Count > 0 ? "" : "No routes found. Add a content folder in the desktop menu's Options first.";
-                        break;
-                    case Screen.Activities:
-                        {
-                            var folder = Routes[Selection[(int)Screen.Routes]].Key;
-                            var route = Routes[Selection[(int)Screen.Routes]].Value;
-                            // GetActivities puts the two explore entries first; keep them there and sort the rest by name.
-                            var all = Activity.GetActivities(folder, route);
-                            var activities = all.Where(a => a is ExploreActivity).ToList();
-                            activities.AddRange(all.Where(a => !(a is ExploreActivity)).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase));
-                            lock (ContentLock) { Activities = activities; LoadedRoute = route; Paths = null; }
-                            Status = "";
-                        }
-                        break;
-                    case Screen.Paths:
-                        {
-                            var route = Routes[Selection[(int)Screen.Routes]].Value;
-                            var paths = Path.GetPaths(route, false).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-                            lock (ContentLock) { Paths = paths; LoadedRoute = route; }
-                            Status = paths.Count > 0 ? "" : "This route has no player paths.";
-                        }
-                        break;
-                    case Screen.Consists:
-                        {
-                            var folder = Routes[Selection[(int)Screen.Routes]].Key;
-                            var consists = Consist.GetConsists(folder).OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-                            lock (ContentLock) { Consists = consists; LoadedFolder = folder; }
-                            Status = consists.Count > 0 ? "" : "No consists found in this folder.";
-                        }
-                        break;
+                    // The window may be resized by the desktop once shown (tiling window managers do); capture
+                    // the size it was designed with, plus room underneath for drop-down lists.
+                    CaptureSize = new System.Drawing.Size(form.ClientSize.Width, form.ClientSize.Height + DropdownMarginPx);
+                    form.Shown += (sender, e) => StartCapture(form);
+                    Form = form;
+                    var result = form.ShowDialog();
+                    StopCapture();
+                    if (result == DialogResult.OK)
+                    {
+                        var args = global::Menu.MenuLauncher.GetRunActivityArguments(form).ToArray();
+                        lock (Lock)
+                            PendingArguments = args;
+                    }
                 }
             }
             catch (Exception error)
             {
                 Trace.WriteLine(error);
-                Status = "Could not read the content: " + error.Message;
             }
-            Busy = false;
+            Form = null;
+            FormClosed = true;
         }
 
-        [CallOnThread("Updater")]
-        internal override void Update(RenderFrame frame, double totalRealSeconds)
+        void CloseForm()
         {
-            if (!Launched && !Busy)
-                HandleInput();
-
-            // The driver sits at the origin looking along -Z; the panel floats ahead.
-            var display = Game.RenderProcess.DisplaySize;
-            var projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(50), (float)display.X / display.Y, 0.1f, 100f);
-            frame.SetView(Matrix.Identity, projection);
-            if (Primitive != null)
-                frame.AddPrimitive(Primitive.Material, Primitive, RenderPrimitiveGroup.World, ref PanelMatrix);
-
-            base.Update(frame, totalRealSeconds);
+            var form = Form;
+            if (form != null && !form.IsDisposed)
+                form.BeginInvoke((Action)(() => { if (!form.IsDisposed) form.Close(); }));
         }
 
-        void RequestLoad(Screen screen)
+        void StartCapture(MenuForm form)
         {
-            Busy = true;
-            Status = "Reading...";
-            lock (ContentLock) PendingLoad = screen;
+            CaptureBitmap = new System.Drawing.Bitmap(CaptureSize.Width, CaptureSize.Height, PixelFormat.Format32bppArgb);
+            lock (Lock)
+                Pixels = new byte[CaptureSize.Width * CaptureSize.Height * 4];
+            CaptureTimer = new System.Windows.Forms.Timer { Interval = CaptureIntervalMs };
+            CaptureTimer.Tick += (sender, e) => Capture(form);
+            CaptureTimer.Start();
+            Trace.TraceInformation("Menu: showing the menu window as a panel ({0}x{1})", CaptureSize.Width, CaptureSize.Height);
         }
 
-        int CurrentCount()
+        void StopCapture()
         {
-            lock (ContentLock)
+            if (CaptureTimer != null)
             {
-                switch (CurrentScreen)
+                CaptureTimer.Stop();
+                CaptureTimer.Dispose();
+                CaptureTimer = null;
+            }
+        }
+
+        /// <summary>
+        /// Copies the window's client area and, on top of it, every other visible window of this thread
+        /// (drop-down lists, dialogs, message boxes) into the capture, by their positions on screen.
+        /// </summary>
+        void Capture(MenuForm form)
+        {
+            if (form.IsDisposed || !form.Visible)
+                return;
+            var origin = form.PointToScreen(System.Drawing.Point.Empty);
+            var windows = new List<IntPtr>();
+            Native.EnumThreadWindows(Native.GetCurrentThreadId(), (hwnd, lParam) =>
+            {
+                if (Native.IsWindowVisible(hwnd))
+                    windows.Add(hwnd);
+                return true;
+            }, IntPtr.Zero);
+
+            using (var graphics = System.Drawing.Graphics.FromImage(CaptureBitmap))
+            {
+                graphics.Clear(System.Drawing.SystemColors.Control);
+                var destination = graphics.GetHdc();
+                try
                 {
-                    case Screen.Routes: return Routes != null ? Routes.Count : 0;
-                    case Screen.Activities: return Activities != null ? Activities.Count : 0;
-                    case Screen.Paths: return Paths != null ? Paths.Count : 0;
-                    case Screen.Consists: return Consists != null ? Consists.Count : 0;
-                    default: return OptionRows;
+                    // Enumeration is top-most first; paint bottom-up so pop-ups land on top of the main window.
+                    for (var i = windows.Count - 1; i >= 0; i--)
+                    {
+                        var hwnd = windows[i];
+                        Native.RECT client;
+                        if (!Native.GetClientRect(hwnd, out client))
+                            continue;
+                        var topLeft = new Native.POINT();
+                        Native.ClientToScreen(hwnd, ref topLeft);
+                        var x = topLeft.X - origin.X;
+                        var y = topLeft.Y - origin.Y;
+                        var width = Math.Min(client.Right - client.Left, CaptureSize.Width - x);
+                        var height = Math.Min(client.Bottom - client.Top, CaptureSize.Height - y);
+                        if (width <= 0 || height <= 0)
+                            continue;
+                        var source = Native.GetDC(hwnd);
+                        if (source == IntPtr.Zero)
+                            continue;
+                        Native.BitBlt(destination, x, y, width, height, source, 0, 0, Native.SrcCopy);
+                        Native.ReleaseDC(hwnd, source);
+                    }
+                }
+                finally
+                {
+                    graphics.ReleaseHdc(destination);
                 }
             }
-        }
 
-        void HandleInput()
-        {
-            var screen = (int)CurrentScreen;
-            var count = CurrentCount();
-            var step = 0;
-            if (UserInput.IsKeyPressed(Keys.Down)) step = 1;
-            if (UserInput.IsKeyPressed(Keys.Up)) step = -1;
-            if (UserInput.IsKeyPressed(Keys.PageDown)) step = VisibleRows - 1;
-            if (UserInput.IsKeyPressed(Keys.PageUp)) step = -(VisibleRows - 1);
-            if (UserInput.IsKeyPressed(Keys.Home)) Selection[screen] = 0;
-            if (UserInput.IsKeyPressed(Keys.End)) Selection[screen] = Math.Max(0, count - 1);
-            if (step != 0 && count > 0)
-                Selection[screen] = MathHelper.Clamp(Selection[screen] + step, 0, count - 1);
-            if (CurrentScreen == Screen.Options)
-                OptionRow = Selection[screen];
-
-            if (CurrentScreen == Screen.Options)
+            var data = CaptureBitmap.LockBits(new System.Drawing.Rectangle(0, 0, CaptureSize.Width, CaptureSize.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
             {
-                var delta = UserInput.IsKeyPressed(Keys.Right) ? 1 : UserInput.IsKeyPressed(Keys.Left) ? -1 : 0;
-                if (delta != 0)
+                lock (Lock)
                 {
-                    switch (OptionRow)
-                    {
-                        case 0: StartHour = (StartHour + delta + 24) % 24; break;
-                        case 1: StartMinute = (StartMinute + delta * 15 + 60) % 60; break;
-                        case 2: Season = (SeasonType)(((int)Season + delta + 4) % 4); break;
-                        case 3: Weather = (WeatherType)(((int)Weather + delta + 3) % 3); break;
-                    }
+                    var rowBytes = CaptureSize.Width * 4;
+                    for (var row = 0; row < CaptureSize.Height; row++)
+                        Marshal.Copy(data.Scan0 + row * data.Stride, Pixels, row * rowBytes, rowBytes);
+                    CaptureOrigin = origin;
+                    PixelsVersion++;
                 }
             }
-
-            if (UserInput.IsKeyPressed(Keys.Enter) && count > 0)
-                Choose();
-            if (UserInput.IsKeyPressed(Keys.Back))
-                Back();
-            if (UserInput.IsKeyPressed(Keys.Escape))
-                Game.Exit();
-        }
-
-        void Choose()
-        {
-            switch (CurrentScreen)
+            finally
             {
-                case Screen.Routes:
-                    CurrentScreen = Screen.Activities;
-                    Selection[(int)Screen.Activities] = Scroll[(int)Screen.Activities] = 0;
-                    RequestLoad(Screen.Activities);
-                    break;
-                case Screen.Activities:
-                    ChosenActivity = Activities[Selection[(int)Screen.Activities]];
-                    if (ChosenActivity is ExploreActivity)
-                    {
-                        CurrentScreen = Screen.Paths;
-                        Selection[(int)Screen.Paths] = Scroll[(int)Screen.Paths] = 0;
-                        RequestLoad(Screen.Paths);
-                    }
-                    else
-                        Start();
-                    break;
-                case Screen.Paths:
-                    ChosenPath = Paths[Selection[(int)Screen.Paths]];
-                    CurrentScreen = Screen.Consists;
-                    if (Consists == null || LoadedFolder != Routes[Selection[(int)Screen.Routes]].Key)
-                    {
-                        Selection[(int)Screen.Consists] = Scroll[(int)Screen.Consists] = 0;
-                        RequestLoad(Screen.Consists);
-                    }
-                    break;
-                case Screen.Consists:
-                    ChosenConsist = Consists[Selection[(int)Screen.Consists]];
-                    CurrentScreen = Screen.Options;
-                    Selection[(int)Screen.Options] = OptionRow = OptionRows - 1; // land on Start
-                    break;
-                case Screen.Options:
-                    if (OptionRow == OptionRows - 1)
-                        Start();
-                    break;
+                CaptureBitmap.UnlockBits(data);
             }
         }
+        #endregion
 
-        void Back()
-        {
-            switch (CurrentScreen)
-            {
-                case Screen.Activities: CurrentScreen = Screen.Routes; break;
-                case Screen.Paths: CurrentScreen = Screen.Activities; break;
-                case Screen.Consists: CurrentScreen = Screen.Paths; break;
-                case Screen.Options: CurrentScreen = Screen.Consists; break;
-            }
-        }
-
-        /// <summary>Starts the chosen run in this process, with the same command line the desktop menu would build.</summary>
-        void Start()
-        {
-            var startTime = String.Format("{0}:{1:00}", StartHour, StartMinute);
-            string[] args;
-            if (ChosenActivity is DefaultExploreActivity)
-                args = new[] { "-start", "-explorer", ChosenPath.FilePath, ChosenConsist.FilePath, startTime, ((int)Season).ToString(), ((int)Weather).ToString() };
-            else if (ChosenActivity is ExploreThroughActivity)
-                args = new[] { "-start", "-exploreactivity", ChosenPath.FilePath, ChosenConsist.FilePath, startTime, ((int)Season).ToString(), ((int)Weather).ToString() };
-            else
-                args = new[] { "-start", "-activity", ChosenActivity.FilePath };
-            Launched = true;
-            Status = "Starting...";
-            Trace.TraceInformation("Menu: starting RunActivity {0}", String.Join(" ", args.Select(a => a.Contains(" ") ? "\"" + a + "\"" : a)));
-            Game.ReplaceState(new GameStateRunActivity(args));
-        }
-
-        [CallOnThread("Render")]
         internal override void BeginRender(RenderFrame frame)
         {
             var graphicsDevice = Game.RenderProcess.GraphicsDevice;
-            if (Panel == null)
+            lock (Lock)
             {
-                Panel = new RenderTarget2D(graphicsDevice, PanelWidthPx, PanelHeightPx, false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-                SpriteBatch = new SpriteBatch(graphicsDevice);
-                TextManager = new WindowTextManager();
-                TitleFont = TextManager.GetExact("Arial", 30, System.Drawing.FontStyle.Bold);
-                ItemFont = TextManager.GetExact("Arial", 24, System.Drawing.FontStyle.Regular);
-                SmallFont = TextManager.GetExact("Arial", 18, System.Drawing.FontStyle.Regular);
-                var height = PanelWidthM * PanelHeightPx / PanelWidthPx;
-                Primitive = new PanelPrimitive(graphicsDevice, Panel, PanelWidthM, height, new Vector3(0, -PanelDropM, -PanelDistanceM));
+                if (Pixels != null && PixelsVersion != UploadedVersion)
+                {
+                    if (PanelTexture == null)
+                    {
+                        PanelTexture = new Texture2D(graphicsDevice, CaptureSize.Width, CaptureSize.Height, false, SurfaceFormat.Bgra32);
+                        PanelHeightM = PanelWidthM * CaptureSize.Height / CaptureSize.Width;
+                        PanelMaterial = new VRTexturedMaterial(graphicsDevice, PanelTexture, false);
+                        PanelMatrix = Matrix.CreateTranslation(0, -PanelDropM, -PanelDistanceM);
+                        PanelQuad = new VRQuadPrimitive(graphicsDevice, PanelWidthM, PanelHeightM);
+                    }
+                    PanelTexture.SetData(Pixels);
+                    UploadedVersion = PixelsVersion;
+                }
             }
-            DrawPanel(graphicsDevice);
+            if (LaserMaterial == null)
+            {
+                LaserMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, Color.White), false);
+                LaserHitMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, Color.LightGreen), false);
+                CursorMaterial = new VRTexturedMaterial(graphicsDevice, VRPointer.SolidTexture(graphicsDevice, Color.Red), false);
+                CursorQuad = new VRQuadPrimitive(graphicsDevice, CursorSizeM, CursorSizeM);
+            }
             base.BeginRender(frame);
         }
 
-        void DrawPanel(GraphicsDevice graphicsDevice)
+        void Start(string[] args)
         {
-            TextManager.Load(graphicsDevice); // uploads the glyphs measured and drawn last frame
-            graphicsDevice.SetRenderTarget(Panel);
-            graphicsDevice.Clear(new Color(18, 22, 30, 235));
-            SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied);
-
-            var margin = 40;
-            var y = margin;
-            string title, hint;
-            var rows = new List<string>();
-            var screen = (int)CurrentScreen;
-            lock (ContentLock)
-            {
-                switch (CurrentScreen)
-                {
-                    case Screen.Routes:
-                        title = "Open Rails - choose a route";
-                        if (Routes != null) rows.AddRange(Routes.Select(r => r.Value.Name + "   (" + r.Key.Name + ")"));
-                        hint = "Up/Down and Enter choose, Escape quits";
-                        break;
-                    case Screen.Activities:
-                        title = (LoadedRoute != null ? LoadedRoute.Name : "") + " - choose an activity";
-                        if (Activities != null)
-                            rows.AddRange(Activities.Select(a => a is DefaultExploreActivity ? "Explore the route" : a is ExploreThroughActivity ? "Explore in activity mode" : a.Name));
-                        hint = "Enter chooses, Backspace goes back";
-                        break;
-                    case Screen.Paths:
-                        title = (LoadedRoute != null ? LoadedRoute.Name : "") + " - choose a path";
-                        if (Paths != null) rows.AddRange(Paths.Select(p => p.Name));
-                        hint = "Enter chooses, Backspace goes back";
-                        break;
-                    case Screen.Consists:
-                        title = "Choose a consist";
-                        if (Consists != null) rows.AddRange(Consists.Select(c => c.Name + "   (" + c.Locomotive.Name + ")"));
-                        hint = "Enter chooses, Backspace goes back";
-                        break;
-                    default:
-                        title = "Ready to start";
-                        rows.Add("Start hour      " + StartHour.ToString("00"));
-                        rows.Add("Start minute    " + StartMinute.ToString("00"));
-                        rows.Add("Season        " + Season);
-                        rows.Add("Weather       " + Weather);
-                        rows.Add("Start  >  " + (ChosenPath != null ? ChosenPath.Name : "") + "  with  " + (ChosenConsist != null ? ChosenConsist.Name : ""));
-                        hint = "Left/Right change a value, Enter on Start begins the run, Backspace goes back";
-                        break;
-                }
-            }
-
-            TitleFont.Draw(SpriteBatch, new Point(margin, y), title, Color.White);
-            y += TitleFont.Height + 16;
-
-            // Keep the selection visible.
-            var selected = Selection[screen];
-            if (selected < Scroll[screen]) Scroll[screen] = selected;
-            if (selected >= Scroll[screen] + VisibleRows) Scroll[screen] = selected - VisibleRows + 1;
-            var rowHeight = ItemFont.Height + 6;
-            for (var i = Scroll[screen]; i < rows.Count && i < Scroll[screen] + VisibleRows; i++)
-            {
-                var text = rows[i];
-                var maxWidth = PanelWidthPx - 2 * margin - 30;
-                while (text.Length > 4 && ItemFont.MeasureString(text) > maxWidth)
-                    text = text.Substring(0, text.Length - 4) + "...";
-                if (i == selected)
-                {
-                    SpriteBatch.Draw(Panel == null ? null : WhitePixel(graphicsDevice), new Rectangle(margin - 10, y - 2, PanelWidthPx - 2 * margin + 20, rowHeight), new Color(70, 110, 170, 255));
-                    ItemFont.Draw(SpriteBatch, new Point(margin, y), "> " + text, Color.White);
-                }
-                else
-                    ItemFont.Draw(SpriteBatch, new Point(margin + 28, y), text, new Color(210, 215, 225));
-                y += rowHeight;
-            }
-            if (rows.Count > VisibleRows)
-                SmallFont.Draw(SpriteBatch, new Point(margin, y + 4), String.Format("{0} of {1}", selected + 1, rows.Count), new Color(160, 165, 175));
-
-            var status = Status;
-            if (!String.IsNullOrEmpty(status))
-                SmallFont.Draw(SpriteBatch, new Point(margin, PanelHeightPx - margin - SmallFont.Height * 2 - 8), status, new Color(255, 210, 120));
-            SmallFont.Draw(SpriteBatch, new Point(margin, PanelHeightPx - margin - SmallFont.Height), hint, new Color(160, 165, 175));
-
-            SpriteBatch.End();
-            graphicsDevice.SetRenderTarget(null);
-        }
-
-        static Texture2D whitePixel;
-        static Texture2D WhitePixel(GraphicsDevice graphicsDevice)
-        {
-            if (whitePixel == null)
-            {
-                whitePixel = new Texture2D(graphicsDevice, 1, 1);
-                whitePixel.SetData(new[] { Color.White });
-            }
-            return whitePixel;
+            Launched = true;
+            Trace.TraceInformation("Menu: starting RunActivity {0}", global::Menu.MenuLauncher.JoinArguments(args));
+            // The menu may have changed the options (its own Options dialog); the run must see them as saved.
+            var options = Environment.GetCommandLineArgs().Skip(1).Where(a => a.StartsWith("-") || a.StartsWith("/")).Select(a => a.Substring(1));
+            Game.ReplaceSettings(new UserSettings(options));
+            Game.ReplaceState(new GameStateRunActivity(args));
         }
 
         internal override void Dispose()
         {
-            // The render targets and fonts are small; the run that follows keeps using the device, so leave them to the GC.
+            CloseForm();
             base.Dispose();
         }
 
-        /// <summary>A textured rectangle at a fixed place in the seat frame, showing the menu panel.</summary>
-        class PanelPrimitive : RenderPrimitive
+        static class Native
         {
-            public readonly PanelMaterial Material;
-            readonly VertexBuffer VertexBuffer;
+            public delegate bool EnumThreadDelegate(IntPtr hwnd, IntPtr lParam);
 
-            public PanelPrimitive(GraphicsDevice graphicsDevice, Texture2D texture, float width, float height, Vector3 centre)
-            {
-                Material = new PanelMaterial(graphicsDevice, texture);
-                var w = width / 2;
-                var h = height / 2;
-                var vertices = new[] {
-                    new VertexPositionTexture(centre + new Vector3(-w, +h, 0), new Vector2(0, 0)),
-                    new VertexPositionTexture(centre + new Vector3(+w, +h, 0), new Vector2(1, 0)),
-                    new VertexPositionTexture(centre + new Vector3(-w, -h, 0), new Vector2(0, 1)),
-                    new VertexPositionTexture(centre + new Vector3(+w, -h, 0), new Vector2(1, 1)),
-                };
-                VertexBuffer = new VertexBuffer(graphicsDevice, typeof(VertexPositionTexture), vertices.Length, BufferUsage.WriteOnly);
-                VertexBuffer.SetData(vertices);
-            }
+            [DllImport("user32.dll")] public static extern bool EnumThreadWindows(uint threadId, EnumThreadDelegate callback, IntPtr lParam);
+            [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+            [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
+            [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr hwnd, ref POINT point);
+            [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hwnd);
+            [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+            [DllImport("user32.dll")] public static extern uint SendInput(uint count, [In] INPUT[] inputs, int size);
+            [DllImport("user32.dll")] public static extern int GetSystemMetrics(int index);
+            [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height, IntPtr source, int sourceX, int sourceY, uint rop);
+            [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
 
-            public override void Draw(GraphicsDevice graphicsDevice)
-            {
-                graphicsDevice.SetVertexBuffer(VertexBuffer);
-                graphicsDevice.DrawPrimitives(PrimitiveType.TriangleStrip, 0, 2);
-            }
-        }
+            [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+            [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+            [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT { public int X, Y; public uint Data, Flags, Time; public IntPtr ExtraInfo; }
+            // 40 bytes on x64: SendInput rejects any other size.
+            [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint Type; public MOUSEINPUT Mouse; }
 
-        class PanelMaterial : Material
-        {
-            readonly PanelShader Shader;
-            readonly Texture2D Texture;
-
-            public PanelMaterial(GraphicsDevice graphicsDevice, Texture2D texture)
-                : base(null, null)
-            {
-                Shader = new PanelShader(graphicsDevice);
-                Texture = texture;
-            }
-
-            public override void SetState(GraphicsDevice graphicsDevice, Material previousMaterial)
-            {
-                Shader.CurrentTechnique = Shader.Techniques["Loading"];
-                Shader.Texture = Texture;
-                graphicsDevice.BlendState = BlendState.NonPremultiplied;
-                graphicsDevice.RasterizerState = RasterizerState.CullNone;
-                graphicsDevice.DepthStencilState = DepthStencilState.Default;
-            }
-
-            public override void Render(GraphicsDevice graphicsDevice, IEnumerable<RenderItem> renderItems, ref Matrix XNAViewMatrix, ref Matrix XNAProjectionMatrix)
-            {
-                foreach (var item in renderItems)
-                {
-                    Shader.WorldViewProjection = item.XNAMatrix * XNAViewMatrix * XNAProjectionMatrix;
-                    Shader.CurrentTechnique.Passes[0].Apply();
-                    item.RenderPrimitive.Draw(graphicsDevice);
-                }
-            }
-
-            public override void ResetState(GraphicsDevice graphicsDevice)
-            {
-                graphicsDevice.BlendState = BlendState.Opaque;
-                graphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
-            }
-        }
-
-        /// <summary>The loading screen's shader: a texture through a world-view-projection, which is all a panel needs.</summary>
-        class PanelShader : Shader
-        {
-            readonly EffectParameter worldViewProjection;
-            readonly EffectParameter loadingTexture;
-
-            public Matrix WorldViewProjection { set { worldViewProjection.SetValue(value); } }
-            public Texture2D Texture { set { loadingTexture.SetValue(value); } }
-
-            public PanelShader(GraphicsDevice graphicsDevice)
-                : base(graphicsDevice, "Loading")
-            {
-                worldViewProjection = Parameters["WorldViewProjection"];
-                loadingTexture = Parameters["LoadingTexture"];
-            }
+            public const uint InputMouse = 0;
+            public const uint MouseMove = 0x0001, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseWheel = 0x0800, MouseVirtualDesk = 0x4000, MouseAbsolute = 0x8000;
+            public const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77, SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+            public const uint SrcCopy = 0x00CC0020;
         }
     }
 }
