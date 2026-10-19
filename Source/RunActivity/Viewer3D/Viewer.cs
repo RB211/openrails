@@ -981,7 +981,7 @@ namespace Orts.Viewer3D
                     vr.RequestRecenter();
                 HandMenuWasDown[h] = hands[h].MenuButton;
                 if (hands[h].Enabled && hands[h].SecondaryButton && !HandSecondaryWasDown[h])
-                    RenderProcess.VROverlayVisible = !RenderProcess.VROverlayVisible;
+                    ToggleVROverlay();
                 HandSecondaryWasDown[h] = hands[h].SecondaryButton;
             }
             var seatView = Camera.XnaSeatView;
@@ -1003,6 +1003,15 @@ namespace Orts.Viewer3D
             var up = Microsoft.Xna.Framework.Input.ButtonState.Released;
             var trigger = hands[PointerHand].TriggerDown ? Microsoft.Xna.Framework.Input.ButtonState.Pressed : up;
             return new MouseState((int)screen.X, (int)screen.Y, lastMouse.ScrollWheelValue, trigger, up, up, up, up);
+        }
+
+        /// <summary>The overlay panel in the headset; when it comes up with no window open, the HUD opens on it so there is something to see.</summary>
+        void ToggleVROverlay()
+        {
+            RenderProcess.VROverlayVisible = !RenderProcess.VROverlayVisible;
+            if (RenderProcess.VROverlayVisible && HUDWindow != null && !HUDWindow.Visible && !WindowManager.VisibleWindows.Any(w => !(w is Popups.LayeredWindow)))
+                HUDWindow.Visible = true;
+            Trace.TraceInformation("VR: overlay panel {0}", RenderProcess.VROverlayVisible ? "shown" : "hidden");
         }
 
         /// <summary>Draws each tracked controller's beam, green from the pointing hand when it is on a cab control.</summary>
@@ -1175,7 +1184,7 @@ namespace Orts.Viewer3D
 
             if (UserInput.IsPressed(UserCommand.DisplayNextStationWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) NextStationWindow.TabAction(); else NextStationWindow.Visible = !NextStationWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DisplayCompassWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) CompassWindow.TabAction(); else CompassWindow.Visible = !CompassWindow.Visible;
-            if (UserInput.IsPressed(UserCommand.GameVROverlay)) RenderProcess.VROverlayVisible = !RenderProcess.VROverlayVisible;
+            if (UserInput.IsPressed(UserCommand.GameVROverlay)) ToggleVROverlay();
             if (UserInput.IsPressed(UserCommand.DisplayTrainForcesWindow)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) TrainForcesWindow.TabAction(); else TrainForcesWindow.Visible = !TrainForcesWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DebugTracks)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) TracksDebugWindow.TabAction(); else TracksDebugWindow.Visible = !TracksDebugWindow.Visible;
             if (UserInput.IsPressed(UserCommand.DebugSignalling)) if (UserInput.IsDown(UserCommand.DisplayNextWindowTab)) SignallingDebugWindow.TabAction(); else SignallingDebugWindow.Visible = !SignallingDebugWindow.Visible;

@@ -422,7 +422,7 @@ namespace Orts.Viewer3D
         static Orts.Viewer3D.VR.VRQuadPrimitive OverlayPanelQuad;
         static readonly Vector3 OverlayPanelCentre = new Vector3(0, -0.32f, -1.0f);
         const float OverlayPanelWidthM = 1.3f;
-        const float OverlayPanelTiltDeg = 25f;
+        const float OverlayPanelTiltDeg = -25f; // top toward the driver: the panel sits below eye level
 
         public RenderFrame(Game game)
         {
